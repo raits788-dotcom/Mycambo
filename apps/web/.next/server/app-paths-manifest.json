@@ -1,0 +1,7 @@
+{
+  "/page": "app/page.js",
+  "/_not-found/page": "app/_not-found/page.js",
+  "/rubrique/[type]/page": "app/rubrique/[type]/page.js",
+  "/espace-partenaire/connexion/page": "app/espace-partenaire/connexion/page.js",
+  "/partenaire/page": "app/partenaire/page.js"
+}

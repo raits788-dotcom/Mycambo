@@ -1,36 +1,60 @@
-This is a [Next.js](https://nextjs.org/) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+# 🇰🇭 My Cambo
 
-## Getting Started
+Plateforme numérique dédiée au Cambodge : annuaire commercial, culture,
+vie locale, annonces et emploi.
 
-First, run the development server:
+## 🏗️ Architecture
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
+Monorepo Turborepo + pnpm workspaces :
+
+\`\`\`
+my-cambo/
+├── apps/
+│   ├── web/       Site public + espace partenaire
+│   └── admin/     Console SuperAdmin
+├── packages/
+│   ├── ui/        Design system partagé
+│   ├── database/  Client Supabase + types
+│   ├── auth/      Auth + impersonation
+│   ├── config/    TS, ESLint, Tailwind partagés
+│   └── utils/     Helpers (cn, formatDate, etc.)
+└── supabase/
+    └── migrations/  Schéma SQL
+\`\`\`
+
+## 🚀 Démarrage
+
+\`\`\`bash
+# Installer les dépendances
+pnpm install
+
+# Lancer toutes les apps en mode dev
 pnpm dev
-# or
-bun run dev
-```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+# Lancer seulement le site web
+pnpm --filter web dev
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+# Lancer seulement la console admin
+pnpm --filter admin dev
 
-This project uses [`next/font`](https://nextjs.org/docs/basic-features/font-optimization) to automatically optimize and load Inter, a custom Google Font.
+# Build pour production
+pnpm build
+\`\`\`
 
-## Learn More
+## 🎨 Charte graphique
 
-To learn more about Next.js, take a look at the following resources:
+- **Marine** : `#1B3A6B`
+- **Rouge khmer** : `#E63329`
+- **Typo** : Inter
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## 📦 Stack technique
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js/) - your feedback and contributions are welcome!
+- Next.js 15 + React 19 + TypeScript
+- Tailwind CSS
+- Supabase (PostgreSQL + Auth + Storage)
+- Turborepo + pnpm
+- Déploiement : Cloudflare Pages
 
-## Deploy on Vercel
+## 📄 Licence
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/deployment) for more details.
+Propriétaire — Tous droits réservés.
