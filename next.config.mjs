@@ -1,0 +1,63 @@
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  images: {
+    remotePatterns: [
+      { protocol: 'https', hostname: 'images.unsplash.com' },
+      { protocol: 'https', hostname: 'destyidomswayahciskk.supabase.co' },
+    ],
+  },
+  async headers() {
+    return [
+      {
+        source: '/(.*)',
+        headers: [
+          {
+            key: 'Strict-Transport-Security',
+            value: 'max-age=63072000; includeSubDomains; preload',
+          },
+          { key: 'X-Content-Type-Options', value: 'nosniff' },
+          { key: 'X-Frame-Options', value: 'DENY' },
+          { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+        ],
+      },
+    ];
+  },
+  async redirects() {
+    return [
+      // ===== Redirections ancien → nouveau =====
+      {
+        source: '/devenir-partenaire',
+        destination: '/partenaire',
+        permanent: true,
+      },
+      {
+        source: '/devenir-partenaire/:path*',
+        destination: '/partenaire/:path*',
+        permanent: true,
+      },
+
+      // ===== Anciennes rubriques =====
+      { source: '/hotels', destination: '/rubrique/hotel', permanent: true },
+      {
+        source: '/restaurants',
+        destination: '/rubrique/restaurant',
+        permanent: true,
+      },
+      {
+        source: '/associations',
+        destination: '/rubrique/association',
+        permanent: true,
+      },
+
+      // ===== Anciennes pages =====
+      { source: '/vente', destination: '/annonces', permanent: true },
+      {
+        source: '/vente/:path*',
+        destination: '/annonces/:path*',
+        permanent: true,
+      },
+    ];
+  },
+};
+
+export default nextConfig;

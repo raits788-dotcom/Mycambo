@@ -1,0 +1,85 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-inter: 'Inter';
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  @apply bg-white text-ink font-sans antialiased;
+}
+
+::selection {
+  @apply bg-marine text-white;
+}
+
+/* ===== Lien avec soulignement animé ===== */
+.link-underline {
+  @apply relative inline-block;
+}
+.link-underline::after {
+  content: '';
+  @apply absolute left-0 bottom-0 h-px w-0 bg-marine transition-all duration-300;
+}
+.link-underline:hover::after {
+  @apply w-full;
+}
+
+/* ===== Focus visible pour accessibilité ===== */
+:focus-visible {
+  @apply outline-2 outline-offset-2 outline-marine;
+}
+
+/* ===== Scrollbar discrète ===== */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  @apply bg-gris-fond;
+}
+::-webkit-scrollbar-thumb {
+  @apply bg-gris-ligne rounded-full;
+}
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-gris-doux;
+}
+/* Cache la scrollbar des carrousels horizontaux */
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+/* ===== Padding latéral responsive pour pleine largeur ===== */
+.px-section {
+  padding-left: 1rem;    /* 16px mobile */
+  padding-right: 1rem;
+}
+
+@media (min-width: 768px) {
+  .px-section {
+    padding-left: 2rem;   /* 32px tablette */
+    padding-right: 2rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .px-section {
+    padding-left: 3rem;   /* 48px desktop */
+    padding-right: 3rem;
+  }
+}
+
+@media (min-width: 1536px) {
+  .px-section {
+    padding-left: 5rem;   /* 80px grand écran */
+    padding-right: 5rem;
+  }
+}
