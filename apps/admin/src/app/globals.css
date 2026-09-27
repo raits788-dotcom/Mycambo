@@ -1,0 +1,37 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-inter: 'Inter';
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  @apply bg-gris-fond text-ink font-sans antialiased;
+}
+
+::selection {
+  @apply bg-marine text-white;
+}
+
+:focus-visible {
+  @apply outline-2 outline-offset-2 outline-marine;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  @apply bg-gris-fond;
+}
+::-webkit-scrollbar-thumb {
+  @apply bg-gris-ligne rounded-full;
+}
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-gris-doux;
+}
