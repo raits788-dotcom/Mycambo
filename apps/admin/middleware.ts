@@ -3,6 +3,7 @@ import { updateSession } from '@my-cambo/database/middleware';
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  console.log('[MIDDLEWARE]', pathname);
 
   // 1. Rafraîchir la session Supabase
   const response = await updateSession(request);
