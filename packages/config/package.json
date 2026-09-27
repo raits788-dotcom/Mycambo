@@ -1,0 +1,21 @@
+{
+  "name": "@my-cambo/config",
+  "version": "0.0.0",
+  "private": true,
+  "main": "index.js",
+  "types": "index.d.ts",
+  "files": [
+    "tailwind.config.ts",
+    "tsconfig.json",
+    "eslint.config.js"
+  ],
+  "exports": {
+    "./tailwind": "./tailwind.config.ts",
+    "./tsconfig": "./tsconfig.json",
+    "./eslint": "./eslint.config.js"
+  },
+  "devDependencies": {
+    "tailwindcss": "3.4.6",
+    "typescript": "5.5.3"
+  }
+}
