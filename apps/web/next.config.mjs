@@ -1,4 +1,5 @@
 /** @type {import('next').NextConfig} */
+import { withCloudflare } from '@opennextjs/cloudflare';
 const nextConfig = {
   images: {
     remotePatterns: [
@@ -60,4 +61,4 @@ const nextConfig = {
   },
 };
 
-export default nextConfig;
+export default withCloudflare(nextConfig);
