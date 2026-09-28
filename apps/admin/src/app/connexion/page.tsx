@@ -1,10 +1,11 @@
 'use client';
 
+import { Suspense } from 'react';
 import { useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Shield, Loader2 } from 'lucide-react';
 
-export default function AdminLoginPage() {
+function AdminLoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirectTo = searchParams.get('redirect') || '/dashboard';
@@ -19,7 +20,6 @@ export default function AdminLoginPage() {
     setError('');
     setLoading(true);
 
-    // ⚠️ Auth temporaire (mock) — sera remplacé par Supabase
     await new Promise((r) => setTimeout(r, 500));
 
     if (email === 'admin@mycambo.app' && password === 'admin1234') {
@@ -34,24 +34,15 @@ export default function AdminLoginPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gris-fond px-4">
       <div className="w-full max-w-md">
-        {/* Logo + titre */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-red-600 text-white mb-4">
             <Shield size={28} />
           </div>
-          <h1 className="text-2xl font-extrabold text-marine">
-            myCAMBO · Console
-          </h1>
-          <p className="text-sm text-gris-texte mt-1">
-            Accès réservé au personnel autorisé
-          </p>
+          <h1 className="text-2xl font-extrabold text-marine">myCAMBO · Console</h1>
+          <p className="text-sm text-gris-texte mt-1">Accès réservé au personnel autorisé</p>
         </div>
 
-        {/* Formulaire */}
-        <form
-          onSubmit={handleSubmit}
-          className="bg-white rounded-xl border border-gris-ligne p-6 shadow-cb-sm"
-        >
+        <form onSubmit={handleSubmit} className="bg-white rounded-xl border border-gris-ligne p-6 shadow-cb-sm">
           <div className="space-y-4">
             <div>
               <label className="block text-xs font-bold text-gris-texte uppercase tracking-wider mb-2">
@@ -82,9 +73,7 @@ export default function AdminLoginPage() {
             </div>
 
             {error && (
-              <div className="text-xs text-red-600 bg-red-50 px-3 py-2 rounded-lg">
-                {error}
-              </div>
+              <div className="text-xs text-red-600 bg-red-50 px-3 py-2 rounded-lg">{error}</div>
             )}
 
             <button
@@ -111,5 +100,19 @@ export default function AdminLoginPage() {
         </form>
       </div>
     </div>
+  );
+}
+
+export default function AdminLoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-gris-fond">
+          <Loader2 size={24} className="text-marine animate-spin" />
+        </div>
+      }
+    >
+      <AdminLoginForm />
+    </Suspense>
   );
 }

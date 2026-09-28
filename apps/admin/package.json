@@ -2,12 +2,13 @@
   "name": "admin",
   "version": "0.1.0",
   "private": true,
-  "scripts": {
-    "dev": "next dev --port 3001",
-    "build": "next build",
-    "start": "next start --port 3001",
-    "lint": "next lint"
-  },
+"scripts": {
+  "dev": "next dev --port 3001",
+  "build": "next build",
+  "build:cloudflare": "opennextjs-cloudflare build && cp -r src/public/* .open-next/assets/ 2>/dev/null || true",
+  "start": "next start --port 3001",
+  "lint": "next lint"
+},
   "dependencies": {
     "@my-cambo/auth": "workspace:*",
     "@my-cambo/database": "workspace:*",
