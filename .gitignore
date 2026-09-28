@@ -88,3 +88,7 @@ supabase/.temp
 # ============================================
 .eslintcache
 .cache
+
+# OpenNext / Cloudflare build output
+.open-next/
+apps/*/.open-next/

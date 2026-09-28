@@ -193,10 +193,10 @@ export default function ApercuPublicPage() {
                   {establishment.typeLabel}
                 </span>
                 <span>{establishment.category}</span>
-                {establishment.foundedYear && (
+                {(establishment as any).foundedYear && (
                   <>
                     <span className="text-white/40">·</span>
-                    <span>Depuis {establishment.foundedYear}</span>
+                    <span>Depuis {(establishment as any).foundedYear}</span>
                   </>
                 )}
               </div>

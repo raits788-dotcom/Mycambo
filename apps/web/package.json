@@ -2,12 +2,13 @@
   "name": "web",
   "version": "0.1.0",
   "private": true,
-  "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "next lint"
-  },
+"scripts": {
+  "dev": "next dev",
+  "build": "next build",
+  "build:cloudflare": "opennextjs-cloudflare build",
+  "start": "next start",
+  "lint": "next lint"
+},
   "dependencies": {
     "clsx": "2.1.1",
     "date-fns": "4.4.0",

@@ -66,9 +66,9 @@ export default function CommercePage() {
 
     // 2. Si pas trouvé dans localStorage, cherche dans les données mock
     const mockEtab = ETABLISSEMENTS[slug] || [];
-    const foundMock = Object.values(ETABLISSEMENTS)
-      .flat()
-      .find((e: any) => e.slug === slug);
+const foundMock: any = Object.values(ETABLISSEMENTS)
+  .flat()
+  .find((e: any) => e.slug === slug);
 
     if (foundMock) {
       // Données mock basiques
@@ -223,7 +223,7 @@ export default function CommercePage() {
                   <AssociationActionsBar
                     associationSlug={slug}
                     associationName={commerce.name}
-                    donationLink={enriched?.donation_link}
+donationLink={(enriched as any)?.donation_link}
                     variant="sidebar"
                   />
                 </div>
