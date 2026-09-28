@@ -74,16 +74,12 @@ export default function HeroCarousel() {
           )}
           aria-hidden={i !== current}
         >
-          <Image
-            src={slide.image}
-            alt={slide.alt}
-            fill
-            priority={i === 0}
-            loading={i === 0 ? 'eager' : 'lazy'}
-            className="object-cover object-center"
-            sizes="100vw"
-            quality={90}
-          />
+<img
+  src={slide.image}
+  alt={slide.alt}
+  loading={i === 0 ? 'eager' : 'lazy'}
+  className="absolute inset-0 w-full h-full object-cover object-center"
+/>
         </div>
       ))}
 

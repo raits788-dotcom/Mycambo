@@ -77,14 +77,11 @@ export default function Header() {
               </button>
 
               <Link href="/" className="flex items-center flex-shrink-0">
-                <Image
-                  src="/logo-cambo.png"
-                  alt="myCAMBO"
-                  width={180}
-                  height={84}
-                  priority
-                  className="h-14 md:h-20 w-auto object-contain"
-                />
+<img
+  src="/logo-cambo.png"
+  alt="myCAMBO"
+  className="h-14 md:h-20 w-auto object-contain"
+/>
               </Link>
             </div>
 

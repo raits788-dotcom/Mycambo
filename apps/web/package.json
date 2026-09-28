@@ -5,7 +5,7 @@
 "scripts": {
   "dev": "next dev",
   "build": "next build",
-  "build:cloudflare": "opennextjs-cloudflare build",
+"build:cloudflare": "opennextjs-cloudflare build && cp -r src/public/* .open-next/assets/",
   "start": "next start",
   "lint": "next lint"
 },

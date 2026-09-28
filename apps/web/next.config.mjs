@@ -6,7 +6,9 @@ const nextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
+  transpilePackages: ['@my-cambo/ui', '@my-cambo/utils', '@my-cambo/database', '@my-cambo/auth'],
   images: {
+    unoptimized: true,
     remotePatterns: [
       { protocol: 'https', hostname: 'images.unsplash.com' },
       { protocol: 'https', hostname: 'jxfdwjwpsqvgczywipff.supabase.co' },
