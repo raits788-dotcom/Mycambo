@@ -92,3 +92,7 @@ supabase/.temp
 # OpenNext / Cloudflare build output
 .open-next/
 apps/*/.open-next/
+
+# Wrangler (Cloudflare CLI) cache
+.wrangler/
+apps/*/.wrangler/
