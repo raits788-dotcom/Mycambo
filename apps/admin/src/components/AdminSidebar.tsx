@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useState, useEffect } from 'react';
 import {
   LayoutDashboard,
   Inbox,
@@ -19,8 +20,10 @@ import {
   Users,
   Settings,
   Shield,
+  Loader2,
 } from 'lucide-react';
 import { cn } from '@my-cambo/utils';
+import { getCurrentAdmin, getInitials } from '@/lib/auth';
 
 interface NavItem {
   id: string;
@@ -79,6 +82,18 @@ const NAV_SECTIONS: NavSection[] = [
 
 export default function AdminSidebar() {
   const pathname = usePathname();
+  const [userEmail, setUserEmail] = useState<string>('');
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      const current = await getCurrentAdmin();
+      if (current) setUserEmail(current.email);
+      setLoading(false);
+    })();
+  }, []);
+
+  const initials = getInitials(userEmail);
 
   return (
     <aside className="w-64 bg-ink text-white flex flex-col shrink-0 min-h-screen">
@@ -95,6 +110,29 @@ export default function AdminSidebar() {
             </div>
           </div>
         </Link>
+      </div>
+
+      {/* Bloc identité DYNAMIQUE */}
+      <div className="px-4 py-3 border-b border-white/10">
+        <div className="flex items-center gap-2.5">
+          <div className="w-9 h-9 rounded-lg bg-red-600 text-white flex items-center justify-center font-bold text-xs flex-shrink-0">
+            {loading ? <Loader2 size={14} className="animate-spin" /> : initials}
+          </div>
+          <div className="min-w-0 flex-1">
+            {loading ? (
+              <div className="text-xs text-white/50">Chargement...</div>
+            ) : (
+              <>
+                <div className="text-[11px] font-bold text-white truncate">
+                  {userEmail}
+                </div>
+                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full uppercase tracking-wider inline-block mt-0.5 bg-red-100 text-red-700">
+                  SuperAdmin
+                </span>
+              </>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Nav */}

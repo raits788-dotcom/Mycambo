@@ -1,9 +1,9 @@
 'use client';
 
-import { Suspense } from 'react';
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Shield, Loader2 } from 'lucide-react';
+import { signInAdmin } from '@/lib/auth';
 
 function AdminLoginForm() {
   const router = useRouter();
@@ -20,13 +20,14 @@ function AdminLoginForm() {
     setError('');
     setLoading(true);
 
-    await new Promise((r) => setTimeout(r, 500));
+    const result = await signInAdmin(email, password);
 
-    if (email === 'admin@mycambo.app' && password === 'admin1234') {
+    if (result.success) {
+      // Pose un cookie simple pour le middleware
       document.cookie = 'mycambo_admin_session=true; path=/; max-age=86400';
       router.push(redirectTo);
     } else {
-      setError('Email ou mot de passe incorrect.');
+      setError(result.error || 'Erreur de connexion');
       setLoading(false);
     }
   };
@@ -73,7 +74,9 @@ function AdminLoginForm() {
             </div>
 
             {error && (
-              <div className="text-xs text-red-600 bg-red-50 px-3 py-2 rounded-lg">{error}</div>
+              <div className="text-xs text-red-600 bg-red-50 px-3 py-2 rounded-lg">
+                {error}
+              </div>
             )}
 
             <button
