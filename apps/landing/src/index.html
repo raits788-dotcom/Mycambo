@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MyCambo — La plateforme digitale du Cambodge</title>
+<meta name="description" content="MyCambo, la plateforme numérique dédiée au Cambodge. Bientôt en ligne.">
+<link rel="icon" type="image/png" href="logo-cambo.png">
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Serif+Khmer:wght@400;600;700&display=swap" rel="stylesheet">
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          marine: { DEFAULT: '#1B3A6B', dark: '#12294D', light: '#2C5599' },
+          khmer: '#C1272D',
+          'ic-or': '#D9A441',
+          ink: '#16233A',
+        },
+        fontFamily: {
+          sans: ['Inter', 'sans-serif'],
+          khmer: ['"Noto Serif Khmer"', 'serif'],
+        },
+      },
+    },
+  };
+</script>
+<style>
+  html, body {
+    font-family: 'Inter', sans-serif;
+    margin: 0;
+    padding: 0;
+    overflow-x: hidden;
+  }
+  .khmer { font-family: 'Noto Serif Khmer', serif; line-height: 1.9; }
+
+  /* Fade-up au chargement */
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(24px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .fade-up { animation: fadeUp 0.8s ease-out both; }
+  .fade-up-1 { animation: fadeUp 0.8s ease-out 0.15s both; }
+  .fade-up-2 { animation: fadeUp 0.8s ease-out 0.3s both; }
+  .fade-up-3 { animation: fadeUp 0.8s ease-out 0.45s both; }
+  .fade-up-4 { animation: fadeUp 0.8s ease-out 0.6s both; }
+
+  /* Badge pulse */
+  @keyframes pulseSoft {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.6; transform: scale(1.1); }
+  }
+  .pulse-soft { animation: pulseSoft 2.5s ease-in-out infinite; }
+
+  /* Zoom lent sur l'image de fond */
+  @keyframes slowZoom {
+    from { transform: scale(1); }
+    to { transform: scale(1.05); }
+  }
+  .slow-zoom { animation: slowZoom 20s ease-in-out infinite alternate; }
+
+  /* Hauteur du hero : plein écran moins le header */
+  .hero-full {
+    min-height: calc(100vh - 88px);
+  }
+  @media (max-width: 768px) {
+    .hero-full {
+      min-height: calc(100vh - 72px);
+    }
+  }
+</style>
+</head>
+
+<body class="bg-ink text-white">
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- HEADER BLANC — Logo NON CLIQUABLE                            -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<header class="w-full bg-white border-b border-[#E4E9F2] relative z-50">
+  <div class="max-w-[1500px] mx-auto px-6 md:px-12 lg:px-20 py-4">
+    <div class="flex items-center justify-between">
+
+      <!-- Logo NON CLIQUABLE -->
+      <div class="flex items-center gap-3 min-w-0">
+        <button class="flex flex-col justify-between w-6 h-4 cursor-pointer flex-shrink-0">
+          <span class="block h-0.5 w-full bg-marine rounded"></span>
+          <span class="block h-0.5 w-full bg-marine rounded"></span>
+          <span class="block h-0.5 w-full bg-marine rounded"></span>
+        </button>
+
+        <div class="flex items-center">
+          <img src="/logo-cambo.png"
+               alt="MyCambo — Tout le Cambodge dans votre poche"
+               class="h-12 md:h-16 w-auto object-contain pointer-events-none select-none"/>
+        </div>
+      </div>
+
+      <!-- Actions droite -->
+      <div class="flex items-center gap-3 md:gap-4 flex-shrink-0">
+        <svg class="w-5 h-5 text-marine cursor-pointer" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+        </svg>
+        <svg class="w-5 h-5 text-marine cursor-pointer" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+        </svg>
+        <svg class="w-4 h-4 text-marine cursor-pointer" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+        </svg>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- HERO avec IMAGE FIXE (chapeau Cambodia)                      -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<section class="relative w-full overflow-hidden hero-full">
+
+  <!-- IMAGE DE FOND FIXE -->
+  <div class="absolute inset-0 z-0">
+    <img src="/hero-cambodia.jpg"
+         alt="Chapeau Cambodia — Voyage au Cambodge"
+         class="w-full h-full object-cover object-center slow-zoom"/>
+  </div>
+
+  <!-- OVERLAY DÉGRADÉ pour lisibilité du texte -->
+  <div class="absolute inset-0 bg-gradient-to-br from-ink/95 via-ink/75 to-ink/60 z-10"></div>
+  <div class="absolute inset-0 bg-gradient-to-t from-ink via-transparent to-transparent z-10"></div>
+
+  <!-- CONTENU -->
+  <div class="relative z-20 flex flex-col hero-full">
+
+    <main class="flex-1 flex items-center px-6 md:px-12 lg:px-20 py-12">
+      <div class="max-w-[1400px] mx-auto w-full">
+        <div class="max-w-4xl">
+
+          <!-- Badge "Bientôt en ligne" -->
+          <div class="fade-up inline-flex items-center gap-2.5 bg-ic-or/15 border border-ic-or/30 rounded-full px-4 py-2 mb-8">
+            <span class="w-2 h-2 rounded-full bg-ic-or pulse-soft"></span>
+            <span class="text-[11px] font-bold text-ic-or tracking-[0.25em] uppercase">
+              Bientôt en ligne
+            </span>
+          </div>
+
+          <!-- Séparateur + label -->
+          <div class="fade-up-1 flex items-center gap-3 mb-6">
+            <span class="h-px w-12 bg-white/40"></span>
+            <span class="text-xs uppercase tracking-[0.35em] text-white/70 font-bold">
+              Royaume du Cambodge
+            </span>
+          </div>
+
+          <!-- Titre -->
+          <h1 class="fade-up-2 text-5xl md:text-7xl lg:text-8xl font-extrabold leading-[1.02] tracking-tight mb-6">
+            Le Cambodge<br/>
+            <span class="text-ic-or">se dévoile.</span>
+          </h1>
+
+          <!-- Sous-titre -->
+          <p class="fade-up-3 text-xl md:text-2xl text-white/90 font-light mb-12 max-w-2xl">
+            La plateforme digitale du <span class="font-bold text-ic-or">Cambodge</span>
+          </p>
+
+          <!-- 3 cartes multilingues -->
+          <div class="fade-up-4 grid grid-cols-1 md:grid-cols-3 gap-4 max-w-4xl mb-12">
+
+            <!-- FR -->
+            <div class="bg-white/[0.07] backdrop-blur-md border border-white/15 rounded-2xl p-5 hover:bg-white/[0.12] transition-all">
+              <p class="text-white/95 text-sm leading-relaxed">
+                Notre plateforme dédiée au Cambodge est en préparation.
+                Très bientôt, explorez hôtels, restaurants, associations
+                et artisans du Royaume.
+              </p>
+            </div>
+
+            <!-- EN -->
+            <div class="bg-white/[0.07] backdrop-blur-md border border-white/15 rounded-2xl p-5 hover:bg-white/[0.12] transition-all">
+              <p class="text-white/95 text-sm leading-relaxed">
+                Our platform dedicated to Cambodia is in preparation.
+                Very soon, explore the Kingdom's hotels, restaurants,
+                associations and artisans.
+              </p>
+            </div>
+
+            <!-- KH -->
+            <div class="khmer bg-white/[0.07] backdrop-blur-md border border-white/15 rounded-2xl p-5 hover:bg-white/[0.12] transition-all">
+              <p class="text-white/95 text-sm leading-relaxed">
+                វេទិការបស់យើងខ្ញុំសម្រាប់កម្ពុជា កំពុងស្ថិតក្នុងការរៀបចំ។
+                ឆាប់ៗនេះ សូមរកឃើញសណ្ឋាគារ ភោជនីយដ្ឋាន
+                សមាគម និងសិប្បករនៅក្នុងព្រះរាជាណាចក្រ។
+              </p>
+            </div>
+
+          </div>
+
+          <!-- CTA email -->
+          <div class="fade-up-4">
+            <a href="mailto:contact@mycambo.net"
+               class="inline-flex items-center gap-3 bg-white/10 backdrop-blur border border-white/20 rounded-full px-6 py-3 hover:bg-white/15 transition-all">
+              <svg class="w-5 h-5 text-ic-or" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+              </svg>
+              <span class="text-sm font-medium">
+                Écrivez-nous : <span class="font-bold text-white">contact@mycambo.net</span>
+              </span>
+            </a>
+          </div>
+
+        </div>
+      </div>
+    </main>
+
+    <!-- Footer discret -->
+    <footer class="w-full px-6 md:px-12 lg:px-20 pb-4">
+      <div class="max-w-[1400px] mx-auto flex items-center justify-center text-xs text-white/50">
+        <span>🇰🇭 © 2026 MyCambo · Tous droits réservés</span>
+      </div>
+    </footer>
+
+  </div>
+
+</section>
+
+</body>
+</html>
