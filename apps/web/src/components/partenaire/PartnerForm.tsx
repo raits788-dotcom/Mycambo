@@ -1,7 +1,9 @@
 'use client';
 
 import { useState } from 'react';
+import { createBrowserClient } from '@supabase/ssr';
 import Button from '@/components/ui/Button';
+import { sendEmail } from '@/lib/email';
 
 const SECTEURS = [
   { id: 'hotel', label: 'Hôtel / Hébergement' },
@@ -12,6 +14,13 @@ const SECTEURS = [
   { id: 'transport', label: 'Transport' },
   { id: 'autre', label: 'Autre' },
 ];
+
+function getSupabase() {
+  return createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
+}
 
 export default function PartnerForm() {
   const [sent, setSent] = useState(false);
@@ -24,23 +33,111 @@ export default function PartnerForm() {
     setLoading(true);
 
     const form = new FormData(e.currentTarget);
-    const data = {
-      contact_name: form.get('name'),
-      contact_email: form.get('email'),
-      contact_phone: form.get('phone'),
-      business_name: form.get('business'),
-      sector_id: form.get('sector'),
-      city: form.get('city'),
-      description: form.get('message'),
-    };
+    const contactName = form.get('name') as string;
+    const businessName = form.get('business') as string;
+    const email = form.get('email') as string;
+    const phone = form.get('phone') as string;
+    const sector = form.get('sector') as string;
+    const city = form.get('city') as string;
+    const message = form.get('message') as string;
 
-    // ⚠️ Simulation — branchement Supabase au module 🅱️
-    console.log('📨 Demande partenaire :', data);
+    // Trouve le label du secteur pour le stockage
+    const sectorLabel =
+      SECTEURS.find((s) => s.id === sector)?.label || sector;
 
-    setTimeout(() => {
+    try {
+      const supabase = getSupabase();
+
+      // 1. INSERT dans partner_requests
+      const { data: inserted, error: insertError } = await supabase
+        .from('partner_requests')
+        .insert({
+          company_name: businessName,
+          email: email,
+          phone: phone || null,
+          category: sectorLabel,
+          city: city || null,
+          message: `Contact : ${contactName}\n\n${message || ''}`,
+          status: 'pending',
+        })
+        .select()
+        .single();
+
+      if (insertError) {
+        console.error('Erreur insert:', insertError);
+        throw new Error("Erreur lors de l'enregistrement");
+      }
+
+      // 2. ENVOI EMAIL à contact@mycambo.net (notification)
+      const emailHtml = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <div style="background: #1B3A6B; color: white; padding: 20px; border-radius: 8px 8px 0 0;">
+            <h1 style="margin: 0; font-size: 22px;">🇰🇭 Nouvelle demande partenaire</h1>
+          </div>
+          <div style="background: #f9f9f9; padding: 24px; border-radius: 0 0 8px 8px;">
+            <h2 style="color: #1B3A6B; margin-top: 0;">${businessName}</h2>
+
+            <table style="width: 100%; border-collapse: collapse; margin: 16px 0;">
+              <tr><td style="padding: 8px 0; color: #666; width: 140px;">Contact</td><td style="padding: 8px 0;"><b>${contactName}</b></td></tr>
+              <tr><td style="padding: 8px 0; color: #666;">Email</td><td style="padding: 8px 0;"><a href="mailto:${email}">${email}</a></td></tr>
+              <tr><td style="padding: 8px 0; color: #666;">Téléphone</td><td style="padding: 8px 0;">${phone || '—'}</td></tr>
+              <tr><td style="padding: 8px 0; color: #666;">Secteur</td><td style="padding: 8px 0;">${sectorLabel}</td></tr>
+              <tr><td style="padding: 8px 0; color: #666;">Ville</td><td style="padding: 8px 0;">${city || '—'}</td></tr>
+            </table>
+
+            ${message ? `<div style="background: white; padding: 16px; border-left: 3px solid #D9A441; margin: 16px 0;"><p style="margin: 0; white-space: pre-wrap;">${message}</p></div>` : ''}
+
+            <div style="margin-top: 24px; padding-top: 16px; border-top: 1px solid #ddd;">
+              <a href="https://admin.mycambo.net/demandes" style="background: #1B3A6B; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
+                Voir dans la console admin →
+              </a>
+            </div>
+
+            <p style="color: #999; font-size: 12px; margin-top: 24px;">
+              Demande reçue le ${new Date().toLocaleString('fr-FR')} · ID : ${inserted.id}
+            </p>
+          </div>
+        </div>
+      `;
+
+      await sendEmail({
+        to: 'contact@mycambo.net',
+        subject: `🇰🇭 Nouvelle demande partenaire : ${businessName}`,
+        html: emailHtml,
+      });
+
+      // 3. Envoi email de confirmation au partenaire
+      const confirmationHtml = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <div style="background: #1B3A6B; color: white; padding: 20px; border-radius: 8px 8px 0 0;">
+            <h1 style="margin: 0; font-size: 22px;">Merci ${contactName} !</h1>
+          </div>
+          <div style="background: #f9f9f9; padding: 24px; border-radius: 0 0 8px 8px;">
+            <p>Nous avons bien reçu votre demande pour <b>${businessName}</b>.</p>
+            <p>Notre équipe va l'étudier dans les plus brefs délais et vous répondra sous <b>48 heures ouvrées</b>.</p>
+            <p>En attendant, n'hésitez pas à explorer notre annuaire :</p>
+            <p><a href="https://mycambo.net/annuaire" style="color: #1B3A6B;">→ Explorer l'annuaire</a></p>
+            <p style="color: #999; font-size: 12px; margin-top: 24px;">
+              Cet email a été envoyé automatiquement. Pour toute question, contactez-nous à <a href="mailto:contact@mycambo.net">contact@mycambo.net</a>.
+            </p>
+          </div>
+        </div>
+      `;
+
+      await sendEmail({
+        to: email,
+        subject: `Demande bien reçue — My Cambo`,
+        html: confirmationHtml,
+      });
+
+      // 4. Succès
       setLoading(false);
       setSent(true);
-    }, 800);
+    } catch (err) {
+      console.error('Erreur:', err);
+      setError("Erreur lors de l'envoi. Réessayez dans quelques instants.");
+      setLoading(false);
+    }
   }
 
   if (sent) {
@@ -59,10 +156,7 @@ export default function PartnerForm() {
           </p>
           <p className="text-sm text-gris-doux">
             En attendant, explorez notre{' '}
-            <a
-              href="/rubrique/hotel"
-              className="text-marine underline font-bold"
-            >
+            <a href="/rubrique/hotel" className="text-marine underline font-bold">
               annuaire
             </a>{' '}
             pour découvrir nos partenaires actuels.
@@ -75,10 +169,7 @@ export default function PartnerForm() {
   return (
     <section className="py-16 bg-white">
       <div className="max-w-3xl mx-auto px-4 md:px-6">
-        <form
-          onSubmit={handleSubmit}
-          className="bg-gris-fond rounded-lg p-6 md:p-8"
-        >
+        <form onSubmit={handleSubmit} className="bg-gris-fond rounded-lg p-6 md:p-8">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div className="md:col-span-2">
               <label className="block text-xs font-bold text-ink mb-2 uppercase tracking-wider">
