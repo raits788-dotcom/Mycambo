@@ -1,6 +1,7 @@
 'use client';
 
-import { Plus, Shield, UserCog, Eye, Mail, Edit3, Trash2 } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Plus, Shield, UserCog, Eye, Mail, Edit3, Trash2, Loader2 } from 'lucide-react';
 
 type Role = 'superadmin' | 'admin' | 'moderator';
 
@@ -9,15 +10,9 @@ interface AdminUser {
   name: string;
   email: string;
   role: Role;
-  lastLogin: string;
+  lastLogin: string | null;
   initials: string;
 }
-
-const MOCK_ADMINS: AdminUser[] = [
-  { id: 'a1', name: 'Super Admin', email: 'admin@mycambo.app', role: 'superadmin', lastLogin: '2025-02-15 09:23', initials: 'SA' },
-  { id: 'a2', name: 'Sophie Martin', email: 'sophie@mycambo.app', role: 'admin', lastLogin: '2025-02-14 16:11', initials: 'SM' },
-  { id: 'a3', name: 'Pierre Durand', email: 'pierre@mycambo.app', role: 'moderator', lastLogin: '2025-02-13 11:08', initials: 'PD' },
-];
 
 const ROLE_STYLES: Record<Role, { label: string; style: string; icon: React.ElementType }> = {
   superadmin: { label: 'Super-admin', style: 'bg-red-100 text-red-700', icon: Shield },
@@ -34,7 +29,76 @@ const PERMISSIONS = [
   { name: 'Signaler du contenu', roles: ['superadmin', 'admin', 'moderator'] },
 ];
 
+function getInitials(nameOrEmail: string): string {
+  if (!nameOrEmail) return 'XX';
+  const cleaned = nameOrEmail.split('@')[0];
+  const parts = cleaned.split(/[._\-\s]/);
+  if (parts.length >= 2) {
+    return (parts[0][0] + parts[1][0]).toUpperCase();
+  }
+  return cleaned.substring(0, 2).toUpperCase();
+}
+
+function formatDate(dateString: string | null): string {
+  if (!dateString) return 'Jamais';
+  const date = new Date(dateString);
+  return date.toLocaleString('fr-FR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
 export default function RolesPage() {
+  const [admins, setAdmins] = useState<AdminUser[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+        const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+        if (!supabaseUrl || !supabaseKey) {
+          throw new Error('Variables Supabase manquantes');
+        }
+
+        const response = await fetch(`${supabaseUrl}/functions/v1/list-admins`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${supabaseKey}`,
+          },
+        });
+
+        const result = await response.json();
+
+        if (!response.ok) {
+          throw new Error(result.error || 'Erreur de chargement');
+        }
+
+        const enriched: AdminUser[] = (result.admins || []).map((a: any) => ({
+          id: a.id,
+          name: a.name,
+          email: a.email,
+          role: a.role as Role,
+          lastLogin: a.lastLogin,
+          initials: getInitials(a.name || a.email),
+        }));
+
+        setAdmins(enriched);
+      } catch (err) {
+        console.error('Erreur:', err);
+        setError('Impossible de charger les administrateurs.');
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
   return (
     <>
       <div className="flex items-center justify-between mb-8 flex-wrap gap-3">
@@ -43,7 +107,9 @@ export default function RolesPage() {
             Rôles & permissions
           </h1>
           <p className="text-sm text-gris-texte">
-            {MOCK_ADMINS.length} administrateurs · Gestion des accès à la console.
+            {loading
+              ? 'Chargement...'
+              : `${admins.length} administrateur${admins.length > 1 ? 's' : ''} · Gestion des accès à la console.`}
           </p>
         </div>
         <button className="flex items-center gap-2 bg-marine text-white font-bold text-sm px-4 py-2.5 rounded-full hover:bg-marine-dark">
@@ -52,62 +118,80 @@ export default function RolesPage() {
         </button>
       </div>
 
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6 text-sm text-red-700">
+          {error}
+        </div>
+      )}
+
       {/* Liste admins */}
       <div className="bg-white rounded-xl border border-gris-ligne overflow-hidden shadow-cb-sm mb-6">
         <div className="px-6 py-4 border-b border-gris-ligne">
           <h2 className="font-bold text-marine">Administrateurs actifs</h2>
         </div>
-        <table className="w-full text-sm">
-          <thead className="bg-gris-fond text-gris-texte text-xs uppercase tracking-wider">
-            <tr>
-              <th className="text-left px-6 py-3 font-bold">Utilisateur</th>
-              <th className="text-left px-3 py-3 font-bold">Rôle</th>
-              <th className="text-left px-3 py-3 font-bold">Dernière connexion</th>
-              <th className="text-right px-6 py-3 font-bold">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gris-ligne">
-            {MOCK_ADMINS.map((admin) => {
-              const roleConfig = ROLE_STYLES[admin.role];
-              const RoleIcon = roleConfig.icon;
-              return (
-                <tr key={admin.id} className="hover:bg-gris-fond/50">
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-full bg-red-600 text-white flex items-center justify-center font-bold text-xs">
-                        {admin.initials}
-                      </div>
-                      <div>
-                        <div className="font-bold text-marine">{admin.name}</div>
-                        <div className="text-xs text-gris-texte flex items-center gap-1">
-                          <Mail size={10} />
-                          {admin.email}
+
+        {loading ? (
+          <div className="p-12 text-center">
+            <Loader2 size={24} className="text-marine animate-spin mx-auto mb-3" />
+            <p className="text-sm text-gris-texte">Chargement des admins...</p>
+          </div>
+        ) : admins.length === 0 ? (
+          <div className="p-12 text-center">
+            <p className="text-sm text-gris-texte">Aucun administrateur trouvé.</p>
+          </div>
+        ) : (
+          <table className="w-full text-sm">
+            <thead className="bg-gris-fond text-gris-texte text-xs uppercase tracking-wider">
+              <tr>
+                <th className="text-left px-6 py-3 font-bold">Utilisateur</th>
+                <th className="text-left px-3 py-3 font-bold">Rôle</th>
+                <th className="text-left px-3 py-3 font-bold">Dernière connexion</th>
+                <th className="text-right px-6 py-3 font-bold">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gris-ligne">
+              {admins.map((admin) => {
+                const roleConfig = ROLE_STYLES[admin.role] || ROLE_STYLES.admin;
+                const RoleIcon = roleConfig.icon;
+                return (
+                  <tr key={admin.id} className="hover:bg-gris-fond/50">
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-full bg-red-600 text-white flex items-center justify-center font-bold text-xs">
+                          {admin.initials}
+                        </div>
+                        <div>
+                          <div className="font-bold text-marine">{admin.name}</div>
+                          <div className="text-xs text-gris-texte flex items-center gap-1">
+                            <Mail size={10} />
+                            {admin.email}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  </td>
-                  <td className="px-3 py-4">
-                    <span className={'inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold ' + roleConfig.style}>
-                      <RoleIcon size={10} />
-                      {roleConfig.label}
-                    </span>
-                  </td>
-                  <td className="px-3 py-4 text-xs text-gris-texte">{admin.lastLogin}</td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center justify-end gap-1.5">
-                      <button className="w-8 h-8 rounded-lg flex items-center justify-center text-gris-texte hover:bg-marine/10 hover:text-marine">
-                        <Edit3 size={14} />
-                      </button>
-                      <button className="w-8 h-8 rounded-lg flex items-center justify-center text-red-500 hover:bg-red-100">
-                        <Trash2 size={14} />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+                    </td>
+                    <td className="px-3 py-4">
+                      <span className={'inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold ' + roleConfig.style}>
+                        <RoleIcon size={10} />
+                        {roleConfig.label}
+                      </span>
+                    </td>
+                    <td className="px-3 py-4 text-xs text-gris-texte">{formatDate(admin.lastLogin)}</td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center justify-end gap-1.5">
+                        <button className="w-8 h-8 rounded-lg flex items-center justify-center text-gris-texte hover:bg-marine/10 hover:text-marine">
+                          <Edit3 size={14} />
+                        </button>
+                        <button className="w-8 h-8 rounded-lg flex items-center justify-center text-red-500 hover:bg-red-100">
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
       </div>
 
       {/* Matrice permissions */}
