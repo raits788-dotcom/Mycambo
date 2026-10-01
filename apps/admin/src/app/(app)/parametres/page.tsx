@@ -2,28 +2,24 @@
 
 import { useState, useEffect } from 'react';
 import { Tag, MapPin, Mail, KeyRound, Loader2 } from 'lucide-react';
-import { getCategories } from '@/lib/services';
+import { getCategories, getCities } from '@/lib/services';
 
 type Tab = 'categories' | 'cities' | 'email' | 'api';
-
-const MOCK_CITIES = [
-  { id: 'v1', name: 'Phnom Penh', count: 124 },
-  { id: 'v2', name: 'Siem Reap', count: 89 },
-  { id: 'v3', name: 'Battambang', count: 23 },
-  { id: 'v4', name: 'Kampot', count: 18 },
-  { id: 'v5', name: 'Koh Rong', count: 12 },
-  { id: 'v6', name: 'Kep', count: 8 },
-];
 
 export default function SettingsPage() {
   const [tab, setTab] = useState<Tab>('categories');
   const [categories, setCategories] = useState<any[]>([]);
+  const [cities, setCities] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     (async () => {
-      const data = await getCategories();
-      setCategories(data);
+      const [cats, cts] = await Promise.all([
+        getCategories(),
+        getCities(),
+      ]);
+      setCategories(cats);
+      setCities(cts);
       setLoading(false);
     })();
   }, []);
@@ -80,18 +76,30 @@ export default function SettingsPage() {
         <div className="bg-white rounded-xl border border-gris-ligne overflow-hidden shadow-cb-sm">
           <div className="px-6 py-4 border-b border-gris-ligne">
             <h2 className="font-bold text-marine">Villes &amp; régions</h2>
+            <p className="text-xs text-gris-texte mt-1">{cities.length} villes · utilisées dans les filtres</p>
           </div>
-          <ul className="divide-y divide-gris-ligne">
-            {MOCK_CITIES.map((c) => (
-              <li key={c.id} className="px-6 py-4 flex items-center gap-4">
-                <MapPin size={16} className="text-marine" />
-                <div className="flex-1">
-                  <div className="font-bold text-marine">{c.name}</div>
-                  <div className="text-xs text-gris-texte">{c.count} établissements</div>
-                </div>
-              </li>
-            ))}
-          </ul>
+          {loading ? (
+            <div className="p-12 text-center"><Loader2 size={24} className="text-marine animate-spin mx-auto" /></div>
+          ) : (
+            <ul className="divide-y divide-gris-ligne">
+              {cities.map((c) => (
+                <li key={c.id} className="px-6 py-4 flex items-center gap-4 hover:bg-gris-fond/50">
+                  <MapPin size={16} className="text-marine flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <div className="font-bold text-marine">{c.name}</div>
+                    <div className="text-xs text-gris-texte">
+                      {c.count > 0 ? `${c.count} établissement${c.count > 1 ? 's' : ''}` : 'Aucun établissement'}
+                    </div>
+                  </div>
+                  {c.region && c.region !== c.name && (
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-gris-fond text-gris-texte">
+                      {c.region}
+                    </span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       )}
 
@@ -101,14 +109,16 @@ export default function SettingsPage() {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-bold text-gris-texte uppercase tracking-wider mb-2">Expéditeur</label>
-              <input type="text" defaultValue="no-reply@mycambo.com" className="w-full px-3 py-2 text-sm rounded-lg border border-gris-ligne" />
+              <input type="text" defaultValue="contact@mycambo.net" className="w-full px-3 py-2 text-sm rounded-lg border border-gris-ligne" />
             </div>
             <div>
               <label className="block text-xs font-bold text-gris-texte uppercase tracking-wider mb-2">Nom expéditeur</label>
               <input type="text" defaultValue="My Cambo" className="w-full px-3 py-2 text-sm rounded-lg border border-gris-ligne" />
             </div>
           </div>
-          <p className="text-xs text-gris-doux">À configurer avec Resend en Phase G.</p>
+          <p className="text-xs text-gris-doux">
+            ✅ Envoi configuré via SMTP Hostinger (contact@mycambo.net).
+          </p>
         </div>
       )}
 

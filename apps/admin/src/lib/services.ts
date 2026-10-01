@@ -236,3 +236,33 @@ export async function getAdminUsers() {
   if (error) { console.error('getAdminUsers error:', error); return []; }
   return data || [];
 }
+
+// ═══════════════════════════════════════════════════════════
+// CITIES
+// ═══════════════════════════════════════════════════════════
+export async function getCities() {
+  const supabase = getSupabase();
+  const { data, error } = await supabase
+    .from('cities')
+    .select('*')
+    .eq('is_active', true)
+    .order('position', { ascending: true });
+
+  if (error) {
+    console.error('getCities error:', error);
+    return [];
+  }
+
+  const citiesWithCount = await Promise.all(
+    (data || []).map(async (city: any) => {
+      const { count } = await supabase
+        .from('businesses')
+        .select('*', { count: 'exact', head: true })
+        .eq('city', city.name);
+
+      return { ...city, count: count || 0 };
+    })
+  );
+
+  return citiesWithCount;
+}
