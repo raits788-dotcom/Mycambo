@@ -1,48 +1,77 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter, usePathname } from 'next/navigation';
-import PartnerTopBar from '@/components/partenaire/PartnerTopBar';
+import { useRouter } from 'next/navigation';
+import { Loader2 } from 'lucide-react';
 import PartnerSidebar from '@/components/partenaire/PartnerSidebar';
-import { getCurrentPartnerMock } from '@/lib/auth-mock';
+import PartnerTopBar from '@/components/partenaire/PartnerTopBar';
+import ImpersonationBanner from '@/components/partenaire/ImpersonationBanner';
+import { getImpersonateToken, getImpersonatedTenant, clearImpersonation } from '@/lib/impersonation';
 
-export default function PartnerLayout({
+export default function PartnerAppLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
   const router = useRouter();
-  const pathname = usePathname();
   const [checking, setChecking] = useState(true);
+  const [authorized, setAuthorized] = useState(false);
+  const [isImpersonating, setIsImpersonating] = useState(false);
 
   useEffect(() => {
-    const partner = getCurrentPartnerMock();
-    if (!partner) {
-      router.replace(
-        `/espace-partenaire/connexion?redirect=${encodeURIComponent(pathname)}`
+    (async () => {
+      // 1. Vérifie si on est en mode impersonation
+      const token = getImpersonateToken();
+      if (token) {
+        const tenant = await getImpersonatedTenant();
+        if (tenant) {
+          setIsImpersonating(true);
+          setAuthorized(true);
+          setChecking(false);
+          return;
+        } else {
+          // Token invalide/expiré
+          clearImpersonation();
+        }
+      }
+
+      // 2. Sinon, vérifie la session partenaire normale
+      const { createBrowserClient } = await import('@supabase/ssr');
+      const supabase = createBrowserClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
       );
-      return;
-    }
-    setChecking(false);
-  }, [router, pathname]);
+      const { data: { user } } = await supabase.auth.getUser();
+
+      if (!user) {
+        router.replace('/espace-partenaire/connexion');
+        return;
+      }
+
+      setAuthorized(true);
+      setChecking(false);
+    })();
+  }, [router]);
 
   if (checking) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-sm text-gris-texte">Vérification...</div>
+      <div className="min-h-screen flex items-center justify-center bg-gris-fond">
+        <Loader2 size={24} className="text-marine animate-spin" />
       </div>
     );
   }
 
-  return (
-    <div className="min-h-screen bg-gray-50">
-      <PartnerTopBar />
+  if (!authorized) return null;
 
-      <div className="max-w-wrap mx-auto px-4 md:px-8 lg:px-12 xl:px-20 py-6">
-        <div className="grid grid-cols-1 lg:grid-cols-[240px_1fr] gap-6">
-          <PartnerSidebar />
-          <main className="min-w-0">{children}</main>
-        </div>
+  return (
+    <div className="flex min-h-screen bg-gris-fond">
+      {isImpersonating && <ImpersonationBanner />}
+      <PartnerSidebar />
+      <div className={`flex-1 flex flex-col min-w-0 ${isImpersonating ? 'pt-10' : ''}`}>
+        <PartnerTopBar />
+        <main className="flex-1 p-6 md:p-8 overflow-x-hidden">
+          {children}
+        </main>
       </div>
     </div>
   );

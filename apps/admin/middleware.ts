@@ -3,23 +3,31 @@ import { updateSession } from '@my-cambo/database/middleware';
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  console.log('[MIDDLEWARE]', pathname);
 
   // 1. Rafraîchir la session Supabase
   const response = await updateSession(request);
 
   // 2. Autoriser la page de connexion
-  if (pathname === '/connexion') {
-    return response;
-  }
+  if (pathname === '/connexion') return response;
 
   // 3. Vérifier le cookie de session admin
   const adminSession = request.cookies.get('mycambo_admin_session');
-
   if (!adminSession) {
     const url = request.nextUrl.clone();
     url.pathname = '/connexion';
     url.searchParams.set('redirect', pathname);
+    return NextResponse.redirect(url);
+  }
+
+  // 4. Forcer le setup MFA si pas encore vérifié
+  const mfaVerified = request.cookies.get('mycambo_mfa_verified');
+  if (
+    !mfaVerified &&
+    pathname !== '/setup-mfa' &&
+    !pathname.startsWith('/_next')
+  ) {
+    const url = request.nextUrl.clone();
+    url.pathname = '/setup-mfa';
     return NextResponse.redirect(url);
   }
 
@@ -28,13 +36,6 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    /*
-     * Match toutes les routes sauf :
-     * - _next/static (fichiers statiques)
-     * - _next/image (optimisation images)
-     * - favicon.ico
-     * - fichiers publics
-     */
     '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 };

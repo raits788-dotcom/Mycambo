@@ -52,6 +52,7 @@ export async function signOutAdmin() {
   const supabase = createClient();
   await supabase.auth.signOut();
   document.cookie = 'mycambo_admin_session=; path=/; max-age=0';
+  document.cookie = 'mycambo_mfa_verified=; path=/; max-age=0';
 }
 
 /**

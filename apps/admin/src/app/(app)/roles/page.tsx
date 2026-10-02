@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Plus, Shield, UserCog, Eye, Mail, Edit3, Trash2, Loader2 } from 'lucide-react';
 
-type Role = 'superadmin' | 'admin' | 'moderator';
+type Role = 'superadmin' | 'admin' | 'moderator' | 'editor' | 'content_manager' | 'finance';
 
 interface AdminUser {
   id: string;
@@ -12,12 +12,16 @@ interface AdminUser {
   role: Role;
   lastLogin: string | null;
   initials: string;
+  mfa_enabled: boolean;
 }
 
 const ROLE_STYLES: Record<Role, { label: string; style: string; icon: React.ElementType }> = {
   superadmin: { label: 'Super-admin', style: 'bg-red-100 text-red-700', icon: Shield },
   admin: { label: 'Administrateur', style: 'bg-purple-100 text-purple-700', icon: UserCog },
   moderator: { label: 'Modérateur', style: 'bg-blue-100 text-blue-700', icon: Eye },
+  editor: { label: 'Éditeur', style: 'bg-green-100 text-green-700', icon: Edit3 },
+  content_manager: { label: 'Gestionnaire contenu', style: 'bg-yellow-100 text-yellow-700', icon: Edit3 },
+  finance: { label: 'Finance', style: 'bg-orange-100 text-orange-700', icon: UserCog },
 };
 
 const PERMISSIONS = [
@@ -25,6 +29,8 @@ const PERMISSIONS = [
   { name: 'Configurer la plateforme', roles: ['superadmin'] },
   { name: 'Valider les partenaires', roles: ['superadmin', 'admin'] },
   { name: 'Suspendre des comptes', roles: ['superadmin', 'admin'] },
+  { name: 'Gérer les paiements', roles: ['superadmin', 'admin', 'finance'] },
+  { name: 'Publier du contenu', roles: ['superadmin', 'admin', 'content_manager'] },
   { name: 'Modérer les avis', roles: ['superadmin', 'admin', 'moderator'] },
   { name: 'Signaler du contenu', roles: ['superadmin', 'admin', 'moderator'] },
 ];
@@ -87,6 +93,7 @@ export default function RolesPage() {
           role: a.role as Role,
           lastLogin: a.lastLogin,
           initials: getInitials(a.name || a.email),
+          mfa_enabled: a.mfa_enabled === true,
         }));
 
         setAdmins(enriched);
@@ -101,10 +108,11 @@ export default function RolesPage() {
 
   return (
     <>
+      {/* En-tête */}
       <div className="flex items-center justify-between mb-8 flex-wrap gap-3">
         <div>
           <h1 className="text-2xl md:text-3xl font-extrabold text-marine mb-1">
-            Rôles & permissions
+            Rôles &amp; permissions
           </h1>
           <p className="text-sm text-gris-texte">
             {loading
@@ -145,6 +153,7 @@ export default function RolesPage() {
               <tr>
                 <th className="text-left px-6 py-3 font-bold">Utilisateur</th>
                 <th className="text-left px-3 py-3 font-bold">Rôle</th>
+                <th className="text-left px-3 py-3 font-bold">MFA</th>
                 <th className="text-left px-3 py-3 font-bold">Dernière connexion</th>
                 <th className="text-right px-6 py-3 font-bold">Actions</th>
               </tr>
@@ -155,6 +164,7 @@ export default function RolesPage() {
                 const RoleIcon = roleConfig.icon;
                 return (
                   <tr key={admin.id} className="hover:bg-gris-fond/50">
+                    {/* Utilisateur */}
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
                         <div className="w-9 h-9 rounded-full bg-red-600 text-white flex items-center justify-center font-bold text-xs">
@@ -169,19 +179,46 @@ export default function RolesPage() {
                         </div>
                       </div>
                     </td>
+
+                    {/* Rôle */}
                     <td className="px-3 py-4">
                       <span className={'inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold ' + roleConfig.style}>
                         <RoleIcon size={10} />
                         {roleConfig.label}
                       </span>
                     </td>
-                    <td className="px-3 py-4 text-xs text-gris-texte">{formatDate(admin.lastLogin)}</td>
+
+                    {/* MFA */}
+                    <td className="px-3 py-4">
+                      {admin.mfa_enabled ? (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-green-100 text-green-700">
+                          🔐 Activée
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-orange-100 text-orange-700">
+                          ⚠️ Sans MFA
+                        </span>
+                      )}
+                    </td>
+
+                    {/* Dernière connexion */}
+                    <td className="px-3 py-4 text-xs text-gris-texte">
+                      {formatDate(admin.lastLogin)}
+                    </td>
+
+                    {/* Actions */}
                     <td className="px-6 py-4">
                       <div className="flex items-center justify-end gap-1.5">
-                        <button className="w-8 h-8 rounded-lg flex items-center justify-center text-gris-texte hover:bg-marine/10 hover:text-marine">
+                        <button
+                          className="w-8 h-8 rounded-lg flex items-center justify-center text-gris-texte hover:bg-marine/10 hover:text-marine"
+                          title="Éditer"
+                        >
                           <Edit3 size={14} />
                         </button>
-                        <button className="w-8 h-8 rounded-lg flex items-center justify-center text-red-500 hover:bg-red-100">
+                        <button
+                          className="w-8 h-8 rounded-lg flex items-center justify-center text-red-500 hover:bg-red-100"
+                          title="Supprimer"
+                        >
                           <Trash2 size={14} />
                         </button>
                       </div>
@@ -194,7 +231,7 @@ export default function RolesPage() {
         )}
       </div>
 
-      {/* Matrice permissions */}
+      {/* Matrice des permissions */}
       <div className="bg-white rounded-xl border border-gris-ligne overflow-hidden shadow-cb-sm">
         <div className="px-6 py-4 border-b border-gris-ligne">
           <h2 className="font-bold text-marine">Matrice des permissions</h2>
@@ -206,6 +243,8 @@ export default function RolesPage() {
               <th className="text-left px-6 py-3 font-bold">Permission</th>
               <th className="text-center px-3 py-3 font-bold">Super-admin</th>
               <th className="text-center px-3 py-3 font-bold">Admin</th>
+              <th className="text-center px-3 py-3 font-bold">Finance</th>
+              <th className="text-center px-3 py-3 font-bold">Content</th>
               <th className="text-center px-3 py-3 font-bold">Modérateur</th>
             </tr>
           </thead>
@@ -214,13 +253,39 @@ export default function RolesPage() {
               <tr key={perm.name} className="hover:bg-gris-fond/50">
                 <td className="px-6 py-4 font-medium text-marine">{perm.name}</td>
                 <td className="px-3 py-4 text-center">
-                  {perm.roles.includes('superadmin') ? <span className="text-green-600 font-bold">✓</span> : <span className="text-gris-doux">—</span>}
+                  {perm.roles.includes('superadmin') ? (
+                    <span className="text-green-600 font-bold">✓</span>
+                  ) : (
+                    <span className="text-gris-doux">—</span>
+                  )}
                 </td>
                 <td className="px-3 py-4 text-center">
-                  {perm.roles.includes('admin') ? <span className="text-green-600 font-bold">✓</span> : <span className="text-gris-doux">—</span>}
+                  {perm.roles.includes('admin') ? (
+                    <span className="text-green-600 font-bold">✓</span>
+                  ) : (
+                    <span className="text-gris-doux">—</span>
+                  )}
                 </td>
                 <td className="px-3 py-4 text-center">
-                  {perm.roles.includes('moderator') ? <span className="text-green-600 font-bold">✓</span> : <span className="text-gris-doux">—</span>}
+                  {perm.roles.includes('finance') ? (
+                    <span className="text-green-600 font-bold">✓</span>
+                  ) : (
+                    <span className="text-gris-doux">—</span>
+                  )}
+                </td>
+                <td className="px-3 py-4 text-center">
+                  {perm.roles.includes('content_manager') ? (
+                    <span className="text-green-600 font-bold">✓</span>
+                  ) : (
+                    <span className="text-gris-doux">—</span>
+                  )}
+                </td>
+                <td className="px-3 py-4 text-center">
+                  {perm.roles.includes('moderator') ? (
+                    <span className="text-green-600 font-bold">✓</span>
+                  ) : (
+                    <span className="text-gris-doux">—</span>
+                  )}
                 </td>
               </tr>
             ))}

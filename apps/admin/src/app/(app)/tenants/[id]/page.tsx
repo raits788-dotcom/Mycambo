@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import {
   getTenant, getTenantBusinesses, getTenantPayments, getTenantSubscription,
+  startImpersonation,
 } from '@/lib/services';
 
 const STATUS_STYLES: Record<string, string> = {
@@ -32,6 +33,7 @@ export default function TenantDetailPage({
   const [payments, setPayments] = useState<any[]>([]);
   const [subscription, setSubscription] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [impersonating, setImpersonating] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -73,9 +75,26 @@ export default function TenantDetailPage({
     .filter((p) => p.status === 'paid')
     .reduce((s, p) => s + Number(p.amount), 0);
 
-  const handleImpersonate = () => {
-    alert('Impersonation : entrer dans le tenant "' + tenant.name + '".');
-  };
+const handleImpersonate = async () => {
+  setImpersonating(true);
+  try {
+    const data = await startImpersonation(tenant.id);
+
+    // Détecte l'URL de base du web (localhost OU Codespaces)
+    const webBaseUrl = process.env.NEXT_PUBLIC_WEB_URL
+      || (typeof window !== 'undefined' && window.location.hostname.includes('github.dev')
+        ? window.location.origin.replace('-3001.', '-3000.')
+        : 'http://localhost:3000');
+
+    const tenantUrl = `${webBaseUrl}/espace-partenaire/dashboard?impersonate=${data.token}`;
+    window.open(tenantUrl, '_blank');
+  } catch (err) {
+    alert('Erreur : ' + (err as Error).message);
+  } finally {
+    setImpersonating(false);
+  }
+};
+
   const handleResetPassword = () => {
     if (confirm('Réinitialiser le mot de passe admin de ' + tenant.name + ' ?')) {
       alert('✅ Email de réinitialisation envoyé à ' + tenant.email);
@@ -113,9 +132,13 @@ export default function TenantDetailPage({
             </div>
           </div>
           <div className="flex gap-2 flex-wrap">
-            <button onClick={handleImpersonate} className="flex items-center gap-2 bg-purple-600 text-white font-bold text-sm px-4 py-2.5 rounded-full hover:bg-purple-700">
+            <button
+              onClick={handleImpersonate}
+              disabled={impersonating}
+              className="flex items-center gap-2 bg-purple-600 text-white font-bold text-sm px-4 py-2.5 rounded-full hover:bg-purple-700 disabled:opacity-50"
+            >
               <Shield size={14} />
-              Entrer dans le tenant
+              {impersonating ? 'Ouverture...' : 'Entrer dans le tenant'}
             </button>
             <button onClick={handleResetPassword} className="flex items-center gap-2 border border-gris-ligne text-marine font-bold text-sm px-4 py-2.5 rounded-full hover:border-marine">
               <KeyRound size={14} />

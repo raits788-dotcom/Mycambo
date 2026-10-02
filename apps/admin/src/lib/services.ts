@@ -266,3 +266,27 @@ export async function getCities() {
 
   return citiesWithCount;
 }
+// ============================================================================
+// IMPERSONATION
+// ============================================================================
+export async function startImpersonation(tenantId: string) {
+  const supabase = getSupabase();
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) throw new Error('NOT_AUTHENTICATED');
+
+  const res = await fetch(
+    `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/impersonate-tenant`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session.access_token}`,
+      },
+      body: JSON.stringify({ tenant_id: tenantId }),
+    }
+  );
+
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'IMPERSONATION_FAILED');
+  return data as { token: string; expiresAt: string; tenantId: string; tenantName: string };
+}

@@ -1,7 +1,17 @@
 'use client';
 
-import { useState } from 'react';
-import { Lock, Bell, Trash2, AlertCircle } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import {
+  Lock,
+  Bell,
+  Trash2,
+  AlertCircle,
+  Shield,
+  Loader2,
+  KeyRound,
+} from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { createBrowserClient } from '@supabase/ssr';
 
 export default function ParametresPage() {
   const [notifications, setNotifications] = useState({
@@ -11,6 +21,38 @@ export default function ParametresPage() {
   });
 
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+  // ═══ MFA ═══
+  const [mfaEnabled, setMfaEnabled] = useState<boolean | null>(null);
+  const [mfaLoading, setMfaLoading] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const supabase = createBrowserClient(
+          process.env.NEXT_PUBLIC_SUPABASE_URL!,
+          process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+        );
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          setMfaLoading(false);
+          return;
+        }
+        const { data } = await supabase
+          .from('user_mfa')
+          .select('is_enabled, is_verified')
+          .eq('user_id', user.id)
+          .maybeSingle();
+
+        setMfaEnabled(data?.is_enabled === true && data?.is_verified === true);
+      } catch (err) {
+        console.error('MFA check error:', err);
+        setMfaEnabled(false);
+      } finally {
+        setMfaLoading(false);
+      }
+    })();
+  }, []);
 
   return (
     <>
@@ -23,7 +65,57 @@ export default function ParametresPage() {
         </p>
       </div>
 
-      {/* Mot de passe */}
+      {/* ═══ Sécurité MFA ═══ */}
+      <div className="bg-white rounded-lg border border-gris-ligne p-6 mb-6">
+        <div className="flex items-center gap-2 mb-4">
+          <KeyRound size={16} className="text-marine" />
+          <h2 className="font-bold text-marine">Double authentification (MFA)</h2>
+        </div>
+
+        {mfaLoading ? (
+          <div className="flex items-center gap-2 text-xs text-gris-texte">
+            <Loader2 size={12} className="animate-spin" />
+            Vérification...
+          </div>
+        ) : mfaEnabled ? (
+          <>
+            <div className="flex items-center gap-2 mb-3">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-green-100 text-green-700">
+                🔐 MFA activée
+              </span>
+            </div>
+            <p className="text-xs text-gris-texte mb-4">
+              Votre compte est protégé par une double authentification.
+            </p>
+            <a
+              href="/setup-mfa"
+              className="text-sm font-bold border border-gris-ligne text-marine rounded-full px-5 py-2.5 hover:border-marine transition-colors inline-block"
+            >
+              Gérer la MFA
+            </a>
+          </>
+        ) : (
+          <>
+            <div className="flex items-center gap-2 mb-3">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-orange-100 text-orange-700">
+                ⚠️ MFA non activée
+              </span>
+            </div>
+            <p className="text-xs text-gris-texte mb-4">
+              Renforcez la sécurité de votre compte avec la double authentification.
+            </p>
+            <a
+              href="/setup-mfa"
+              className="inline-flex items-center gap-2 text-sm font-bold bg-marine text-white rounded-full px-5 py-2.5 hover:bg-marine-dark transition-colors"
+            >
+              <Shield size={14} />
+              Activer la MFA
+            </a>
+          </>
+        )}
+      </div>
+
+      {/* ═══ Mot de passe ═══ */}
       <div className="bg-white rounded-lg border border-gris-ligne p-6 mb-6">
         <div className="flex items-center gap-2 mb-4">
           <Lock size={16} className="text-marine" />
@@ -38,7 +130,7 @@ export default function ParametresPage() {
         </button>
       </div>
 
-      {/* Notifications */}
+      {/* ═══ Notifications ═══ */}
       <div className="bg-white rounded-lg border border-gris-ligne p-6 mb-6">
         <div className="flex items-center gap-2 mb-4">
           <Bell size={16} className="text-marine" />
@@ -49,87 +141,70 @@ export default function ParametresPage() {
           <ToggleRow
             label="M'alerter quand mes avis sont publiés"
             checked={notifications.emailAvis}
-            onChange={(v) =>
-              setNotifications({ ...notifications, emailAvis: v })
-            }
+            onChange={(v) => setNotifications({ ...notifications, emailAvis: v })}
           />
           <ToggleRow
-            label="M'alerter des réponses à mes demandes"
+            label="M'alerter lors de réponses à mes demandes"
             checked={notifications.emailDemandes}
-            onChange={(v) =>
-              setNotifications({ ...notifications, emailDemandes: v })
-            }
+            onChange={(v) => setNotifications({ ...notifications, emailDemandes: v })}
           />
           <ToggleRow
-            label="Recevoir la newsletter myCAMBO"
+            label="Recevoir la newsletter MyCambo"
             checked={notifications.newsletter}
-            onChange={(v) =>
-              setNotifications({ ...notifications, newsletter: v })
-            }
+            onChange={(v) => setNotifications({ ...notifications, newsletter: v })}
           />
         </div>
       </div>
 
-      {/* Suppression du compte */}
+      {/* ═══ Suppression compte ═══ */}
       <div className="bg-white rounded-lg border border-red-200 p-6">
         <div className="flex items-center gap-2 mb-4">
-          <Trash2 size={16} className="text-red-500" />
-          <h2 className="font-bold text-red-600">Supprimer mon compte</h2>
+          <Trash2 size={16} className="text-red-600" />
+          <h2 className="font-bold text-red-600">Zone de danger</h2>
         </div>
+        <p className="text-xs text-gris-texte mb-4">
+          La suppression de votre compte est définitive.
+        </p>
+        <button
+          onClick={() => setShowDeleteConfirm(true)}
+          className="text-sm font-bold bg-red-600 text-white rounded-full px-5 py-2.5 hover:bg-red-700 transition-colors"
+        >
+          Supprimer mon compte
+        </button>
+      </div>
 
-        {!showDeleteConfirm ? (
-          <>
-            <p className="text-xs text-gris-texte mb-4">
-              La suppression de votre compte est <b>définitive</b>. Toutes vos
-              données (favoris, avis, demandes) seront effacées.
-            </p>
-            <button
-              onClick={() => setShowDeleteConfirm(true)}
-              className="text-sm font-bold bg-red-500 text-white rounded-full px-5 py-2.5 hover:bg-red-600 transition-colors"
-            >
-              Supprimer mon compte
-            </button>
-          </>
-        ) : (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-            <div className="flex items-start gap-2 mb-3">
-              <AlertCircle
-                size={16}
-                className="text-red-500 flex-shrink-0 mt-0.5"
-              />
-              <div>
-                <div className="font-bold text-red-700 text-sm mb-1">
-                  Êtes-vous sûr ?
-                </div>
-                <p className="text-xs text-red-700">
-                  Cette action est irréversible.
-                </p>
-              </div>
+      {/* ═══ Modal confirmation ═══ */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <AlertCircle size={24} className="text-red-600" />
+              <h2 className="text-lg font-bold text-marine">Confirmer la suppression</h2>
             </div>
-            <div className="flex gap-2">
+            <p className="text-sm text-gris-texte mb-6">
+              Êtes-vous sûr ? Cette action est irréversible.
+            </p>
+            <div className="flex gap-3">
               <button
                 onClick={() => setShowDeleteConfirm(false)}
-                className="text-xs font-bold border border-red-200 text-red-700 rounded-full px-4 py-2 hover:bg-white transition-colors"
+                className="flex-1 text-sm font-bold border border-gris-ligne rounded-full py-2.5"
               >
                 Annuler
               </button>
-              <button
-                onClick={() => {
-                  // ⚠️ À brancher sur Supabase
-                  console.log('Compte supprimé (simulation)');
-                }}
-                className="text-xs font-bold bg-red-500 text-white rounded-full px-4 py-2 hover:bg-red-600 transition-colors"
-              >
-                Confirmer la suppression
+              <button className="flex-1 text-sm font-bold bg-red-600 text-white rounded-full py-2.5 hover:bg-red-700">
+                Confirmer
               </button>
             </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </>
   );
 }
 
+// ═══════════════════════════════════════════════════════════
+// Composant Toggle Row
+// ═══════════════════════════════════════════════════════════
 function ToggleRow({
   label,
   checked,
@@ -140,26 +215,22 @@ function ToggleRow({
   onChange: (v: boolean) => void;
 }) {
   return (
-    <label className="flex items-center justify-between gap-3 cursor-pointer">
+    <div className="flex items-center justify-between py-2">
       <span className="text-sm text-gris-texte">{label}</span>
       <button
-        type="button"
-        role="switch"
-        aria-checked={checked}
         onClick={() => onChange(!checked)}
-        className={`relative w-11 h-6 rounded-full transition-colors flex-shrink-0 ${
+        className={cn(
+          'relative w-10 h-6 rounded-full transition-colors',
           checked ? 'bg-marine' : 'bg-gris-ligne'
-        }`}
+        )}
       >
         <span
-          className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
-            checked ? 'translate-x-5.5 left-0.5' : 'left-0.5'
-          }`}
-          style={{
-            transform: checked ? 'translateX(20px)' : 'translateX(0)',
-          }}
+          className={cn(
+            'absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform',
+            checked ? 'translate-x-4' : 'translate-x-0.5'
+          )}
         />
       </button>
-    </label>
+    </div>
   );
 }

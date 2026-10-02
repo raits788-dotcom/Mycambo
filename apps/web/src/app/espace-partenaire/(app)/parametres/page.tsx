@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Lock,
   Bell,
@@ -10,8 +10,11 @@ import {
   Check,
   ExternalLink,
   Shield,
+  Loader2,
+  KeyRound,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { createBrowserClient } from '@supabase/ssr';
 
 export default function ParametresPage() {
   const [notifications, setNotifications] = useState({
@@ -21,6 +24,38 @@ export default function ParametresPage() {
     emailBilling: true,
   });
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+  // ═══ MFA ═══
+  const [mfaEnabled, setMfaEnabled] = useState<boolean | null>(null);
+  const [mfaLoading, setMfaLoading] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const supabase = createBrowserClient(
+          process.env.NEXT_PUBLIC_SUPABASE_URL!,
+          process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+        );
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          setMfaLoading(false);
+          return;
+        }
+        const { data } = await supabase
+          .from('user_mfa')
+          .select('is_enabled, is_verified')
+          .eq('user_id', user.id)
+          .maybeSingle();
+
+        setMfaEnabled(data?.is_enabled === true && data?.is_verified === true);
+      } catch (err) {
+        console.error('MFA check error:', err);
+        setMfaEnabled(false);
+      } finally {
+        setMfaLoading(false);
+      }
+    })();
+  }, []);
 
   return (
     <>
@@ -33,7 +68,59 @@ export default function ParametresPage() {
         </p>
       </div>
 
-      {/* Mot de passe */}
+      {/* ═══ Sécurité MFA ═══ */}
+      <div className="bg-white rounded-lg border border-gris-ligne p-6 mb-6">
+        <div className="flex items-center gap-2 mb-4">
+          <KeyRound size={16} className="text-marine" />
+          <h2 className="font-bold text-marine">Double authentification (MFA)</h2>
+        </div>
+
+        {mfaLoading ? (
+          <div className="flex items-center gap-2 text-xs text-gris-texte">
+            <Loader2 size={12} className="animate-spin" />
+            Vérification...
+          </div>
+        ) : mfaEnabled ? (
+          <>
+            <div className="flex items-center gap-2 mb-3">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-green-100 text-green-700">
+                🔐 MFA activée
+              </span>
+            </div>
+            <p className="text-xs text-gris-texte mb-4">
+              Votre compte est protégé par une double authentification. Un code à 6 chiffres
+              est requis à chaque connexion.
+            </p>
+            <a
+href="/setup-mfa"
+              className="text-sm font-bold border border-gris-ligne text-marine rounded-full px-5 py-2.5 hover:border-marine transition-colors inline-block"
+            >
+              Gérer la MFA
+            </a>
+          </>
+        ) : (
+          <>
+            <div className="flex items-center gap-2 mb-3">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-orange-100 text-orange-700">
+                ⚠️ MFA non activée
+              </span>
+            </div>
+            <p className="text-xs text-gris-texte mb-4">
+              Sécurisez votre compte en activant la double authentification. Un code à 6 chiffres
+              sera demandé à chaque connexion.
+            </p>
+            <a
+              href="/setup-mfa"
+              className="inline-flex items-center gap-2 text-sm font-bold bg-marine text-white rounded-full px-5 py-2.5 hover:bg-marine-dark transition-colors"
+            >
+              <Shield size={14} />
+              Activer la MFA
+            </a>
+          </>
+        )}
+      </div>
+
+      {/* ═══ Mot de passe ═══ */}
       <div className="bg-white rounded-lg border border-gris-ligne p-6 mb-6">
         <div className="flex items-center gap-2 mb-4">
           <Lock size={16} className="text-marine" />
@@ -48,7 +135,7 @@ export default function ParametresPage() {
         </button>
       </div>
 
-      {/* Notifications */}
+      {/* ═══ Notifications ═══ */}
       <div className="bg-white rounded-lg border border-gris-ligne p-6 mb-6">
         <div className="flex items-center gap-2 mb-4">
           <Bell size={16} className="text-marine" />
@@ -57,203 +144,129 @@ export default function ParametresPage() {
 
         <div className="space-y-3">
           <ToggleRow
-            label="Nouvel avis à modérer"
-            description="Recevoir un email quand un avis est publié sur vos fiches."
+            label="M'alerter par email lors de nouveaux avis"
             checked={notifications.emailReviews}
-            onChange={(v) => setNotifications({ ...notifications, emailReviews: v })}
+            onChange={(v) =>
+              setNotifications({ ...notifications, emailReviews: v })
+            }
           />
           <ToggleRow
-            label="Nouvelles demandes"
-            description="Recevoir un email pour chaque nouvelle promesse de don, candidature bénévole ou message."
+            label="M'alerter par email lors de nouvelles demandes"
             checked={notifications.emailRequests}
-            onChange={(v) => setNotifications({ ...notifications, emailRequests: v })}
+            onChange={(v) =>
+              setNotifications({ ...notifications, emailRequests: v })
+            }
           />
           <ToggleRow
-            label="Rappels de facturation"
-            description="Être alerté avant chaque prélèvement d'abonnement."
-            checked={notifications.emailBilling}
-            onChange={(v) => setNotifications({ ...notifications, emailBilling: v })}
-          />
-          <ToggleRow
-            label="Newsletter myCAMBO"
-            description="Recevoir les actualités et conseils pour partenaires."
+            label="Recevoir la newsletter MyCambo"
             checked={notifications.emailNewsletter}
-            onChange={(v) => setNotifications({ ...notifications, emailNewsletter: v })}
+            onChange={(v) =>
+              setNotifications({ ...notifications, emailNewsletter: v })
+            }
+          />
+          <ToggleRow
+            label="M'alerter par email pour la facturation"
+            checked={notifications.emailBilling}
+            onChange={(v) =>
+              setNotifications({ ...notifications, emailBilling: v })
+            }
           />
         </div>
       </div>
 
-      {/* Abonnement */}
+      {/* ═══ Abonnement ═══ */}
       <div className="bg-white rounded-lg border border-gris-ligne p-6 mb-6">
         <div className="flex items-center gap-2 mb-4">
           <CreditCard size={16} className="text-marine" />
           <h2 className="font-bold text-marine">Abonnement</h2>
         </div>
-
-        <div className="bg-gris-fond rounded-lg p-4 mb-4">
-          <div className="flex items-start justify-between gap-3 flex-wrap">
-            <div>
-              <div className="text-xs text-gris-texte mb-1">Formule actuelle</div>
-              <div className="font-extrabold text-marine text-lg">
-                Gratuite (Association)
-              </div>
-              <div className="text-xs text-gris-texte mt-1">
-                Les associations sont référencées gratuitement sur myCAMBO.
-              </div>
-            </div>
-            <span className="inline-flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-1 rounded-full bg-green-100 text-green-700">
-              <Check size={11} />
-              Actif
-            </span>
-          </div>
-        </div>
-
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4 flex items-start gap-2">
-          <AlertCircle size={14} className="text-blue-600 flex-shrink-0 mt-0.5" />
-          <p className="text-xs text-blue-800 leading-relaxed">
-            Votre compte association est gratuit. Aucune facturation.
-          </p>
-        </div>
-
+        <p className="text-xs text-gris-texte mb-4">
+          Votre formule actuelle : <b className="text-marine">Pro</b> — 39 $/mois
+        </p>
         <a
-          href="/partenaire/formules"
-          className="inline-flex items-center gap-2 text-sm font-bold text-marine hover:underline"
+          href="/espace-partenaire/parametres"
+          className="text-sm font-bold border border-gris-ligne text-marine rounded-full px-5 py-2.5 hover:border-marine transition-colors inline-flex items-center gap-2"
         >
-          Voir les autres formules
+          Voir mon abonnement
           <ExternalLink size={12} />
         </a>
       </div>
 
-      {/* Sécurité */}
-      <div className="bg-white rounded-lg border border-gris-ligne p-6 mb-6">
-        <div className="flex items-center gap-2 mb-4">
-          <Shield size={16} className="text-marine" />
-          <h2 className="font-bold text-marine">Sécurité</h2>
-        </div>
-
-        <div className="space-y-3">
-          <div className="flex items-center justify-between gap-3 py-2">
-            <div>
-              <div className="text-sm font-medium text-marine">
-                Authentification à deux facteurs
-              </div>
-              <div className="text-xs text-gris-texte">
-                Ajouter une sécurité supplémentaire à votre compte.
-              </div>
-            </div>
-            <span className="text-[10px] font-bold text-gris-doux border border-gris-ligne px-2.5 py-1 rounded-full">
-              Bientôt
-            </span>
-          </div>
-
-          <div className="flex items-center justify-between gap-3 py-2 border-t border-gris-ligne">
-            <div>
-              <div className="text-sm font-medium text-marine">
-                Sessions actives
-              </div>
-              <div className="text-xs text-gris-texte">
-                Voir et déconnecter vos autres appareils.
-              </div>
-            </div>
-            <button className="text-xs font-bold text-marine hover:underline">
-              Gérer
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Zone de danger */}
+      {/* ═══ Suppression compte ═══ */}
       <div className="bg-white rounded-lg border border-red-200 p-6">
         <div className="flex items-center gap-2 mb-4">
-          <Trash2 size={16} className="text-red-500" />
+          <Trash2 size={16} className="text-red-600" />
           <h2 className="font-bold text-red-600">Zone de danger</h2>
         </div>
+        <p className="text-xs text-gris-texte mb-4">
+          La suppression de votre compte est définitive. Toutes vos données seront effacées.
+        </p>
+        <button
+          onClick={() => setShowDeleteConfirm(true)}
+          className="text-sm font-bold bg-red-600 text-white rounded-full px-5 py-2.5 hover:bg-red-700 transition-colors"
+        >
+          Supprimer mon compte
+        </button>
+      </div>
 
-        {!showDeleteConfirm ? (
-          <>
-            <p className="text-xs text-gris-texte mb-4 leading-relaxed">
-              La suppression de votre compte est <b>définitive</b>. Toutes vos
-              données (fiches, avis, demandes, statistiques) seront effacées.
-            </p>
-            <button
-              onClick={() => setShowDeleteConfirm(true)}
-              className="text-sm font-bold bg-red-500 text-white rounded-full px-5 py-2.5 hover:bg-red-600 transition-colors"
-            >
-              Supprimer mon compte partenaire
-            </button>
-          </>
-        ) : (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-            <div className="flex items-start gap-2 mb-3">
-              <AlertCircle size={16} className="text-red-500 flex-shrink-0 mt-0.5" />
-              <div>
-                <div className="font-bold text-red-700 text-sm mb-1">
-                  Êtes-vous sûr ?
-                </div>
-                <p className="text-xs text-red-700 leading-relaxed">
-                  Cette action est <b>irréversible</b>. Toutes vos fiches seront
-                  retirées de myCAMBO immédiatement.
-                </p>
-              </div>
+      {/* ═══ Modal confirmation ═══ */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <AlertCircle size={24} className="text-red-600" />
+              <h2 className="text-lg font-bold text-marine">Confirmer la suppression</h2>
             </div>
-            <div className="flex flex-wrap gap-2">
+            <p className="text-sm text-gris-texte mb-6">
+              Êtes-vous sûr ? Cette action est irréversible.
+            </p>
+            <div className="flex gap-3">
               <button
                 onClick={() => setShowDeleteConfirm(false)}
-                className="text-xs font-bold border border-red-200 text-red-700 rounded-full px-4 py-2 hover:bg-white transition-colors"
+                className="flex-1 text-sm font-bold border border-gris-ligne rounded-full py-2.5"
               >
                 Annuler
               </button>
-              <button
-                onClick={() => {
-                  console.log('Compte partenaire supprimé (simulation)');
-                }}
-                className="text-xs font-bold bg-red-500 text-white rounded-full px-4 py-2 hover:bg-red-600 transition-colors"
-              >
-                Confirmer la suppression
+              <button className="flex-1 text-sm font-bold bg-red-600 text-white rounded-full py-2.5 hover:bg-red-700">
+                Confirmer
               </button>
             </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </>
   );
 }
 
-// ===== Toggle row =====
+// ═══════════════════════════════════════════════════════════
+// Composant Toggle Row
+// ═══════════════════════════════════════════════════════════
 function ToggleRow({
   label,
-  description,
   checked,
   onChange,
 }: {
   label: string;
-  description: string;
   checked: boolean;
   onChange: (v: boolean) => void;
 }) {
   return (
-    <label className="flex items-start justify-between gap-3 cursor-pointer py-2">
-      <div className="flex-1">
-        <div className="text-sm font-medium text-marine">{label}</div>
-        <div className="text-xs text-gris-texte mt-0.5">{description}</div>
-      </div>
+    <div className="flex items-center justify-between py-2">
+      <span className="text-sm text-gris-texte">{label}</span>
       <button
-        type="button"
-        role="switch"
-        aria-checked={checked}
         onClick={() => onChange(!checked)}
         className={cn(
-          'relative w-11 h-6 rounded-full transition-colors flex-shrink-0 mt-0.5',
+          'relative w-10 h-6 rounded-full transition-colors',
           checked ? 'bg-marine' : 'bg-gris-ligne'
         )}
       >
         <span
-          className="absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform"
-          style={{
-            transform: checked ? 'translateX(20px)' : 'translateX(2px)',
-          }}
+          className={cn(
+            'absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform',
+            checked ? 'translate-x-4' : 'translate-x-0.5'
+          )}
         />
       </button>
-    </label>
+    </div>
   );
 }
