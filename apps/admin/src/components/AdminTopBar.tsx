@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { LogOut, Bell, ChevronDown, ExternalLink, Loader2 } from 'lucide-react';
+import { LogOut, Bell, ChevronDown, ExternalLink, Loader2, Home } from 'lucide-react';
 import { getCurrentAdmin, getInitials, getDisplayName } from '@/lib/auth';
 
 interface AdminUser {
@@ -25,7 +25,28 @@ export default function AdminTopBar() {
     })();
   }, []);
 
+  const handleViewSite = () => {
+    // Ouvre le site public dans un nouvel onglet (session intacte)
+    const siteUrl = process.env.NODE_ENV === 'production'
+      ? 'https://mycambo.net'
+      : window.location.origin.replace('-3001', '-3000');
+    window.open(siteUrl, '_blank');
+  };
+
+  const handleLeaveConsole = async () => {
+    // Déconnecte ET redirige vers le site public
+    const { signOutAdmin } = await import('@/lib/auth');
+    await signOutAdmin();
+
+    const siteUrl = process.env.NODE_ENV === 'production'
+      ? 'https://mycambo.net'
+      : window.location.origin.replace('-3001', '-3000');
+
+    window.location.href = siteUrl;
+  };
+
   const handleLogout = async () => {
+    if (!confirm('Se déconnecter de la console admin ?')) return;
     const { signOutAdmin } = await import('@/lib/auth');
     await signOutAdmin();
     router.push('/connexion');
@@ -49,15 +70,26 @@ export default function AdminTopBar() {
 
         {/* Actions */}
         <div className="flex items-center gap-3">
-          <a
-            href="https://mycambo-web-worker.raits788.workers.dev"
-            target="_blank"
-            rel="noopener noreferrer"
+
+          {/* Bouton "Voir le site" (nouvel onglet) */}
+          <button
+            onClick={handleViewSite}
             className="hidden md:flex items-center gap-1.5 text-xs text-gris-texte hover:text-marine transition-colors px-3 py-1.5 rounded-lg hover:bg-gris-fond"
+            title="Voir le site dans un nouvel onglet"
           >
             <ExternalLink size={12} />
             Voir le site
-          </a>
+          </button>
+
+          {/* Bouton "Quitter la console" (déconnexion + redirect) */}
+          <button
+            onClick={handleLeaveConsole}
+            className="flex items-center gap-1.5 text-xs font-bold text-marine bg-marine/10 hover:bg-marine/20 transition-colors px-3 py-1.5 rounded-lg"
+            title="Quitter la console et aller sur le site public"
+          >
+            <Home size={12} />
+            Quitter la console
+          </button>
 
           <button
             aria-label="Notifications"
@@ -67,7 +99,7 @@ export default function AdminTopBar() {
             <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-red-500" />
           </button>
 
-          {/* Profil - DYNAMIQUE */}
+          {/* Profil */}
           <div className="flex items-center gap-2 pl-3 border-l border-gris-ligne">
             {loading ? (
               <Loader2 size={16} className="animate-spin text-gris-doux" />
@@ -89,11 +121,11 @@ export default function AdminTopBar() {
             )}
           </div>
 
-          {/* Déconnexion */}
+          {/* Déconnexion simple */}
           <button
             onClick={handleLogout}
             aria-label="Se déconnecter"
-            title="Se déconnecter"
+            title="Se déconnecter (rester sur la page de connexion)"
             className="w-9 h-9 rounded-full bg-gris-fond hover:bg-red-50 hover:text-red-600 flex items-center justify-center transition-colors text-gris-texte"
           >
             <LogOut size={15} />

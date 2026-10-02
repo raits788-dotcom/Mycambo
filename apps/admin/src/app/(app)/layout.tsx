@@ -7,6 +7,16 @@ import AdminSidebar from '@/components/AdminSidebar';
 import AdminTopBar from '@/components/AdminTopBar';
 import { getCurrentAdmin } from '@/lib/auth';
 
+// Rôles autorisés à accéder à la console admin
+const ADMIN_ROLES = [
+  'superadmin',
+  'admin',
+  'moderator',
+  'editor',
+  'content_manager',
+  'finance',
+];
+
 export default function AdminAppLayout({
   children,
 }: {
@@ -15,16 +25,28 @@ export default function AdminAppLayout({
   const router = useRouter();
   const pathname = usePathname();
   const [checking, setChecking] = useState(true);
+  const [authorized, setAuthorized] = useState(false);
 
   useEffect(() => {
     (async () => {
       const user = await getCurrentAdmin();
-      if (!user || user.role !== 'superadmin') {
+
+      if (!user) {
+        // Non connecté → redirection vers connexion admin
         router.replace(
           `/connexion?redirect=${encodeURIComponent(pathname)}`
         );
         return;
       }
+
+      // Vérifier que le rôle est autorisé
+      if (!ADMIN_ROLES.includes(user.role)) {
+        // Connecté mais pas autorisé → redirection vers site public
+        window.location.href = 'https://mycambo.net';
+        return;
+      }
+
+      setAuthorized(true);
       setChecking(false);
     })();
   }, [router, pathname]);
@@ -35,6 +57,10 @@ export default function AdminAppLayout({
         <Loader2 size={24} className="text-marine animate-spin" />
       </div>
     );
+  }
+
+  if (!authorized) {
+    return null;
   }
 
   return (

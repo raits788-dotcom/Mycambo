@@ -1,0 +1,14 @@
+{
+  "name": "My Cambo",
+  "forwardPorts": [3000, 3001],
+  "portsAttributes": {
+    "3000": {
+      "label": "Site public",
+      "onAutoForward": "notify"
+    },
+    "3001": {
+      "label": "Console admin",
+      "onAutoForward": "notify"
+    }
+  }
+}

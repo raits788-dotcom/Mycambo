@@ -3,12 +3,13 @@
 import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { createBrowserClient } from '@supabase/ssr';
 import { Eye, EyeOff, AlertCircle, Check } from 'lucide-react';
-import { loginMock } from '@/lib/auth-mock';
 import {
   checkLoginRateLimit,
   formatRetryAfter,
 } from '@/lib/spam-protection';
+import { logLogin } from '@/lib/login-logger';
 
 export default function ConnexionPage() {
   const router = useRouter();
@@ -39,26 +40,118 @@ export default function ConnexionPage() {
     }
 
     setLoading(true);
-    const result = loginMock(form.email, form.password);
 
-    if (!result.ok) {
-      setError(result.error || 'Connexion impossible.');
-      setLoading(false);
-      return;
-    }
+    try {
+      const supabase = createBrowserClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      );
 
-    setSuccess(true);
+      // Connexion Supabase
+      const { data, error: authError } = await supabase.auth.signInWithPassword({
+        email: form.email,
+        password: form.password,
+      });
 
-    // ===== Redirection selon le rôle =====
-    setTimeout(() => {
-      if (result.user?.role === 'partner') {
-        router.push('/espace-partenaire/dashboard');
-      } else if (result.user?.role === 'admin') {
-        router.push('/admin/dashboard');
-      } else {
-        router.push('/mon-compte');
+      // ===== Log l'échec =====
+      if (authError) {
+        await logLogin({
+          email: form.email,
+          status: 'failed',
+          failureReason: authError.message,
+        });
+
+        // Messages d'erreur user-friendly
+        if (authError.message.includes('Invalid login credentials')) {
+          setError('Email ou mot de passe incorrect.');
+        } else if (authError.message.includes('Email not confirmed')) {
+          setError(
+            "Votre email n'est pas encore confirmé. Vérifiez votre boîte mail."
+          );
+        } else {
+          setError(authError.message);
+        }
+        setLoading(false);
+        return;
       }
-    }, 800);
+
+      if (!data.user) {
+        await logLogin({
+          email: form.email,
+          status: 'failed',
+          failureReason: 'Utilisateur introuvable',
+        });
+        setError('Connexion impossible.');
+        setLoading(false);
+        return;
+      }
+
+      // ===== Log le succès =====
+      const role = data.user.app_metadata?.role || 'user';
+      await logLogin({
+        userId: data.user.id,
+        email: data.user.email || '',
+        role: role,
+        status: 'success',
+      });
+
+      setSuccess(true);
+
+      // ===== Redirection selon le rôle =====
+      setTimeout(() => {
+        // Rôles admin → redirection externe vers admin.mycambo.net
+        if (
+          role === 'superadmin' ||
+          role === 'admin' ||
+          role === 'moderator' ||
+          role === 'editor' ||
+          role === 'content_manager' ||
+          role === 'finance'
+        ) {
+          const adminUrl =
+            process.env.NODE_ENV === 'production'
+              ? 'https://admin.mycambo.net/dashboard'
+              : `${window.location.protocol}//${window.location.hostname.replace(
+                  '-3000',
+                  '-3001'
+                )}/dashboard`;
+          window.location.href = adminUrl;
+          return;
+        }
+
+        // Partenaires → espace partenaire
+        if (
+          role === 'partner_owner' ||
+          role === 'partner_adm' ||
+          role === 'partner_member'
+        ) {
+          router.push('/espace-partenaire/dashboard');
+          return;
+        }
+
+        // Associations → espace partenaire (pour l'instant)
+        if (
+          role === 'association_owner' ||
+          role === 'association_adm' ||
+          role === 'association_member'
+        ) {
+          router.push('/espace-partenaire/dashboard');
+          return;
+        }
+
+        // User standard (par défaut) → mon-compte
+        router.push('/mon-compte');
+      }, 800);
+    } catch (err) {
+      console.error('Erreur connexion:', err);
+      await logLogin({
+        email: form.email,
+        status: 'failed',
+        failureReason: String(err),
+      });
+      setError('Erreur de connexion. Réessayez.');
+      setLoading(false);
+    }
   };
 
   if (success) {
@@ -71,9 +164,7 @@ export default function ConnexionPage() {
           <h1 className="text-2xl font-extrabold text-marine mb-2">
             Connexion réussie
           </h1>
-          <p className="text-sm text-gris-texte">
-            Redirection en cours...
-          </p>
+          <p className="text-sm text-gris-texte">Redirection en cours...</p>
         </div>
       </section>
     );
@@ -104,7 +195,10 @@ export default function ConnexionPage() {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label htmlFor="email" className="block text-xs font-bold text-ink mb-1.5 uppercase tracking-wider">
+            <label
+              htmlFor="email"
+              className="block text-xs font-bold text-ink mb-1.5 uppercase tracking-wider"
+            >
               Adresse email
             </label>
             <input
@@ -120,7 +214,10 @@ export default function ConnexionPage() {
 
           <div>
             <div className="flex items-center justify-between mb-1.5">
-              <label htmlFor="password" className="text-xs font-bold text-ink uppercase tracking-wider">
+              <label
+                htmlFor="password"
+                className="text-xs font-bold text-ink uppercase tracking-wider"
+              >
                 Mot de passe
               </label>
               <Link
@@ -162,7 +259,10 @@ export default function ConnexionPage() {
 
         <p className="text-center text-xs text-gris-texte mt-6">
           Pas encore de compte ?{' '}
-          <Link href="/inscription" className="text-marine font-bold hover:underline">
+          <Link
+            href="/inscription"
+            className="text-marine font-bold hover:underline"
+          >
             Créer un compte
           </Link>
         </p>
