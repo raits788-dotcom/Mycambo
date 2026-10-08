@@ -31,6 +31,9 @@ export interface StoredEstablishment {
   name: string;
   slug: string;
   description: string | null;
+  short_description: string | null;
+  long_description: string | null;
+  founded_year: number | null;
   address: string | null;
   city: string | null;
   lat: number | null;
@@ -38,16 +41,18 @@ export interface StoredEstablishment {
   phone: string | null;
   email: string | null;
   website: string | null;
+  whatsapp: string | null;
+  facebook: string | null;
+  instagram: string | null;
   photos: string[] | null;
+  photos_limit: number | null;
   hours: Record<string, unknown> | null;
   status: 'pending' | 'approved' | 'suspended';
   is_featured: boolean;
   featured_position: number | null;
   created_at: string;
   updated_at: string;
-  // Relations
   categories?: { name: string; icon?: string } | null;
-  // Extensions locales (jamais utilisées côté BDD, garde la compat)
   rejectionReason?: string;
   submittedAt?: string;
   approvedAt?: string;
