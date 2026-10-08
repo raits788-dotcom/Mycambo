@@ -2,17 +2,10 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import {
-  ArrowLeft,
-  Eye,
-  Heart,
-  Star,
-  MapPin,
-  ExternalLink,
-  Trash2,
+  ArrowLeft, Eye, Heart, Star, MapPin, ExternalLink, Trash2, Loader2,
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
 import {
   getEstablishmentBySlug,
   getStatusConfig,
@@ -24,29 +17,28 @@ import DeleteEstablishmentModal from '@/components/partenaire/establishment/Dele
 
 export default function GererEtablissementPage() {
   const params = useParams();
-  const router = useRouter();
   const slug = params?.slug as string;
 
-  const [establishment, setEstablishment] = useState<StoredEstablishment | null>(
-    null
-  );
-  const [mounted, setMounted] = useState(false);
+  const [establishment, setEstablishment] = useState<StoredEstablishment | null>(null);
+  const [loading, setLoading] = useState(true);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
 
-  const reload = () => {
-    if (slug) setEstablishment(getEstablishmentBySlug(slug));
+  const reload = async () => {
+    if (!slug) return;
+    setLoading(true);
+    const data = await getEstablishmentBySlug(slug);
+    setEstablishment(data);
+    setLoading(false);
   };
 
   useEffect(() => {
-    if (slug) {
-      setEstablishment(getEstablishmentBySlug(slug));
-      setMounted(true);
-    }
+    reload();
   }, [slug]);
 
-  if (!mounted) {
+  if (loading) {
     return (
-      <div className="bg-white rounded-lg border border-gris-ligne p-12 text-center">
+      <div className="p-12 text-center">
+        <Loader2 size={24} className="text-marine animate-spin mx-auto mb-3" />
         <p className="text-sm text-gris-texte">Chargement...</p>
       </div>
     );
@@ -54,169 +46,114 @@ export default function GererEtablissementPage() {
 
   if (!establishment) {
     return (
-      <div className="bg-white rounded-lg border border-gris-ligne p-12 text-center">
-        <h2 className="text-lg font-bold text-marine mb-2">
-          Établissement introuvable
-        </h2>
-        <p className="text-sm text-gris-texte mb-6">
-          Cet établissement n&apos;existe pas ou ne vous appartient pas.
-        </p>
+      <div className="p-12 text-center">
+        <p className="text-gris-texte mb-4">Établissement introuvable.</p>
         <Link
           href="/espace-partenaire/etablissements"
-          className="inline-flex items-center gap-2 bg-marine text-white font-bold px-6 py-3 rounded-full hover:bg-marine-dark transition-colors text-sm"
+          className="text-marine font-bold hover:underline"
         >
-          <ArrowLeft size={14} />
-          Retour à mes établissements
+          ← Retour à mes établissements
         </Link>
       </div>
     );
   }
 
-  const config = getStatusConfig(establishment.status as EstablishmentStatus);
-  const isApproved = establishment.status === 'approved';
-  const isPending = establishment.status === 'pending';
-  const isRejected = establishment.status === 'rejected';
+  const statusConfig = getStatusConfig(establishment.status as EstablishmentStatus);
 
   return (
     <>
       <Link
         href="/espace-partenaire/etablissements"
-        className="inline-flex items-center gap-2 text-xs font-bold text-marine hover:underline mb-3"
+        className="inline-flex items-center gap-2 text-sm text-gris-texte hover:text-marine mb-4"
       >
-        <ArrowLeft size={12} />
+        <ArrowLeft size={14} />
         Retour à mes établissements
       </Link>
 
-      {/* En-tête fiche */}
-      <div className="bg-white rounded-lg border border-gris-ligne p-6 mb-6">
-        <div className="flex items-start gap-5 flex-wrap">
-          <div className="w-20 h-20 rounded-lg bg-gris-fond flex items-center justify-center text-3xl flex-shrink-0">
-            {establishment.type === 'association' && '🏫'}
-            {establishment.type === 'hotel' && '🏨'}
-            {establishment.type === 'restaurant' && '🍜'}
-            {establishment.type === 'activite' && '🛶'}
-            {establishment.type === 'boutique' && '🧵'}
-            {establishment.type === 'transport' && '🛺'}
-          </div>
-
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-2 flex-wrap">
+      {/* En-tête */}
+      <div className="bg-white rounded-xl border border-gris-ligne p-6 mb-6 shadow-cb-sm">
+        <div className="flex items-start justify-between gap-4 flex-wrap">
+          <div>
+            <div className="flex items-center gap-3 mb-2 flex-wrap">
               <h1 className="text-2xl font-extrabold text-marine">
                 {establishment.name}
               </h1>
               <span
-                className={cn(
-                  'text-[10px] font-bold px-2.5 py-1 rounded-full inline-flex items-center gap-1.5',
-                  config.bg,
-                  config.text
-                )}
+                className={
+                  'inline-flex px-2.5 py-0.5 rounded-full text-[11px] font-bold ' +
+                  statusConfig.bgColor +
+                  ' ' +
+                  statusConfig.color
+                }
               >
-                <i className={`fas ${config.icon}`} />
-                {config.label}
-              </span>
-              <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-blue-100 text-blue-700">
-                {establishment.typeLabel}
+                {statusConfig.label}
               </span>
             </div>
-
-            <div className="flex items-center gap-2 text-sm text-gris-texte mb-3 flex-wrap">
-              <span>{establishment.category}</span>
-              <span>·</span>
-              <span className="flex items-center gap-1">
-                <MapPin size={12} />
-                {establishment.city}
-              </span>
+            <div className="flex items-center gap-3 flex-wrap text-xs text-gris-texte">
+              {establishment.categories?.name && (
+                <span>{establishment.categories.name}</span>
+              )}
+              {establishment.city && (
+                <span className="flex items-center gap-1">
+                  <MapPin size={11} />
+                  {establishment.city}
+                </span>
+              )}
             </div>
-
-            {isApproved && (
-              <div className="flex items-center gap-4 text-xs text-gris-texte flex-wrap">
-                <span className="flex items-center gap-1">
-                  <Eye size={12} />
-                  <b className="text-marine">
-                    {(establishment.views || 0).toLocaleString('fr-FR')}
-                  </b>{' '}
-                  vues
-                </span>
-                <span className="flex items-center gap-1">
-                  <Heart size={12} className="text-red-500" />
-                  <b className="text-marine">{establishment.supports || 0}</b>{' '}
-                  soutiens
-                </span>
-                <span className="flex items-center gap-1">
-                  <Star size={12} className="fill-ic-or text-ic-or" />
-                  <b className="text-marine">{establishment.rating || 0}</b> (
-                  {establishment.reviewsCount || 0} avis)
-                </span>
-              </div>
-            )}
           </div>
 
-          {/* Actions */}
-          <div className="flex gap-2 flex-shrink-0 flex-wrap">
-            {isApproved && (
-              <a
-                href={`/commerce/${establishment.slug}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-xs font-bold border border-gris-ligne text-marine px-4 py-2 rounded-full hover:border-marine transition-colors whitespace-nowrap inline-flex items-center gap-1.5"
-              >
-                <Eye size={12} />
-                Aperçu public
-                <ExternalLink size={11} />
-              </a>
-            )}
-
+          <div className="flex gap-2 flex-wrap">
+            <a
+              href={`/commerce/${establishment.slug}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 border border-gris-ligne text-marine font-bold text-sm px-4 py-2.5 rounded-full hover:border-marine"
+            >
+              <ExternalLink size={14} />
+              Voir public
+            </a>
             <button
               onClick={() => setShowDeleteModal(true)}
-              className="text-xs font-bold border border-red-200 text-red-600 px-4 py-2 rounded-full hover:bg-red-50 transition-colors whitespace-nowrap inline-flex items-center gap-1.5"
+              className="flex items-center gap-2 border border-red-200 text-red-600 font-bold text-sm px-4 py-2.5 rounded-full hover:bg-red-50"
             >
-              <Trash2 size={12} />
-              {isApproved || isPending
-                ? 'Demander la suppression'
-                : 'Supprimer'}
+              <Trash2 size={14} />
+              Supprimer
             </button>
           </div>
         </div>
       </div>
 
-      {/* Bandeau statut */}
-      {isPending && (
-        <div className="bg-orange-50 border border-orange-200 rounded-lg p-4 mb-6 flex items-start gap-3">
-          <i className="fas fa-clock text-orange-600 mt-0.5" />
-          <div className="text-xs text-orange-800 leading-relaxed">
-            <b>En cours de validation par myCAMBO</b>
-            <br />
-            Votre demande est en cours d&apos;examen. Notre équipe vérifie vos
-            informations sous 48h ouvrées.
+      {/* KPIs */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <div className="bg-white rounded-xl border border-gris-ligne p-5 shadow-cb-sm">
+          <div className="flex items-center gap-2 text-xs text-gris-texte mb-3">
+            <Eye size={14} className="text-blue-600" /> Vues
           </div>
+          <div className="text-3xl font-extrabold text-marine">0</div>
         </div>
-      )}
-
-      {isRejected && establishment.rejectionReason && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6 flex items-start gap-3">
-          <i className="fas fa-exclamation-triangle text-red-500 mt-0.5" />
-          <div className="text-xs text-red-800 leading-relaxed">
-            <b>Refusé par myCAMBO</b>
-            <br />
-            <b>Motif :</b> {establishment.rejectionReason}
+        <div className="bg-white rounded-xl border border-gris-ligne p-5 shadow-cb-sm">
+          <div className="flex items-center gap-2 text-xs text-gris-texte mb-3">
+            <Heart size={14} className="text-red-500" /> Soutiens
           </div>
+          <div className="text-3xl font-extrabold text-marine">0</div>
         </div>
-      )}
+        <div className="bg-white rounded-xl border border-gris-ligne p-5 shadow-cb-sm">
+          <div className="flex items-center gap-2 text-xs text-gris-texte mb-3">
+            <Star size={14} className="text-yellow-500" /> Note
+          </div>
+          <div className="text-3xl font-extrabold text-marine">—</div>
+        </div>
+      </div>
 
-      {/* Onglets */}
+      {/* Tabs */}
       <EstablishmentTabs establishment={establishment} onUpdate={reload} />
 
-      {/* Modale de suppression */}
       {showDeleteModal && (
         <DeleteEstablishmentModal
-          establishmentSlug={establishment.slug}
-          establishmentName={establishment.name}
-          establishmentStatus={establishment.status}
-          isPublished={establishment.status === 'approved'}
+          establishment={establishment}
           onClose={() => setShowDeleteModal(false)}
-          onConfirmed={() => {
-            setShowDeleteModal(false);
-            router.push('/espace-partenaire/etablissements');
+          onDeleted={() => {
+            window.location.href = '/espace-partenaire/etablissements';
           }}
         />
       )}
