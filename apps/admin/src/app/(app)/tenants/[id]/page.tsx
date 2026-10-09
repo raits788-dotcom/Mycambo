@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import {
   getTenant, getTenantBusinesses, getTenantPayments, getTenantSubscription,
-  startImpersonation,
+  startImpersonation, resetTenantAdminPassword,
 } from '@/lib/services';
 
 const STATUS_STYLES: Record<string, string> = {
@@ -34,6 +34,7 @@ export default function TenantDetailPage({
   const [subscription, setSubscription] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [impersonating, setImpersonating] = useState(false);
+  const [resetting, setResetting] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -75,29 +76,33 @@ export default function TenantDetailPage({
     .filter((p) => p.status === 'paid')
     .reduce((s, p) => s + Number(p.amount), 0);
 
-const handleImpersonate = async () => {
-  setImpersonating(true);
-  try {
-    const data = await startImpersonation(tenant.id);
+  const handleImpersonate = async () => {
+    setImpersonating(true);
+    try {
+      const data = await startImpersonation(tenant.id);
+      const webBaseUrl = process.env.NEXT_PUBLIC_WEB_URL
+        || (typeof window !== 'undefined' && window.location.hostname.includes('github.dev')
+          ? window.location.origin.replace('-3001.', '-3000.')
+          : 'http://localhost:3000');
+      const tenantUrl = `${webBaseUrl}/espace-partenaire/dashboard?impersonate=${data.token}`;
+      window.open(tenantUrl, '_blank');
+    } catch (err) {
+      alert('Erreur : ' + (err as Error).message);
+    } finally {
+      setImpersonating(false);
+    }
+  };
 
-    // Détecte l'URL de base du web (localhost OU Codespaces)
-    const webBaseUrl = process.env.NEXT_PUBLIC_WEB_URL
-      || (typeof window !== 'undefined' && window.location.hostname.includes('github.dev')
-        ? window.location.origin.replace('-3001.', '-3000.')
-        : 'http://localhost:3000');
-
-    const tenantUrl = `${webBaseUrl}/espace-partenaire/dashboard?impersonate=${data.token}`;
-    window.open(tenantUrl, '_blank');
-  } catch (err) {
-    alert('Erreur : ' + (err as Error).message);
-  } finally {
-    setImpersonating(false);
-  }
-};
-
-  const handleResetPassword = () => {
-    if (confirm('Réinitialiser le mot de passe admin de ' + tenant.name + ' ?')) {
-      alert('✅ Email de réinitialisation envoyé à ' + tenant.email);
+  const handleResetPassword = async () => {
+    if (!confirm('Envoyer un email de réinitialisation à ' + tenant.email + ' ?')) return;
+    setResetting(true);
+    try {
+      const res = await resetTenantAdminPassword(tenant.id);
+      alert('✅ Email envoyé à ' + res.email);
+    } catch (err) {
+      alert('Erreur : ' + (err as Error).message);
+    } finally {
+      setResetting(false);
     }
   };
 
@@ -140,9 +145,13 @@ const handleImpersonate = async () => {
               <Shield size={14} />
               {impersonating ? 'Ouverture...' : 'Entrer dans le tenant'}
             </button>
-            <button onClick={handleResetPassword} className="flex items-center gap-2 border border-gris-ligne text-marine font-bold text-sm px-4 py-2.5 rounded-full hover:border-marine">
+            <button
+              onClick={handleResetPassword}
+              disabled={resetting}
+              className="flex items-center gap-2 border border-gris-ligne text-marine font-bold text-sm px-4 py-2.5 rounded-full hover:border-marine disabled:opacity-50"
+            >
               <KeyRound size={14} />
-              Reset MDP admin
+              {resetting ? 'Envoi...' : 'Reset MDP admin'}
             </button>
           </div>
         </div>

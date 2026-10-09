@@ -3,17 +3,11 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import {
-  Search,
-  Plus,
-  Filter,
-  Eye,
-  Shield,
-  KeyRound,
-  Building2,
-  MoreHorizontal,
-  Loader2,
+  Search, Plus, Filter, Eye, Shield, KeyRound, Building2,
+  MoreHorizontal, Loader2, Trash2,
 } from 'lucide-react';
-import { getTenants } from '@/lib/services';
+import { getTenants, deleteTenant } from '@/lib/services';
+import CreateTenantModal from '@/components/CreateTenantModal';
 
 interface Tenant {
   id: string;
@@ -50,14 +44,32 @@ export default function TenantsPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | Tenant['status']>('all');
+  const [showCreate, setShowCreate] = useState(false);
+  const [deleting, setDeleting] = useState<string | null>(null);
+
+  const reload = async () => {
+    setLoading(true);
+    const data = await getTenants();
+    setTenants(data as Tenant[]);
+    setLoading(false);
+  };
 
   useEffect(() => {
-    (async () => {
-      const data = await getTenants();
-      setTenants(data as Tenant[]);
-      setLoading(false);
-    })();
+    reload();
   }, []);
+
+  const handleDelete = async (tenant: Tenant) => {
+    if (!confirm(`Supprimer définitivement "${tenant.name}" ?\n\nTous ses établissements seront aussi supprimés. Cette action est irréversible.`)) return;
+    setDeleting(tenant.id);
+    try {
+      await deleteTenant(tenant.id);
+      await reload();
+    } catch (err) {
+      alert('Erreur : ' + (err as Error).message);
+    } finally {
+      setDeleting(null);
+    }
+  };
 
   const filtered = tenants.filter((t) => {
     const matchSearch =
@@ -76,10 +88,15 @@ export default function TenantsPage() {
             Tenants
           </h1>
           <p className="text-sm text-gris-texte">
-            {loading ? 'Chargement...' : tenants.length + ' partenaires · ' + tenants.filter((t) => t.status === 'active').length + ' actifs'}
+            {loading
+              ? 'Chargement...'
+              : tenants.length + ' partenaires · ' + tenants.filter((t) => t.status === 'active').length + ' actifs'}
           </p>
         </div>
-        <button className="flex items-center gap-2 bg-marine text-white font-bold text-sm px-4 py-2.5 rounded-full hover:bg-marine-dark transition-colors">
+        <button
+          onClick={() => setShowCreate(true)}
+          className="flex items-center gap-2 bg-marine text-white font-bold text-sm px-4 py-2.5 rounded-full hover:bg-marine-dark transition-colors"
+        >
           <Plus size={15} />
           Nouveau tenant
         </button>
@@ -162,17 +179,36 @@ export default function TenantsPage() {
                     </td>
                     <td className="px-5 py-4">
                       <div className="flex items-center justify-end gap-1.5">
-                        <Link href={'/tenants/' + tenant.id} className="w-8 h-8 rounded-lg flex items-center justify-center text-gris-texte hover:bg-marine/10 hover:text-marine transition-colors" title="Voir">
+                        <Link
+                          href={'/tenants/' + tenant.id}
+                          className="w-8 h-8 rounded-lg flex items-center justify-center text-gris-texte hover:bg-marine/10 hover:text-marine transition-colors"
+                          title="Voir"
+                        >
                           <Eye size={14} />
                         </Link>
-                        <button className="w-8 h-8 rounded-lg flex items-center justify-center text-gris-texte hover:bg-purple-100 hover:text-purple-700 transition-colors" title="Impersonate">
+                        <Link
+                          href={'/tenants/' + tenant.id}
+                          className="w-8 h-8 rounded-lg flex items-center justify-center text-gris-texte hover:bg-purple-100 hover:text-purple-700 transition-colors"
+                          title="Impersonate"
+                        >
                           <Shield size={14} />
-                        </button>
-                        <button className="w-8 h-8 rounded-lg flex items-center justify-center text-gris-texte hover:bg-orange-100 hover:text-orange-700 transition-colors" title="Reset MDP">
+                        </Link>
+                        <Link
+                          href={'/tenants/' + tenant.id}
+                          className="w-8 h-8 rounded-lg flex items-center justify-center text-gris-texte hover:bg-orange-100 hover:text-orange-700 transition-colors"
+                          title="Reset MDP"
+                        >
                           <KeyRound size={14} />
-                        </button>
-                        <button className="w-8 h-8 rounded-lg flex items-center justify-center text-gris-texte hover:bg-gris-fond transition-colors">
-                          <MoreHorizontal size={14} />
+                        </Link>
+                        <button
+                          onClick={() => handleDelete(tenant)}
+                          disabled={deleting === tenant.id}
+                          className="w-8 h-8 rounded-lg flex items-center justify-center text-red-500 hover:bg-red-100 transition-colors disabled:opacity-50"
+                          title="Supprimer"
+                        >
+                          {deleting === tenant.id
+                            ? <Loader2 size={14} className="animate-spin" />
+                            : <Trash2 size={14} />}
                         </button>
                       </div>
                     </td>
@@ -187,6 +223,13 @@ export default function TenantsPage() {
       <div className="mt-5 text-xs text-gris-texte">
         {filtered.length} sur {tenants.length} tenants
       </div>
+
+      {showCreate && (
+        <CreateTenantModal
+          onClose={() => setShowCreate(false)}
+          onCreated={reload}
+        />
+      )}
     </>
   );
 }

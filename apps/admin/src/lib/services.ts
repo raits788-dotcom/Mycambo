@@ -290,3 +290,98 @@ export async function startImpersonation(tenantId: string) {
   if (!res.ok) throw new Error(data.error || 'IMPERSONATION_FAILED');
   return data as { token: string; expiresAt: string; tenantId: string; tenantName: string };
 }
+// ============================================================================
+// RESET PASSWORD
+// ============================================================================
+export async function resetTenantAdminPassword(tenantId: string) {
+  const supabase = getSupabase();
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) throw new Error('NOT_AUTHENTICATED');
+
+  const res = await fetch(
+    `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/reset-admin-password`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session.access_token}`,
+      },
+      body: JSON.stringify({ tenant_id: tenantId }),
+    }
+  );
+
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'RESET_FAILED');
+  return data as { success: boolean; email: string };
+}
+// ============================================================================
+// TENANTS CRUD
+// ============================================================================
+export async function createTenant(payload: {
+  name: string; email: string; phone?: string;
+  city?: string; address?: string; plan_id?: string;
+}) {
+  const supabase = getSupabase();
+  const { data, error } = await supabase.rpc('admin_create_tenant', {
+    p_name: payload.name,
+    p_email: payload.email,
+    p_phone: payload.phone || null,
+    p_city: payload.city || null,
+    p_address: payload.address || null,
+    p_plan_id: payload.plan_id || null,
+  });
+  if (error) throw error;
+  return data as string;
+}
+
+export async function deleteTenant(id: string) {
+  const supabase = getSupabase();
+  const { error } = await supabase.rpc('admin_delete_tenant', { p_tenant_id: id });
+  if (error) throw error;
+}
+// ============================================================================
+// PLANS CRUD
+// ============================================================================
+export async function createPlan(payload: {
+  name: string; slug?: string; price_monthly: number;
+  price_yearly?: number; max_businesses: number;
+  features: string[]; trial_days?: number;
+}) {
+  const supabase = getSupabase();
+  const slug = payload.slug || payload.name
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+
+  const { data, error } = await supabase.from('plans').insert({
+    name: payload.name,
+    slug,
+    price_monthly: payload.price_monthly,
+    price_yearly: payload.price_yearly || null,
+    max_businesses: payload.max_businesses,
+    features: payload.features,
+    trial_days: payload.trial_days || 0,
+    is_active: true,
+    position: 99,
+  }).select().single();
+  if (error) throw error;
+  return data;
+}
+
+export async function updatePlan(id: string, payload: Partial<{
+  name: string; price_monthly: number; price_yearly: number | null;
+  max_businesses: number; features: string[]; is_active: boolean;
+  trial_days: number;
+}>) {
+  const supabase = getSupabase();
+  const { error } = await supabase.from('plans').update(payload).eq('id', id);
+  if (error) throw error;
+}
+
+export async function deletePlan(id: string) {
+  const supabase = getSupabase();
+  const { error } = await supabase.from('plans').delete().eq('id', id);
+  if (error) throw error;
+}
