@@ -1,12 +1,13 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import PartnerSidebar from '@/components/partenaire/PartnerSidebar';
 import PartnerTopBar from '@/components/partenaire/PartnerTopBar';
 import ImpersonationBanner from '@/components/partenaire/ImpersonationBanner';
 import { getImpersonateToken, getImpersonatedTenant, clearImpersonation } from '@/lib/impersonation';
+import { createBrowserClient } from '@supabase/ssr';
 
 export default function PartnerAppLayout({
   children,
@@ -14,44 +15,55 @@ export default function PartnerAppLayout({
   children: React.ReactNode;
 }) {
   const router = useRouter();
+  const pathname = usePathname();
   const [checking, setChecking] = useState(true);
   const [authorized, setAuthorized] = useState(false);
   const [isImpersonating, setIsImpersonating] = useState(false);
 
   useEffect(() => {
+    let cancelled = false;
+
     (async () => {
-      // 1. Vérifie si on est en mode impersonation
+      // 1. Vérifie impersonation en priorité
       const token = getImpersonateToken();
       if (token) {
         const tenant = await getImpersonatedTenant();
+        if (cancelled) return;
+
         if (tenant) {
           setIsImpersonating(true);
           setAuthorized(true);
           setChecking(false);
           return;
-        } else {
-          // Token invalide/expiré
-          clearImpersonation();
         }
+        // Token invalide → on nettoie et on continue
+        clearImpersonation();
       }
 
-      // 2. Sinon, vérifie la session partenaire normale
-      const { createBrowserClient } = await import('@supabase/ssr');
+      // 2. Vérifie la session normale via getSession (plus fiable)
       const supabase = createBrowserClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
         process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
       );
-      const { data: { user } } = await supabase.auth.getUser();
 
-      if (!user) {
-        router.replace('/espace-partenaire/connexion');
+      const { data: { session } } = await supabase.auth.getSession();
+      if (cancelled) return;
+
+      if (!session) {
+        // Pas de session → redirection UNE SEULE FOIS
+        if (pathname !== '/espace-partenaire/connexion') {
+          router.replace('/espace-partenaire/connexion');
+        }
         return;
       }
 
+      // Session OK
       setAuthorized(true);
       setChecking(false);
     })();
-  }, [router]);
+
+    return () => { cancelled = true; };
+  }, [router, pathname]);
 
   if (checking) {
     return (
