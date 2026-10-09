@@ -1,308 +1,291 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
-import Image from 'next/image';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Eye, EyeOff, Check, AlertCircle, Mail } from 'lucide-react';
-import Honeypot from '@/components/auth/Honeypot';
-import { checkRecaptcha } from '@/components/auth/RecaptchaV3';
-import { isEmailSafe } from '@/lib/disposable-emails';
-import {
-  checkHoneypot,
-  isFormFilledTooFast,
-  checkSignupRateLimit,
-  formatRetryAfter,
-  HONEYPOT_FIELD_NAME,
-} from '@/lib/spam-protection';
-import { signupMock } from '@/lib/auth-mock';
+import { useRouter } from 'next/navigation';
+import { Loader2, Check, AlertCircle, ArrowLeft, Building2, Mail, Lock, User, Phone, MapPin } from 'lucide-react';
+import { createBrowserClient } from '@supabase/ssr';
+import { storeRefCode, getStoredRefCode, saveReferral } from '@/lib/referral';
 
 export default function InscriptionPage() {
+  const router = useRouter();
+
   const [form, setForm] = useState({
     name: '',
     email: '',
     password: '',
-    acceptCgu: false,
+    phone: '',
+    city: '',
   });
-  const [showPassword, setShowPassword] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [acceptTerms, setAcceptTerms] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
-  const startTime = useRef<number>(0);
 
+  // ─── Capture du code parrain depuis ?ref=CODE ─────────────
   useEffect(() => {
-    startTime.current = Date.now();
+    const params = new URLSearchParams(window.location.search);
+    const ref = params.get('ref');
+    if (ref) storeRefCode(ref);
   }, []);
 
-  // ===== Validation du mot de passe =====
-  const passwordChecks = {
-    length: form.password.length >= 8,
-    upper: /[A-Z]/.test(form.password),
-    digit: /[0-9]/.test(form.password),
-  };
-  const passwordValid =
-    passwordChecks.length && passwordChecks.upper && passwordChecks.digit;
-
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
-    // ===== 1. Honeypot =====
-    const formData = new FormData(e.currentTarget);
-    const honeypot = formData.get(HONEYPOT_FIELD_NAME) as string;
-    if (!checkHoneypot(honeypot)) {
-      setError('Erreur de validation.');
+    if (form.password.length < 8) {
+      setError('Le mot de passe doit contenir au moins 8 caractères.');
+      return;
+    }
+    if (!acceptTerms) {
+      setError('Vous devez accepter les conditions générales.');
       return;
     }
 
-    // ===== 2. Validation temporelle =====
-    if (isFormFilledTooFast(startTime.current)) {
-      setError('Formulaire rempli trop rapidement. Merci de réessayer.');
-      return;
-    }
+    setSaving(true);
 
-    // ===== 3. Validation email =====
-    const emailCheck = isEmailSafe(form.email);
-    if (!emailCheck.ok) {
-      setError(emailCheck.error || 'Email invalide.');
-      return;
-    }
-
-    // ===== 4. Validation mot de passe =====
-    if (!passwordValid) {
-      setError('Le mot de passe ne respecte pas les règles.');
-      return;
-    }
-
-    // ===== 5. CGU =====
-    if (!form.acceptCgu) {
-      setError('Vous devez accepter les CGU et la politique de confidentialité.');
-      return;
-    }
-
-    // ===== 6. Rate limiting =====
-    const rateLimit = checkSignupRateLimit();
-    if (!rateLimit.allowed) {
-      setError(
-        `Trop de tentatives. Réessayez dans ${formatRetryAfter(
-          rateLimit.retryAfterMs || 0
-        )}.`
+    try {
+      const supabase = createBrowserClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
       );
-      return;
+
+      // 1. Créer le compte auth
+      const { data: authData, error: authErr } = await supabase.auth.signUp({
+        email: form.email,
+        password: form.password,
+      });
+
+      if (authErr) throw authErr;
+      if (!authData.user) throw new Error('Utilisateur non créé');
+
+      // 2. Créer le tenant
+      const slug = form.name
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '') +
+        '-' + Math.random().toString(36).substring(2, 6);
+
+      const { data: tenant, error: tenantErr } = await supabase
+        .from('tenants')
+        .insert({
+          slug,
+          name: form.name,
+          email: form.email,
+          phone: form.phone || null,
+          city: form.city || null,
+          status: 'pending',
+        })
+        .select()
+        .single();
+
+      if (tenantErr) throw tenantErr;
+
+      // 3. Lier l'utilisateur au tenant
+      await supabase.from('tenant_users').insert({
+        tenant_id: tenant.id,
+        user_id: authData.user.id,
+        role: 'owner',
+      });
+
+      // 4. Enregistrer le parrainage si un code était stocké
+      const refCode = getStoredRefCode();
+      if (refCode && tenant?.id) {
+        await saveReferral({ code: refCode, referredTenantId: tenant.id });
+        sessionStorage.removeItem('mycambo_ref_code');
+      }
+
+      setSuccess(true);
+      setTimeout(() => {
+        router.push('/espace-partenaire/dashboard');
+      }, 2000);
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setSaving(false);
     }
-
-    // ===== 7. reCAPTCHA =====
-    const captcha = await checkRecaptcha('signup');
-    if (!captcha.ok) {
-      setError('Vérification anti-robot échouée.');
-      return;
-    }
-
-    // ===== 8. Création du compte =====
-    setLoading(true);
-    const result = signupMock({
-      name: form.name,
-      email: form.email,
-      password: form.password,
-    });
-
-    if (!result.ok) {
-      setError(result.error || 'Erreur lors de la création du compte.');
-      setLoading(false);
-      return;
-    }
-
-    setSuccess(true);
-    setLoading(false);
   };
 
-  // ===== Écran de confirmation email =====
   if (success) {
     return (
-      <section className="min-h-[calc(100vh-160px)] bg-gris-fond flex items-center justify-center px-4 py-12">
-        <div className="max-w-md w-full bg-white rounded-2xl shadow-lg p-8 text-center">
-          <div className="w-16 h-16 rounded-full bg-marine/10 flex items-center justify-center mx-auto mb-4">
-            <Mail size={32} className="text-marine" />
+      <div className="min-h-screen flex items-center justify-center bg-gris-fond p-4">
+        <div className="bg-white rounded-2xl border border-gris-ligne p-8 max-w-md w-full text-center shadow-cb-md">
+          <div className="w-16 h-16 rounded-full bg-green-100 text-green-600 flex items-center justify-center mx-auto mb-4">
+            <Check size={32} />
           </div>
-          <h1 className="text-2xl font-extrabold text-marine mb-3">
-            Vérifiez votre email
-          </h1>
-          <p className="text-sm text-gris-texte leading-relaxed mb-6">
-            Un email de confirmation a été envoyé à{' '}
-            <b className="text-marine">{form.email}</b>.
-            <br />
-            Cliquez sur le lien pour activer votre compte.
+          <h1 className="text-2xl font-extrabold text-marine mb-2">Compte créé !</h1>
+          <p className="text-sm text-gris-texte mb-6">
+            Votre demande a bien été enregistrée. Vous allez être redirigé vers votre espace.
           </p>
-
-          <div className="bg-gris-fond rounded-lg p-4 mb-6 text-left">
-            <div className="text-xs font-bold text-marine mb-2">
-              Vous ne trouvez pas l&apos;email ?
-            </div>
-            <ul className="text-xs text-gris-texte space-y-1">
-              <li>• Vérifiez vos spams / courriers indésirables</li>
-              <li>• Vérifiez l&apos;adresse saisie</li>
-              <li>• Patientez quelques minutes</li>
-            </ul>
-          </div>
-
-          <Link
-            href="/connexion"
-            className="inline-flex items-center justify-center gap-2 bg-marine text-white font-bold px-6 py-3 rounded-full hover:bg-marine-dark transition-colors text-sm w-full"
-          >
-            Aller à la connexion
-          </Link>
-
-          <div className="mt-4 text-xs text-gris-doux">
-            <b>Démo</b> : le lien de confirmation est dans la console du navigateur.
-          </div>
+          <Loader2 size={20} className="animate-spin text-marine mx-auto" />
         </div>
-      </section>
+      </div>
     );
   }
 
   return (
-    <section className="min-h-[calc(100vh-160px)] bg-gris-fond flex items-center justify-center px-4 py-12">
-      <div className="max-w-md w-full bg-white rounded-2xl shadow-lg p-8">
-        <div className="text-center mb-6">
-          <div className="inline-flex items-center gap-2 mb-4">
-            <span className="text-2xl font-black text-marine">my</span>
-            <span className="text-2xl font-black text-marine">CAMBO</span>
-          </div>
-          <h1 className="text-2xl font-extrabold text-marine mb-2">
-            Créer un compte
-          </h1>
-          <p className="text-sm text-gris-texte">
-            Gratuit et sécurisé. Votre email sera vérifié.
-          </p>
-        </div>
+    <div className="min-h-screen bg-gris-fond py-8 px-4">
+      <div className="max-w-md mx-auto">
+        <Link
+          href="/"
+          className="inline-flex items-center gap-2 text-sm text-gris-texte hover:text-marine mb-6"
+        >
+          <ArrowLeft size={14} />
+          Retour à l&apos;accueil
+        </Link>
 
-        {error && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4 flex items-start gap-2">
-            <AlertCircle size={16} className="text-red-500 flex-shrink-0 mt-0.5" />
-            <span className="text-xs text-red-700">{error}</span>
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <Honeypot />
-
-          <div>
-            <label htmlFor="name" className="block text-xs font-bold text-ink mb-1.5 uppercase tracking-wider">
-              Nom complet
-            </label>
-            <input
-              id="name"
-              type="text"
-              required
-              value={form.name}
-              onChange={(e) => setForm({ ...form, name: e.target.value })}
-              placeholder="Prénom Nom"
-              className="w-full border border-gris-ligne rounded-lg px-4 py-3 text-sm focus:border-marine focus:outline-none transition-colors"
-            />
+        <div className="bg-white rounded-2xl border border-gris-ligne p-8 shadow-cb-md">
+          <div className="text-center mb-6">
+            <h1 className="text-2xl font-extrabold text-marine mb-1">
+              Créer un compte partenaire
+            </h1>
+            <p className="text-sm text-gris-texte">
+              Rejoignez l&apos;annuaire MyCambo
+            </p>
           </div>
 
-          <div>
-            <label htmlFor="email" className="block text-xs font-bold text-ink mb-1.5 uppercase tracking-wider">
-              Adresse email
-            </label>
-            <input
-              id="email"
-              type="email"
-              required
-              value={form.email}
-              onChange={(e) => setForm({ ...form, email: e.target.value })}
-              placeholder="vous@exemple.com"
-              className="w-full border border-gris-ligne rounded-lg px-4 py-3 text-sm focus:border-marine focus:outline-none transition-colors"
-            />
-          </div>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="block text-xs font-bold text-gris-texte uppercase mb-1">
+                Nom de l&apos;établissement *
+              </label>
+              <div className="relative">
+                <Building2 size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gris-doux" />
+                <input
+                  type="text"
+                  required
+                  value={form.name}
+                  onChange={(e) => setForm({ ...form, name: e.target.value })}
+                  placeholder="Le Bistro Khmer"
+                  className="w-full pl-9 pr-3 py-2.5 text-sm rounded-lg border border-gris-ligne focus:border-marine focus:outline-none"
+                />
+              </div>
+            </div>
 
-          <div>
-            <label htmlFor="password" className="block text-xs font-bold text-ink mb-1.5 uppercase tracking-wider">
-              Mot de passe
-            </label>
-            <div className="relative">
+            <div>
+              <label className="block text-xs font-bold text-gris-texte uppercase mb-1">
+                Email *
+              </label>
+              <div className="relative">
+                <Mail size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gris-doux" />
+                <input
+                  type="email"
+                  required
+                  value={form.email}
+                  onChange={(e) => setForm({ ...form, email: e.target.value })}
+                  placeholder="contact@exemple.com"
+                  className="w-full pl-9 pr-3 py-2.5 text-sm rounded-lg border border-gris-ligne focus:border-marine focus:outline-none"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-gris-texte uppercase mb-1">
+                Mot de passe * (min. 8 caractères)
+              </label>
+              <div className="relative">
+                <Lock size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gris-doux" />
+                <input
+                  type="password"
+                  required
+                  minLength={8}
+                  value={form.password}
+                  onChange={(e) => setForm({ ...form, password: e.target.value })}
+                  placeholder="••••••••"
+                  className="w-full pl-9 pr-3 py-2.5 text-sm rounded-lg border border-gris-ligne focus:border-marine focus:outline-none"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-bold text-gris-texte uppercase mb-1">
+                  Téléphone
+                </label>
+                <div className="relative">
+                  <Phone size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gris-doux" />
+                  <input
+                    type="tel"
+                    value={form.phone}
+                    onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                    placeholder="+855..."
+                    className="w-full pl-9 pr-3 py-2.5 text-sm rounded-lg border border-gris-ligne focus:border-marine focus:outline-none"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gris-texte uppercase mb-1">
+                  Ville
+                </label>
+                <div className="relative">
+                  <MapPin size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gris-doux" />
+                  <input
+                    type="text"
+                    value={form.city}
+                    onChange={(e) => setForm({ ...form, city: e.target.value })}
+                    placeholder="Phnom Penh"
+                    className="w-full pl-9 pr-3 py-2.5 text-sm rounded-lg border border-gris-ligne focus:border-marine focus:outline-none"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <label className="flex items-start gap-2 text-xs cursor-pointer">
               <input
-                id="password"
-                type={showPassword ? 'text' : 'password'}
-                required
-                value={form.password}
-                onChange={(e) => setForm({ ...form, password: e.target.value })}
-                placeholder="8 caractères minimum"
-                className="w-full border border-gris-ligne rounded-lg px-4 py-3 text-sm focus:border-marine focus:outline-none transition-colors pr-10"
+                type="checkbox"
+                checked={acceptTerms}
+                onChange={(e) => setAcceptTerms(e.target.checked)}
+                className="mt-0.5"
               />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gris-doux hover:text-marine"
-                aria-label={showPassword ? 'Masquer' : 'Afficher'}
-              >
-                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-              </button>
-            </div>
+              <span className="text-gris-texte">
+                J&apos;accepte les{' '}
+                <Link href="/legal/cgu" className="text-marine font-bold hover:underline">
+                  conditions générales
+                </Link>{' '}
+                et la{' '}
+                <Link href="/legal/confidentialite" className="text-marine font-bold hover:underline">
+                  politique de confidentialité
+                </Link>
+              </span>
+            </label>
 
-            <div className="mt-2 space-y-1">
-              <PasswordRule ok={passwordChecks.length} label="8 caractères minimum" />
-              <PasswordRule ok={passwordChecks.upper} label="1 majuscule" />
-              <PasswordRule ok={passwordChecks.digit} label="1 chiffre" />
-            </div>
+            {error && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-3 flex items-start gap-2">
+                <AlertCircle size={16} className="text-red-500 flex-shrink-0 mt-0.5" />
+                <span className="text-xs text-red-700">{error}</span>
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={saving}
+              className="w-full bg-marine text-white font-bold py-3 rounded-full hover:bg-marine-dark disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              {saving ? (
+                <>
+                  <Loader2 size={14} className="animate-spin" />
+                  Création en cours...
+                </>
+              ) : (
+                'Créer mon compte'
+              )}
+            </button>
+          </form>
+
+          <div className="mt-6 pt-6 border-t border-gris-ligne text-center text-xs text-gris-texte">
+            Déjà un compte ?{' '}
+            <Link href="/espace-partenaire/connexion" className="text-marine font-bold hover:underline">
+              Se connecter
+            </Link>
           </div>
-
-          <label className="flex items-start gap-2.5 text-xs text-gris-texte cursor-pointer">
-            <input
-              type="checkbox"
-              checked={form.acceptCgu}
-              onChange={(e) => setForm({ ...form, acceptCgu: e.target.checked })}
-              className="mt-0.5 w-4 h-4 accent-marine"
-            />
-            <span>
-              J&apos;accepte les{' '}
-              <Link href="/legal/cgu" className="text-marine underline">
-                CGU
-              </Link>{' '}
-              et la{' '}
-              <Link href="/legal/confidentialite" className="text-marine underline">
-                politique de confidentialité
-              </Link>
-              .
-            </span>
-          </label>
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-marine text-white font-bold py-3 rounded-full hover:bg-marine-dark transition-colors text-sm disabled:opacity-60"
-          >
-            {loading ? 'Création...' : 'Créer mon compte'}
-          </button>
-        </form>
-
-        <p className="text-center text-xs text-gris-texte mt-6">
-          Déjà un compte ?{' '}
-          <Link href="/connexion" className="text-marine font-bold hover:underline">
-            Se connecter
-          </Link>
-        </p>
-
-        <div className="mt-6 pt-6 border-t border-gris-ligne text-center">
-          <p className="text-xs text-gris-texte mb-2">
-            Vous êtes un commerce ?
-          </p>
-          <Link
-            href="/partenaire"
-            className="text-xs text-marine font-bold hover:underline"
-          >
-            Devenir partenaire →
-          </Link>
         </div>
-      </div>
-    </section>
-  );
-}
 
-function PasswordRule({ ok, label }: { ok: boolean; label: string }) {
-  return (
-    <div className={`flex items-center gap-1.5 text-[11px] ${ok ? 'text-green-600' : 'text-gris-doux'}`}>
-      {ok ? <Check size={11} /> : <span className="w-[11px] h-[11px] inline-block">•</span>}
-      <span>{label}</span>
+        <p className="text-[11px] text-center text-gris-doux mt-6">
+          🔒 Vos données sont sécurisées · Validation manuelle par l&apos;équipe MyCambo
+        </p>
+      </div>
     </div>
   );
 }

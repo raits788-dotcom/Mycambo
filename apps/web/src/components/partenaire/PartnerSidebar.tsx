@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard, Store, Inbox, Star, BarChart3,
-  Users, User, Settings, Loader2,
+  Users, User, Settings, Loader2, Gift,
 } from 'lucide-react';
 import { cn } from '@my-cambo/utils';
 import { useCurrentTenant } from '@/lib/use-current-tenant';
@@ -19,6 +19,7 @@ const NAV_ITEMS = [
 
 const ACCOUNT_ITEMS = [
   { id: 'equipe', label: 'Mon équipe', icon: Users, href: '/espace-partenaire/equipe' },
+  { id: 'parrainage', label: 'Parrainage', icon: Gift, href: '/espace-partenaire/parrainage' },
   { id: 'profil', label: 'Mon profil', icon: User, href: '/espace-partenaire/profil' },
   { id: 'parametres', label: 'Paramètres', icon: Settings, href: '/espace-partenaire/parametres' },
 ];
