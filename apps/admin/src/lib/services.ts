@@ -385,3 +385,148 @@ export async function deletePlan(id: string) {
   const { error } = await supabase.from('plans').delete().eq('id', id);
   if (error) throw error;
 }
+// ============================================================================
+// PLAN FEATURES (catalogue)
+// ============================================================================
+export async function getPlanFeatures() {
+  const supabase = getSupabase();
+  const { data, error } = await supabase
+    .from('plan_features')
+    .select('*')
+    .order('position', { ascending: true });
+  if (error) { console.error('getPlanFeatures:', error); return []; }
+  return data || [];
+}
+
+export async function createPlanFeature(payload: {
+  code: string; label: string; description?: string;
+  category: string; metadata?: Record<string, unknown>;
+}) {
+  const supabase = getSupabase();
+  const { data, error } = await supabase.from('plan_features').insert({
+    code: payload.code,
+    label: payload.label,
+    description: payload.description || null,
+    category: payload.category,
+    metadata: payload.metadata || {},
+    is_active: true,
+  }).select().single();
+  if (error) throw error;
+  return data;
+}
+
+export async function updatePlanFeature(id: string, payload: Partial<{
+  label: string; description: string; category: string;
+  metadata: Record<string, unknown>; is_active: boolean;
+}>) {
+  const supabase = getSupabase();
+  const { error } = await supabase.from('plan_features').update(payload).eq('id', id);
+  if (error) throw error;
+}
+
+export async function deletePlanFeature(id: string) {
+  const supabase = getSupabase();
+  const { error } = await supabase.from('plan_features').delete().eq('id', id);
+  if (error) throw error;
+}
+
+// ============================================================================
+// PLAN VERSIONS
+// ============================================================================
+export async function getPlanVersions(planId: string) {
+  const supabase = getSupabase();
+  const { data, error } = await supabase
+    .from('plan_versions')
+    .select('*')
+    .eq('plan_id', planId)
+    .order('version', { ascending: false });
+  if (error) { console.error('getPlanVersions:', error); return []; }
+  return data || [];
+}
+
+export async function getCurrentPlanVersion(planId: string) {
+  const supabase = getSupabase();
+  const { data, error } = await supabase
+    .from('plan_versions')
+    .select('*')
+    .eq('plan_id', planId)
+    .eq('status', 'current')
+    .maybeSingle();
+  if (error) { console.error('getCurrentPlanVersion:', error); return null; }
+  return data;
+}
+
+export async function getPlansWithCurrentVersion() {
+  const supabase = getSupabase();
+  const { data: plans, error: plansErr } = await supabase
+    .from('plans')
+    .select('*')
+    .order('position', { ascending: true });
+  if (plansErr) { console.error('getPlansWithCurrentVersion:', plansErr); return []; }
+
+  const { data: versions, error: versErr } = await supabase
+    .from('plan_versions')
+    .select('*')
+    .eq('status', 'current');
+  if (versErr) { console.error('versions:', versErr); return plans || []; }
+
+  const { data: features } = await supabase
+    .from('plan_features')
+    .select('*');
+
+  return (plans || []).map((p: any) => {
+    const v = (versions || []).find((ver: any) => ver.plan_id === p.id);
+    const featureIds: string[] = v?.feature_ids || [];
+    const planFeatures = (features || []).filter((f: any) => featureIds.includes(f.id));
+    return {
+      ...p,
+      current_version: v || null,
+      features_details: planFeatures,
+    };
+  });
+}
+
+export async function createPlanWithVersion(payload: {
+  name: string; price_monthly: number; price_yearly: number | null;
+  max_businesses: number; trial_days: number; feature_ids: string[];
+}) {
+  const supabase = getSupabase();
+  const { data, error } = await supabase.rpc('admin_create_plan_with_version', {
+    p_name: payload.name,
+    p_price_monthly: payload.price_monthly,
+    p_price_yearly: payload.price_yearly,
+    p_max_businesses: payload.max_businesses,
+    p_trial_days: payload.trial_days,
+    p_feature_ids: payload.feature_ids,
+  });
+  if (error) throw error;
+  return data as string;
+}
+
+export async function createNewPlanVersion(payload: {
+  plan_id: string; price_monthly: number; price_yearly: number | null;
+  max_businesses: number; trial_days: number; feature_ids: string[];
+  notes?: string;
+}) {
+  const supabase = getSupabase();
+  const { data, error } = await supabase.rpc('admin_create_plan_version', {
+    p_plan_id: payload.plan_id,
+    p_price_monthly: payload.price_monthly,
+    p_price_yearly: payload.price_yearly,
+    p_max_businesses: payload.max_businesses,
+    p_trial_days: payload.trial_days,
+    p_feature_ids: payload.feature_ids,
+    p_notes: payload.notes || null,
+  });
+  if (error) throw error;
+  return data as string;
+}
+
+export async function migrateSubscriptionsToCurrentVersion(planId: string) {
+  const supabase = getSupabase();
+  const { data, error } = await supabase.rpc('admin_migrate_subscriptions_to_current_version', {
+    p_plan_id: planId,
+  });
+  if (error) throw error;
+  return data as number;
+}
