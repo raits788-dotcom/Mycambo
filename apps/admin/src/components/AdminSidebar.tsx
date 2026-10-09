@@ -20,6 +20,7 @@ import {
   Users,
   Settings,
   Shield,
+  Gift,
   Loader2,
 } from 'lucide-react';
 import { cn } from '@my-cambo/utils';
@@ -59,6 +60,7 @@ const NAV_SECTIONS: NavSection[] = [
       { id: 'formules', label: 'Formules', icon: Package, href: '/formules' },
       { id: 'abonnements', label: 'Abonnements', icon: CreditCard, href: '/abonnements' },
       { id: 'paiements', label: 'Paiements', icon: DollarSign, href: '/paiements' },
+      { id: 'parrainage', label: 'Parrainage', icon: Gift, href: '/parrainage' },
       { id: 'ca', label: "Chiffre d'affaires", icon: TrendingUp, href: '/abonnements?tab=ca' },
     ],
   },

@@ -530,3 +530,94 @@ export async function migrateSubscriptionsToCurrentVersion(planId: string) {
   if (error) throw error;
   return data as number;
 }
+// ============================================================================
+// REFERRAL / PARRAINAGE
+// ============================================================================
+export async function getReferralSettings() {
+  const supabase = getSupabase();
+  const { data } = await supabase.from('referral_settings').select('*').eq('id', 1).maybeSingle();
+  return data || { enabled: true, referee_discount_percent: 10 };
+}
+
+export async function updateReferralSettings(payload: {
+  enabled: boolean; referee_discount_percent: number;
+}) {
+  const supabase = getSupabase();
+  const { error } = await supabase.from('referral_settings').update({
+    ...payload, updated_at: new Date().toISOString(),
+  }).eq('id', 1);
+  if (error) throw error;
+}
+
+export async function getReferralTiers() {
+  const supabase = getSupabase();
+  const { data, error } = await supabase
+    .from('referral_tiers')
+    .select('*')
+    .order('tier_order', { ascending: true });
+  if (error) { console.error('getReferralTiers:', error); return []; }
+  return data || [];
+}
+
+export async function createReferralTier(payload: {
+  tier_order: number; referrals_required: number;
+  reward_type: 'discount_percent' | 'free_months';
+  reward_value: number; badge_name?: string; badge_color?: string;
+}) {
+  const supabase = getSupabase();
+  const { error } = await supabase.from('referral_tiers').insert(payload);
+  if (error) throw error;
+}
+
+export async function updateReferralTier(id: string, payload: Partial<{
+  tier_order: number; referrals_required: number;
+  reward_type: 'discount_percent' | 'free_months';
+  reward_value: number; badge_name: string; badge_color: string;
+  is_active: boolean;
+}>) {
+  const supabase = getSupabase();
+  const { error } = await supabase.from('referral_tiers').update(payload).eq('id', id);
+  if (error) throw error;
+}
+
+export async function deleteReferralTier(id: string) {
+  const supabase = getSupabase();
+  const { error } = await supabase.from('referral_tiers').delete().eq('id', id);
+  if (error) throw error;
+}
+
+export async function getReferrals() {
+  const supabase = getSupabase();
+  const { data, error } = await supabase
+    .from('referrals')
+    .select(`
+      *,
+      referrer:tenants!referrals_referrer_tenant_id_fkey(id, name, email),
+      referred:tenants!referrals_referred_tenant_id_fkey(id, name, email)
+    `)
+    .order('created_at', { ascending: false });
+  if (error) { console.error('getReferrals:', error); return []; }
+  return data || [];
+}
+
+export async function getReferralsStats() {
+  const supabase = getSupabase();
+  const { data } = await supabase.from('referrals').select('status');
+  const all = data || [];
+  return {
+    total: all.length,
+    pending: all.filter((r: any) => r.status === 'pending').length,
+    qualified: all.filter((r: any) => r.status === 'qualified').length,
+    cancelled: all.filter((r: any) => r.status === 'cancelled').length,
+  };
+}
+
+export async function getReferralCodes() {
+  const supabase = getSupabase();
+  const { data, error } = await supabase
+    .from('referral_codes')
+    .select('*, tenants(name, email)')
+    .order('created_at', { ascending: false });
+  if (error) { console.error('getReferralCodes:', error); return []; }
+  return data || [];
+}
