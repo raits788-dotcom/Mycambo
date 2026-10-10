@@ -489,18 +489,62 @@ export async function getPlansWithCurrentVersion() {
 export async function createPlanWithVersion(payload: {
   name: string; price_monthly: number; price_yearly: number | null;
   max_businesses: number; trial_days: number; feature_ids: string[];
+  audience?: 'business' | 'association';
 }) {
   const supabase = getSupabase();
-  const { data, error } = await supabase.rpc('admin_create_plan_with_version', {
-    p_name: payload.name,
-    p_price_monthly: payload.price_monthly,
-    p_price_yearly: payload.price_yearly,
-    p_max_businesses: payload.max_businesses,
-    p_trial_days: payload.trial_days,
-    p_feature_ids: payload.feature_ids,
+
+  // 1. Insère le plan (audience incluse)
+  const slug = payload.name
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+
+  const { data: plan, error: planErr } = await supabase
+    .from('plans')
+    .insert({
+      name: payload.name,
+      slug,
+      price_monthly: payload.price_monthly,
+      price_yearly: payload.price_yearly,
+      max_businesses: payload.max_businesses,
+      features: [],
+      trial_days: payload.trial_days,
+      is_active: true,
+      position: 99,
+      audience: payload.audience || 'business',
+    })
+    .select()
+    .single();
+
+  if (planErr) throw planErr;
+
+  // 2. Crée la version 1
+  const { error: verErr } = await supabase
+    .from('plan_versions')
+    .insert({
+      plan_id: plan.id,
+      version: 1,
+      price_monthly: payload.price_monthly,
+      price_yearly: payload.price_yearly,
+      max_businesses: payload.max_businesses,
+      trial_days: payload.trial_days,
+      feature_ids: payload.feature_ids,
+      status: 'current',
+    });
+
+  if (verErr) throw verErr;
+
+  // 3. Log audit
+  await supabase.from('audit_logs').insert({
+    actor_type: 'superadmin',
+    action: 'plan.create',
+    entity_type: 'plan',
+    entity_id: plan.id,
   });
-  if (error) throw error;
-  return data as string;
+
+  return plan.id;
 }
 
 export async function createNewPlanVersion(payload: {
@@ -620,4 +664,77 @@ export async function getReferralCodes() {
     .order('created_at', { ascending: false });
   if (error) { console.error('getReferralCodes:', error); return []; }
   return data || [];
+}
+// ============================================================================
+// AUDIENCE (business / association)
+// ============================================================================
+export async function getPlansByAudience(audience: 'business' | 'association') {
+  const supabase = getSupabase();
+
+  const { data: plans, error: plansErr } = await supabase
+    .from('plans')
+    .select('*')
+    .eq('audience', audience)
+    .order('position', { ascending: true });
+
+  if (plansErr) { console.error('getPlansByAudience:', plansErr); return []; }
+
+  const { data: versions } = await supabase
+    .from('plan_versions')
+    .select('*')
+    .eq('status', 'current');
+
+  const { data: features } = await supabase
+    .from('plan_features')
+    .select('*');
+
+  return (plans || []).map((p: any) => {
+    const v = (versions || []).find((ver: any) => ver.plan_id === p.id);
+    const featureIds: string[] = v?.feature_ids || [];
+    const planFeatures = (features || []).filter((f: any) => featureIds.includes(f.id));
+    return { ...p, current_version: v || null, features_details: planFeatures };
+  });
+}
+
+export async function getReferralBadgeForTenant(tenantId: string) {
+  const supabase = getSupabase();
+  const { data } = await supabase
+    .rpc('count_qualified_referrals', { p_tenant_id: tenantId });
+  return (data as number) || 0;
+}
+// ============================================================================
+// VALIDATION TENANT (approve / reject)
+// ============================================================================
+export async function approveTenant(tenantId: string) {
+  const supabase = getSupabase();
+  const { error } = await supabase
+    .from('tenants')
+    .update({ status: 'active' })
+    .eq('id', tenantId);
+
+  if (error) throw error;
+
+  await supabase.from('audit_logs').insert({
+    actor_type: 'superadmin',
+    action: 'tenant.approve',
+    entity_type: 'tenant',
+    entity_id: tenantId,
+  });
+}
+
+export async function suspendTenant(tenantId: string) {
+  const supabase = getSupabase();
+  const { error } = await supabase
+    .from('tenants')
+    .update({ status: 'suspended' })
+    .eq('id', tenantId);
+
+  if (error) throw error;
+
+  await supabase.from('audit_logs').insert({
+    actor_type: 'superadmin',
+    action: 'tenant.suspend',
+    entity_type: 'tenant',
+    entity_id: tenantId,
+  });
 }

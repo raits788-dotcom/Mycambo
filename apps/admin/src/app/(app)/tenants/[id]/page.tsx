@@ -9,6 +9,7 @@ import {
 import {
   getTenant, getTenantBusinesses, getTenantPayments, getTenantSubscription,
   startImpersonation, resetTenantAdminPassword,
+  approveTenant, suspendTenant,
 } from '@/lib/services';
 
 const STATUS_STYLES: Record<string, string> = {
@@ -35,6 +36,8 @@ export default function TenantDetailPage({
   const [loading, setLoading] = useState(true);
   const [impersonating, setImpersonating] = useState(false);
   const [resetting, setResetting] = useState(false);
+  const [approving, setApproving] = useState(false);
+  const [suspending, setSuspending] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -93,6 +96,32 @@ export default function TenantDetailPage({
     }
   };
 
+const handleApprove = async () => {
+  if (!confirm(`Approuver le tenant "${tenant.name}" ?`)) return;
+  setApproving(true);
+  try {
+    await approveTenant(tenant.id);
+    setTenant({ ...tenant, status: 'active' });
+  } catch (err) {
+    alert('Erreur : ' + (err as Error).message);
+  } finally {
+    setApproving(false);
+  }
+};
+
+const handleSuspend = async () => {
+  if (!confirm(`Suspendre le tenant "${tenant.name}" ?`)) return;
+  setSuspending(true);
+  try {
+    await suspendTenant(tenant.id);
+    setTenant({ ...tenant, status: 'suspended' });
+  } catch (err) {
+    alert('Erreur : ' + (err as Error).message);
+  } finally {
+    setSuspending(false);
+  }
+};
+
   const handleResetPassword = async () => {
     if (!confirm('Envoyer un email de réinitialisation à ' + tenant.email + ' ?')) return;
     setResetting(true);
@@ -136,24 +165,58 @@ export default function TenantDetailPage({
               </div>
             </div>
           </div>
-          <div className="flex gap-2 flex-wrap">
-            <button
-              onClick={handleImpersonate}
-              disabled={impersonating}
-              className="flex items-center gap-2 bg-purple-600 text-white font-bold text-sm px-4 py-2.5 rounded-full hover:bg-purple-700 disabled:opacity-50"
-            >
-              <Shield size={14} />
-              {impersonating ? 'Ouverture...' : 'Entrer dans le tenant'}
-            </button>
-            <button
-              onClick={handleResetPassword}
-              disabled={resetting}
-              className="flex items-center gap-2 border border-gris-ligne text-marine font-bold text-sm px-4 py-2.5 rounded-full hover:border-marine disabled:opacity-50"
-            >
-              <KeyRound size={14} />
-              {resetting ? 'Envoi...' : 'Reset MDP admin'}
-            </button>
-          </div>
+<div className="flex gap-2 flex-wrap">
+  {tenant.status === 'pending' && (
+    <button
+      onClick={handleApprove}
+      disabled={approving}
+      className="flex items-center gap-2 bg-green-600 text-white font-bold text-sm px-4 py-2.5 rounded-full hover:bg-green-700 disabled:opacity-50"
+    >
+      <CheckCircle2 size={14} />
+      {approving ? 'Approbation...' : 'Approuver'}
+    </button>
+  )}
+
+  {tenant.status === 'active' && (
+    <button
+      onClick={handleSuspend}
+      disabled={suspending}
+      className="flex items-center gap-2 border border-orange-200 text-orange-600 font-bold text-sm px-4 py-2.5 rounded-full hover:bg-orange-50 disabled:opacity-50"
+    >
+      <XCircle size={14} />
+      {suspending ? 'Suspension...' : 'Suspendre'}
+    </button>
+  )}
+
+  {tenant.status === 'suspended' && (
+    <button
+      onClick={handleApprove}
+      disabled={approving}
+      className="flex items-center gap-2 bg-green-600 text-white font-bold text-sm px-4 py-2.5 rounded-full hover:bg-green-700 disabled:opacity-50"
+    >
+      <CheckCircle2 size={14} />
+      {approving ? 'Réactivation...' : 'Réactiver'}
+    </button>
+  )}
+
+  <button
+    onClick={handleImpersonate}
+    disabled={impersonating}
+    className="flex items-center gap-2 bg-purple-600 text-white font-bold text-sm px-4 py-2.5 rounded-full hover:bg-purple-700 disabled:opacity-50"
+  >
+    <Shield size={14} />
+    {impersonating ? 'Ouverture...' : 'Entrer dans le tenant'}
+  </button>
+
+  <button
+    onClick={handleResetPassword}
+    disabled={resetting}
+    className="flex items-center gap-2 border border-gris-ligne text-marine font-bold text-sm px-4 py-2.5 rounded-full hover:border-marine disabled:opacity-50"
+  >
+    <KeyRound size={14} />
+    {resetting ? 'Envoi...' : 'Reset MDP admin'}
+  </button>
+</div>
         </div>
       </div>
 

@@ -3,17 +3,20 @@
 import { useState, useEffect } from 'react';
 import {
   Package, Check, Loader2, Plus, Edit3, Trash2, ListChecks, Power,
+  Building2, Heart,
 } from 'lucide-react';
 import {
-  getPlansWithCurrentVersion, deletePlan, updatePlan,
+  getPlansByAudience, deletePlan, updatePlan,
   getPlanFeatures, createPlanFeature, updatePlanFeature, deletePlanFeature,
 } from '@/lib/services';
 import PlanVersionModal from '@/components/PlanVersionModal';
 
 type TabId = 'plans' | 'features';
+type Audience = 'business' | 'association';
 
 export default function PlansPage() {
   const [tab, setTab] = useState<TabId>('plans');
+  const [audience, setAudience] = useState<Audience>('business');
   const [plans, setPlans] = useState<any[]>([]);
   const [features, setFeatures] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -24,13 +27,16 @@ export default function PlansPage() {
 
   const reload = async () => {
     setLoading(true);
-    const [p, f] = await Promise.all([getPlansWithCurrentVersion(), getPlanFeatures()]);
+    const [p, f] = await Promise.all([
+      getPlansByAudience(audience),
+      getPlanFeatures(),
+    ]);
     setPlans(p);
     setFeatures(f);
     setLoading(false);
   };
 
-  useEffect(() => { reload(); }, []);
+  useEffect(() => { reload(); }, [audience]);
 
   const handleTogglePlan = async (plan: any) => {
     if (!confirm(`Voulez-vous ${plan.is_active ? 'désactiver' : 'activer'} "${plan.name}" ?`)) return;
@@ -70,12 +76,14 @@ export default function PlansPage() {
             Formules d&apos;abonnement
           </h1>
           <p className="text-sm text-gris-texte">
-            {loading ? 'Chargement...' : `${plans.length} formules · ${features.length} fonctionnalités`}
+            {loading
+              ? 'Chargement...'
+              : `${plans.length} formules · ${features.length} fonctionnalités au catalogue`}
           </p>
         </div>
       </div>
 
-      {/* Tabs */}
+      {/* Tabs principaux */}
       <div className="flex gap-2 border-b border-gris-ligne mb-6">
         <button
           onClick={() => setTab('plans')}
@@ -97,21 +105,57 @@ export default function PlansPage() {
         </button>
       </div>
 
-      {/* ─── Onglet FORMULES ─── */}
+      {/* Sélecteur audience (uniquement sur onglet Formules) */}
       {tab === 'plans' && (
-        <>
-          <div className="flex justify-end mb-5">
+        <div className="flex items-center gap-3 mb-5 flex-wrap">
+          <div className="bg-gris-fond rounded-full p-1 flex">
+            <button
+              onClick={() => setAudience('business')}
+              className={
+                'flex items-center gap-2 px-4 py-2 rounded-full text-sm font-bold transition-all ' +
+                (audience === 'business'
+                  ? 'bg-marine text-white'
+                  : 'text-gris-texte hover:text-marine')
+              }
+            >
+              <Building2 size={14} /> Commerces
+            </button>
+            <button
+              onClick={() => setAudience('association')}
+              className={
+                'flex items-center gap-2 px-4 py-2 rounded-full text-sm font-bold transition-all ' +
+                (audience === 'association'
+                  ? 'bg-khmer text-white'
+                  : 'text-gris-texte hover:text-marine')
+              }
+            >
+              <Heart size={14} /> Associations
+            </button>
+          </div>
+          <div className="ml-auto">
             <button
               onClick={() => setShowCreate(true)}
               className="flex items-center gap-2 bg-marine text-white font-bold text-sm px-4 py-2.5 rounded-full hover:bg-marine-dark"
             >
-              <Plus size={15} /> Nouvelle formule
+              <Plus size={15} /> Nouvelle formule {audience === 'business' ? 'commerce' : 'association'}
             </button>
           </div>
+        </div>
+      )}
 
+      {/* ─── Onglet FORMULES ─── */}
+      {tab === 'plans' && (
+        <>
           {loading ? (
             <div className="p-12 text-center bg-white rounded-xl border border-gris-ligne">
               <Loader2 size={24} className="text-marine animate-spin mx-auto" />
+            </div>
+          ) : plans.length === 0 ? (
+            <div className="p-12 text-center bg-white rounded-xl border border-gris-ligne">
+              <Package size={32} className="text-gris-doux mx-auto mb-3" />
+              <p className="text-sm text-gris-texte">
+                Aucune formule pour {audience === 'business' ? 'les commerces' : 'les associations'}.
+              </p>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -122,7 +166,9 @@ export default function PlansPage() {
                     key={plan.id}
                     className={
                       'bg-white rounded-xl border-2 p-6 transition-all ' +
-                      (plan.is_active ? 'border-gris-ligne hover:border-marine' : 'border-dashed border-gris-ligne opacity-60')
+                      (plan.is_active
+                        ? 'border-gris-ligne hover:border-marine'
+                        : 'border-dashed border-gris-ligne opacity-60')
                     }
                   >
                     <div className="flex items-start justify-between mb-4">
@@ -141,9 +187,13 @@ export default function PlansPage() {
                     <div className="mb-4 pb-4 border-b border-gris-ligne">
                       <div className="flex items-baseline gap-1">
                         <span className="text-3xl font-extrabold text-marine">
-                          {Number(v?.price_monthly ?? plan.price_monthly) === 0 ? 'Gratuit' : (v?.price_monthly ?? plan.price_monthly) + ' $'}
+                          {Number(v?.price_monthly ?? plan.price_monthly) === 0
+                            ? 'Gratuit'
+                            : (v?.price_monthly ?? plan.price_monthly) + ' $'}
                         </span>
-                        {Number(v?.price_monthly ?? plan.price_monthly) > 0 && <span className="text-xs text-gris-texte">/ mois</span>}
+                        {Number(v?.price_monthly ?? plan.price_monthly) > 0 && (
+                          <span className="text-xs text-gris-texte">/ mois</span>
+                        )}
                       </div>
                       {v?.price_yearly > 0 && (
                         <div className="text-xs text-gris-texte mt-1">
@@ -169,7 +219,7 @@ export default function PlansPage() {
                       ))}
                       {(plan.features_details || []).length > 5 && (
                         <li className="text-xs text-gris-doux italic pl-5">
-                          +{plan.features_details.length - 5} autres...
+                          +{plan.features_details.length - 5} autres
                         </li>
                       )}
                     </ul>
@@ -218,7 +268,9 @@ export default function PlansPage() {
 
           <div className="bg-white rounded-xl border border-gris-ligne overflow-hidden shadow-cb-sm">
             {loading ? (
-              <div className="p-12 text-center"><Loader2 size={24} className="text-marine animate-spin mx-auto" /></div>
+              <div className="p-12 text-center">
+                <Loader2 size={24} className="text-marine animate-spin mx-auto" />
+              </div>
             ) : (
               <table className="w-full text-sm">
                 <thead className="bg-gris-fond text-gris-texte text-xs uppercase tracking-wider">
@@ -236,7 +288,22 @@ export default function PlansPage() {
                     <tr key={f.id} className="hover:bg-gris-fond/50">
                       <td className="px-5 py-3 font-bold text-marine">{f.label}</td>
                       <td className="px-3 py-3 text-xs font-mono text-gris-texte">{f.code}</td>
-                      <td className="px-3 py-3 text-xs text-gris-texte">{f.category}</td>
+                      <td className="px-3 py-3 text-xs text-gris-texte">
+                        <span className={
+                          'inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold ' +
+                          (f.category === 'association' ? 'bg-pink-100 text-pink-700'
+                            : f.category === 'visibility' ? 'bg-purple-100 text-purple-700'
+                            : f.category === 'media' ? 'bg-blue-100 text-blue-700'
+                            : f.category === 'businesses' ? 'bg-indigo-100 text-indigo-700'
+                            : f.category === 'team' ? 'bg-teal-100 text-teal-700'
+                            : f.category === 'analytics' ? 'bg-yellow-100 text-yellow-700'
+                            : f.category === 'support' ? 'bg-orange-100 text-orange-700'
+                            : f.category === 'integration' ? 'bg-green-100 text-green-700'
+                            : 'bg-gris-fond text-gris-texte')
+                        }>
+                          {f.category}
+                        </span>
+                      </td>
                       <td className="px-3 py-3 text-xs text-gris-texte">
                         {f.metadata?.max ? `${f.metadata.max} ${f.metadata.unit || ''}` : '—'}
                       </td>
@@ -274,11 +341,19 @@ export default function PlansPage() {
       )}
 
       {showCreate && (
-        <PlanVersionModal onClose={() => setShowCreate(false)} onSaved={reload} />
+        <PlanVersionModal
+          audience={audience}
+          onClose={() => setShowCreate(false)}
+          onSaved={reload}
+        />
       )}
 
       {editingPlan && (
-        <PlanVersionModal plan={editingPlan} onClose={() => setEditingPlan(null)} onSaved={reload} />
+        <PlanVersionModal
+          plan={editingPlan}
+          onClose={() => setEditingPlan(null)}
+          onSaved={reload}
+        />
       )}
 
       {showFeatureModal && (
@@ -292,7 +367,7 @@ export default function PlansPage() {
   );
 }
 
-// ─── Modal édition feature ─────────────────────────────────────────────────
+// ─── Modal édition feature (inchangé) ─────────────────────────────────────
 function FeatureEditModal({
   feature, onClose, onSaved,
 }: {
@@ -311,7 +386,10 @@ function FeatureEditModal({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
-  const CATEGORIES = ['visibility', 'media', 'businesses', 'team', 'analytics', 'support', 'integration', 'communication', 'general'];
+  const CATEGORIES = [
+    'visibility', 'media', 'businesses', 'team', 'analytics',
+    'support', 'integration', 'communication', 'association', 'general',
+  ];
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
