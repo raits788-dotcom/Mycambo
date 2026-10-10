@@ -738,3 +738,137 @@ export async function suspendTenant(tenantId: string) {
     entity_id: tenantId,
   });
 }
+// ============================================================================
+// NIVEAUX DE VÉRIFICATION
+// ============================================================================
+export const VERIFICATION_LEVELS = {
+  inscrit:   { label: 'Inscrit',   badge: 'Inscrit',    color: '#9CA3AF', bg: 'bg-gray-100',   text: 'text-gray-700'   },
+  verifie:   { label: 'Vérifié',   badge: 'Bronze',     color: '#CD7F32', bg: 'bg-amber-100',  text: 'text-amber-800'  },
+  premium:   { label: 'Premium',   badge: 'Silver',     color: '#C0C0C0', bg: 'bg-slate-100',  text: 'text-slate-700'  },
+  exception: { label: 'Exception', badge: 'Gold',       color: '#FFD700', bg: 'bg-yellow-100', text: 'text-yellow-800' },
+  legende:   { label: 'Légende',   badge: 'Platine',    color: '#E5E4E2', bg: 'bg-cyan-100',   text: 'text-cyan-800'   },
+} as const;
+
+export type VerificationLevel = keyof typeof VERIFICATION_LEVELS;
+
+export async function changeVerificationLevel(
+  tenantId: string,
+  newLevel: VerificationLevel,
+  reason?: string
+) {
+  const supabase = getSupabase();
+  const { error } = await supabase.rpc('admin_change_verification_level', {
+    p_tenant_id: tenantId,
+    p_new_level: newLevel,
+    p_reason: reason || null,
+  });
+  if (error) throw error;
+}
+
+export async function getVerificationHistory(tenantId: string) {
+  const supabase = getSupabase();
+  const { data } = await supabase
+    .from('verification_history')
+    .select('*')
+    .eq('tenant_id', tenantId)
+    .order('created_at', { ascending: false })
+    .limit(20);
+  return data || [];
+}
+
+// ============================================================================
+// SOUS-LABELS
+// ============================================================================
+export async function getLabelCatalog() {
+  const supabase = getSupabase();
+  const { data, error } = await supabase
+    .from('label_catalog')
+    .select('*')
+    .order('position', { ascending: true });
+  if (error) { console.error('getLabelCatalog:', error); return []; }
+  return data || [];
+}
+
+export async function createLabel(payload: {
+  code: string; name: string; description?: string;
+  icon?: string; color?: string; category: string;
+  is_paid?: boolean;
+}) {
+  const supabase = getSupabase();
+  const { error } = await supabase.from('label_catalog').insert({
+    code: payload.code,
+    name: payload.name,
+    description: payload.description || null,
+    icon: payload.icon || null,
+    color: payload.color || '#1B3A6B',
+    category: payload.category,
+    is_paid: payload.is_paid || false,
+    is_active: true,
+  });
+  if (error) throw error;
+}
+
+export async function updateLabel(id: string, payload: Partial<{
+  name: string; description: string; icon: string;
+  color: string; category: string; is_paid: boolean; is_active: boolean;
+}>) {
+  const supabase = getSupabase();
+  const { error } = await supabase.from('label_catalog').update(payload).eq('id', id);
+  if (error) throw error;
+}
+
+export async function deleteLabel(id: string) {
+  const supabase = getSupabase();
+  const { error } = await supabase.from('label_catalog').delete().eq('id', id);
+  if (error) throw error;
+}
+
+// ============================================================================
+// ATTRIBUTION LABELS AUX TENANTS
+// ============================================================================
+export async function getTenantLabels(tenantId: string) {
+  const supabase = getSupabase();
+  const { data, error } = await supabase
+    .from('tenant_labels')
+    .select('*, label:label_catalog(*)')
+    .eq('tenant_id', tenantId);
+  if (error) { console.error('getTenantLabels:', error); return []; }
+  return data || [];
+}
+
+export async function toggleTenantLabel(
+  tenantId: string,
+  labelId: string,
+  attach: boolean
+) {
+  const supabase = getSupabase();
+  const { error } = await supabase.rpc('admin_set_tenant_label', {
+    p_tenant_id: tenantId,
+    p_label_id: labelId,
+    p_attach: attach,
+  });
+  if (error) throw error;
+}
+
+// ============================================================================
+// FILE D'ATTENTE VÉRIFICATIONS
+// ============================================================================
+export async function getPendingVerifications() {
+  const supabase = getSupabase();
+  const { data, error } = await supabase
+    .from('tenants')
+    .select('*')
+    .eq('verification_level', 'inscrit')
+    .order('created_at', { ascending: false });
+  if (error) { console.error('getPendingVerifications:', error); return []; }
+  return data || [];
+}
+
+export async function getPendingCount() {
+  const supabase = getSupabase();
+  const { count } = await supabase
+    .from('tenants')
+    .select('*', { count: 'exact', head: true })
+    .eq('verification_level', 'inscrit');
+  return count || 0;
+}

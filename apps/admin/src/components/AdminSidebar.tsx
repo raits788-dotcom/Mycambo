@@ -20,11 +20,13 @@ import {
   Users,
   Settings,
   Shield,
+  ShieldCheck,
   Gift,
   Loader2,
 } from 'lucide-react';
 import { cn } from '@my-cambo/utils';
 import { getCurrentAdmin, getInitials } from '@/lib/auth';
+import { getPendingCount } from '@/lib/services';
 
 interface NavItem {
   id: string;
@@ -44,6 +46,7 @@ const NAV_SECTIONS: NavSection[] = [
     items: [
       { id: 'dashboard', label: "Vue d'ensemble", icon: LayoutDashboard, href: '/dashboard' },
       { id: 'demandes', label: 'Demandes', icon: Inbox, href: '/demandes' },
+      { id: 'verifications', label: 'Vérifications', icon: ShieldCheck, href: '/verifications' },
     ],
   },
   {
@@ -86,14 +89,18 @@ export default function AdminSidebar() {
   const pathname = usePathname();
   const [userEmail, setUserEmail] = useState<string>('');
   const [loading, setLoading] = useState(true);
+  const [pendingCount, setPendingCount] = useState(0);
 
   useEffect(() => {
     (async () => {
       const current = await getCurrentAdmin();
       if (current) setUserEmail(current.email);
       setLoading(false);
+
+      const count = await getPendingCount();
+      setPendingCount(count);
     })();
-  }, []);
+  }, [pathname]);
 
   const initials = getInitials(userEmail);
 
@@ -151,6 +158,8 @@ export default function AdminSidebar() {
                   pathname === item.href ||
                   pathname.startsWith(item.href.split('?')[0] + '/');
 
+                const showBadge = item.id === 'verifications' && pendingCount > 0;
+
                 return (
                   <Link
                     key={item.id}
@@ -163,7 +172,12 @@ export default function AdminSidebar() {
                     )}
                   >
                     <Icon size={15} className="flex-shrink-0" />
-                    <span className="truncate">{item.label}</span>
+                    <span className="truncate flex-1">{item.label}</span>
+                    {showBadge && (
+                      <span className="bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
+                        {pendingCount}
+                      </span>
+                    )}
                   </Link>
                 );
               })}
