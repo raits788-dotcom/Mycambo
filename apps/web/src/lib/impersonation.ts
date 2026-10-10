@@ -3,15 +3,14 @@
 // ============================================================================
 import { createBrowserClient } from '@supabase/ssr';
 
-let cachedTenant: any = null;
-
 export function getImpersonateToken(): string | null {
   if (typeof window === 'undefined') return null;
   const url = new URL(window.location.href);
   const token = url.searchParams.get('impersonate');
   if (token) {
+    // Écrase TOUJOURS l'ancien token
     sessionStorage.setItem('mycambo_impersonate_token', token);
-    // Nettoie l'URL (enlève ?impersonate=xxx)
+    // Nettoie l'URL
     url.searchParams.delete('impersonate');
     window.history.replaceState({}, '', url.toString());
     return token;
@@ -20,8 +19,6 @@ export function getImpersonateToken(): string | null {
 }
 
 export async function getImpersonatedTenant(): Promise<any | null> {
-  if (cachedTenant) return cachedTenant;
-
   const token = getImpersonateToken();
   if (!token) return null;
 
@@ -30,7 +27,6 @@ export async function getImpersonatedTenant(): Promise<any | null> {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   );
 
-  // Récupère le tenant lié au token
   const { data: tokenData, error: tokenErr } = await supabase
     .from('impersonation_tokens')
     .select('tenant_id, expires_at, used_at, tenants(*)')
@@ -42,21 +38,18 @@ export async function getImpersonatedTenant(): Promise<any | null> {
     return null;
   }
 
-  // Vérifie expiration
   if (new Date(tokenData.expires_at) < new Date()) {
     sessionStorage.removeItem('mycambo_impersonate_token');
     return null;
   }
 
-  cachedTenant = tokenData.tenants;
-  return cachedTenant;
+  return tokenData.tenants;
 }
 
 export function clearImpersonation() {
   if (typeof window !== 'undefined') {
     sessionStorage.removeItem('mycambo_impersonate_token');
   }
-  cachedTenant = null;
 }
 
 export function isImpersonating(): boolean {
