@@ -2,8 +2,7 @@
 
 import { useState } from 'react';
 import { X, Check } from 'lucide-react';
-import { submitVolunteer } from '@/lib/mock-data';
-import { incrementSupports } from '@/lib/stats-tracker';
+import { submitVolunteer, incrementSupports } from '@/lib/associations';
 
 interface VolunteerModalProps {
   associationSlug: string;
@@ -28,20 +27,18 @@ export default function VolunteerModal({
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-  
-    submitVolunteer({ association_slug: associationSlug, ...form });
-  
-    const newCount = incrementSupports(associationSlug);
-    console.log('❤️ Soutiens mis à jour :', newCount);
-    window.dispatchEvent(new Event('stats-updated'));
-  
-    setTimeout(() => {
-      setLoading(false);
+    try {
+      await submitVolunteer({ association_slug: associationSlug, ...form });
+      incrementSupports(associationSlug);
       setSent(true);
-    }, 600);
+    } catch (err) {
+      console.error('Erreur candidature:', err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (

@@ -10,8 +10,7 @@ import {
   CreditCard,
   Lock,
 } from 'lucide-react';
-import { submitDonation, type DonationLink } from '@/lib/mock-data';
-import { incrementSupports } from '@/lib/stats-tracker';
+import { submitDonation, incrementSupports, type DonationLink } from '@/lib/associations';
 import { cn } from '@/lib/utils';
 
 interface DonateModalProps {
@@ -44,30 +43,27 @@ export default function DonateModal({
 
   const finalAmount = amount === 'custom' ? Number(customAmount) || 0 : amount;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-  
-    submitDonation({
-      association_slug: associationSlug,
-      amount: finalAmount,
-      frequency,
-      name: anonymous ? 'Anonyme' : name,
-      email,
-      phone: phone || undefined,
-      message: message || undefined,
-      anonymous,
-    });
-  
-    // ===== Incrémente les soutiens AVANT le changement d'état =====
-    const newCount = incrementSupports(associationSlug);
-    console.log('❤️ Soutiens mis à jour :', newCount);
-    window.dispatchEvent(new Event('stats-updated'));
-  
-    setTimeout(() => {
-      setLoading(false);
+    try {
+      await submitDonation({
+        association_slug: associationSlug,
+        amount: finalAmount,
+        frequency,
+        name: anonymous ? 'Anonyme' : name,
+        email,
+        phone: phone || undefined,
+        message: message || undefined,
+        anonymous,
+      });
+      incrementSupports(associationSlug);
       setMode('sent');
-    }, 600);
+    } catch (err) {
+      console.error('Erreur don:', err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const openDonationLink = () => {

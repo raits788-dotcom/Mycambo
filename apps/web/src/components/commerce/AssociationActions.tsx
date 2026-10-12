@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Image from 'next/image';
 import { MapPin, Calendar } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import type { AssociationAction } from '@/lib/mock-data';
+import type { AssociationAction } from '@/lib/associations';
 
 interface AssociationActionsProps {
   actions: AssociationAction[];

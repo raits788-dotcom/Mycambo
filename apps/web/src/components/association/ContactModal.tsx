@@ -2,8 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { X, Check, Mail } from 'lucide-react';
-import { submitContact } from '@/lib/mock-data';
-import { incrementSupports } from '@/lib/stats-tracker';
+import { submitContact, incrementSupports } from '@/lib/associations';
 
 interface ContactModalProps {
   associationSlug: string;
@@ -47,20 +46,20 @@ export default function ContactModal({
     }
   }, [initialSubject]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    submitContact({ association_slug: associationSlug, ...form });
-
-    if (form.subject === 'Don' || form.subject === 'Bénévolat') {
-      incrementSupports(associationSlug);
-      window.dispatchEvent(new Event('stats-updated'));
-    }
-
-    setTimeout(() => {
-      setLoading(false);
+    try {
+      await submitContact({ association_slug: associationSlug, ...form });
+      if (form.subject === 'Don' || form.subject === 'Bénévolat') {
+        incrementSupports(associationSlug);
+      }
       setSent(true);
-    }, 600);
+    } catch (err) {
+      console.error('Erreur contact:', err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (

@@ -4,7 +4,7 @@ import { useState } from 'react';
 import DonateModal from './DonateModal';
 import VolunteerModal from './VolunteerModal';
 import ContactModal from './ContactModal';
-import type { DonationLink } from '@/lib/mock-data';
+import type { DonationLink } from '@/lib/associations';
 import { cn } from '@/lib/utils';
 
 type ModalType = 'donate' | 'volunteer' | 'contact' | null;

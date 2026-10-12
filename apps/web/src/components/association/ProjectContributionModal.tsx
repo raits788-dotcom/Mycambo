@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { X, Check, Target } from 'lucide-react';
-import { submitContribution } from '@/lib/mock-data';
+import { submitContribution } from '@/lib/associations';
 import { cn } from '@/lib/utils';
 
 interface ProjectContributionModalProps {
@@ -32,22 +32,25 @@ export default function ProjectContributionModal({
   const finalAmount =
     amount === 'custom' ? Number(customAmount) || 0 : amount;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    submitContribution({
-      association_slug: associationSlug,
-      project_title: projectTitle,
-      amount: finalAmount,
-      name: anonymous ? 'Anonyme' : name,
-      email,
-      message: message || undefined,
-      anonymous,
-    });
-    setTimeout(() => {
-      setLoading(false);
+    try {
+      await submitContribution({
+        association_slug: associationSlug,
+        project_title: projectTitle,
+        amount: finalAmount,
+        name: anonymous ? 'Anonyme' : name,
+        email,
+        message: message || undefined,
+        anonymous,
+      });
       setSent(true);
-    }, 600);
+    } catch (err) {
+      console.error('Erreur contribution:', err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (

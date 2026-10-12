@@ -1,0 +1,1210 @@
+
+═══════════════════════════════════════════════════════════
+📄 apps/web/src/components/association/AssociationActionsBar.tsx
+═══════════════════════════════════════════════════════════
+'use client';
+
+import { useState } from 'react';
+import DonateModal from './DonateModal';
+import VolunteerModal from './VolunteerModal';
+import ContactModal from './ContactModal';
+import type { DonationLink } from '@/lib/mock-data';
+import { cn } from '@/lib/utils';
+
+type ModalType = 'donate' | 'volunteer' | 'contact' | null;
+
+interface AssociationActionsBarProps {
+  associationSlug: string;
+  associationName: string;
+  donationLink?: DonationLink | null;
+  variant?: 'sidebar' | 'inline';
+}
+
+export default function AssociationActionsBar({
+  associationSlug,
+  associationName,
+  donationLink,
+  variant = 'sidebar',
+}: AssociationActionsBarProps) {
+  const [modal, setModal] = useState<ModalType>(null);
+
+  // ===== Variante SIDEBAR (3 boutons empilés) =====
+  if (variant === 'sidebar') {
+    return (
+      <>
+        <div className="space-y-2">
+          <button
+            onClick={() => setModal('donate')}
+            className="w-full bg-khmer text-white font-bold py-3 rounded-full hover:bg-khmer/90 transition-colors text-sm"
+          >
+            ❤️ Faire un don
+          </button>
+          <button
+            onClick={() => setModal('volunteer')}
+            className="w-full border-[1.5px] border-gris-ligne text-marine font-bold py-3 rounded-full hover:border-marine transition-colors text-sm"
+          >
+            🙋 Devenir bénévole
+          </button>
+          <button
+            onClick={() => setModal('contact')}
+            className="w-full border-[1.5px] border-gris-ligne text-marine font-bold py-3 rounded-full hover:border-marine transition-colors text-sm"
+          >
+            ✉️ Nous contacter
+          </button>
+        </div>
+
+        {/* Modales */}
+        {modal === 'donate' && (
+          <DonateModal
+            associationSlug={associationSlug}
+            associationName={associationName}
+            donationLink={donationLink}
+            onClose={() => setModal(null)}
+          />
+        )}
+        {modal === 'volunteer' && (
+          <VolunteerModal
+            associationSlug={associationSlug}
+            associationName={associationName}
+            onClose={() => setModal(null)}
+          />
+        )}
+        {modal === 'contact' && (
+          <ContactModal
+            associationSlug={associationSlug}
+            associationName={associationName}
+            onClose={() => setModal(null)}
+          />
+        )}
+      </>
+    );
+  }
+
+  // ===== Variante INLINE (bouton seul, pour "Contribuer") =====
+  return (
+    <>
+      <button
+        onClick={() => setModal('donate')}
+        className={cn(
+          'w-full bg-marine text-white font-bold py-3 rounded-full hover:bg-marine-dark transition-colors text-sm'
+        )}
+      >
+        Contribuer
+      </button>
+
+      {modal === 'donate' && (
+        <DonateModal
+          associationSlug={associationSlug}
+          associationName={associationName}
+          donationLink={donationLink}
+          onClose={() => setModal(null)}
+        />
+      )}
+    </>
+  );
+}
+
+// ===== Export d'un hook/bouton séparé pour "Contribuer à ce projet" =====
+export function ContributeProjectButton({
+  associationSlug,
+  associationName,
+  projectTitle,
+}: {
+  associationSlug: string;
+  associationName: string;
+  projectTitle: string;
+}) {
+  const [open, setOpen] = useState(false);
+  // Import dynamique pour éviter les erreurs SSR
+  const [ContributeModal, setContributeModal] = useState<any>(null);
+
+  const handleClick = async () => {
+    if (!ContributeModal) {
+      const mod = await import('./ProjectContributionModal');
+      setContributeModal(() => mod.default);
+    }
+    setOpen(true);
+  };
+
+  return (
+    <>
+      <button
+        onClick={handleClick}
+        className="w-full bg-marine text-white font-bold py-3 rounded-full hover:bg-marine-dark transition-colors text-sm"
+      >
+        Contribuer à ce projet
+      </button>
+
+      {open && ContributeModal && (
+        <ContributeModal
+          associationSlug={associationSlug}
+          associationName={associationName}
+          projectTitle={projectTitle}
+          onClose={() => setOpen(false)}
+        />
+      )}
+    </>
+  );
+}
+
+
+═══════════════════════════════════════════════════════════
+📄 apps/web/src/components/association/ContactModal.tsx
+═══════════════════════════════════════════════════════════
+'use client';
+
+import { useState, useEffect } from 'react';
+import { X, Check, Mail } from 'lucide-react';
+import { submitContact } from '@/lib/mock-data';
+import { incrementSupports } from '@/lib/stats-tracker';
+
+interface ContactModalProps {
+  associationSlug: string;
+  associationName: string;
+  initialSubject?: string;
+  onClose: () => void;
+}
+
+const SUBJECTS = [
+  'Information générale',
+  'Bénévolat',
+  'Don',
+  'Partenariat',
+  'Autre',
+];
+
+export default function ContactModal({
+  associationSlug,
+  associationName,
+  initialSubject,
+  onClose,
+}: ContactModalProps) {
+  const safeInitial =
+    initialSubject && SUBJECTS.includes(initialSubject)
+      ? initialSubject
+      : SUBJECTS[0];
+
+  const [form, setForm] = useState({
+    name: '',
+    email: '',
+    subject: safeInitial,
+    message: '',
+  });
+  const [loading, setLoading] = useState(false);
+  const [sent, setSent] = useState(false);
+
+  // ===== Synchronise le sujet si la prop change =====
+  useEffect(() => {
+    if (initialSubject && SUBJECTS.includes(initialSubject)) {
+      setForm((prev) => ({ ...prev, subject: initialSubject }));
+    }
+  }, [initialSubject]);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    submitContact({ association_slug: associationSlug, ...form });
+
+    if (form.subject === 'Don' || form.subject === 'Bénévolat') {
+      incrementSupports(associationSlug);
+      window.dispatchEvent(new Event('stats-updated'));
+    }
+
+    setTimeout(() => {
+      setLoading(false);
+      setSent(true);
+    }, 600);
+  };
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+      <div
+        className="absolute inset-0 bg-ink/70 backdrop-blur-sm"
+        onClick={onClose}
+      />
+
+      <div className="relative bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
+        <button
+          onClick={onClose}
+          aria-label="Fermer"
+          className="absolute top-4 right-4 w-9 h-9 rounded-full bg-gris-fond hover:bg-gris-ligne flex items-center justify-center transition-colors z-10"
+        >
+          <X size={18} className="text-marine" />
+        </button>
+
+        {sent ? (
+          <div className="p-8 text-center">
+            <div className="w-16 h-16 rounded-full bg-ic-vert/15 flex items-center justify-center mx-auto mb-4">
+              <Check size={32} className="text-ic-vert" />
+            </div>
+            <h3 className="text-2xl font-extrabold text-marine mb-2">
+              Message envoyé !
+            </h3>
+            <p className="text-sm text-gris-texte leading-relaxed mb-6">
+              Votre message a été transmis à {associationName}.
+              Elle vous répondra dans les plus brefs délais.
+            </p>
+            <button
+              onClick={onClose}
+              className="bg-marine text-white font-bold px-8 py-3 rounded-full hover:bg-marine-dark transition-colors text-sm"
+            >
+              Fermer
+            </button>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="p-8">
+            <div className="w-14 h-14 rounded-full bg-marine/10 flex items-center justify-center mb-5">
+              <Mail size={24} className="text-marine" />
+            </div>
+            <h3 className="text-2xl font-extrabold text-marine mb-2">
+              Nous contacter
+            </h3>
+            <p className="text-sm text-gris-texte leading-relaxed mb-6">
+              Envoyez un message à {associationName}.
+            </p>
+
+            <div className="space-y-3 mb-5">
+              <input
+                type="text"
+                placeholder="Votre nom *"
+                required
+                value={form.name}
+                onChange={(e) => setForm({ ...form, name: e.target.value })}
+                className="w-full border border-gris-ligne rounded-lg px-4 py-3 text-sm focus:border-marine focus:outline-none"
+              />
+              <input
+                type="email"
+                placeholder="Votre email *"
+                required
+                value={form.email}
+                onChange={(e) => setForm({ ...form, email: e.target.value })}
+                className="w-full border border-gris-ligne rounded-lg px-4 py-3 text-sm focus:border-marine focus:outline-none"
+              />
+            </div>
+
+            <label className="block text-xs font-bold text-ink mb-2 uppercase tracking-wider">
+              Sujet
+            </label>
+            <div className="flex flex-wrap gap-2 mb-5">
+              {SUBJECTS.map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => setForm({ ...form, subject: s })}
+                  className={`px-3.5 py-2 rounded-full text-xs font-bold transition-colors ${
+                    form.subject === s
+                      ? 'bg-marine text-white'
+                      : 'bg-gris-fond text-gris-texte hover:bg-gris-ligne'
+                  }`}
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+
+            <textarea
+              placeholder="Votre message *"
+              required
+              rows={5}
+              value={form.message}
+              onChange={(e) => setForm({ ...form, message: e.target.value })}
+              className="w-full border border-gris-ligne rounded-lg px-4 py-3 text-sm mb-5 focus:border-marine focus:outline-none resize-none"
+            />
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full bg-marine text-white font-bold py-3 rounded-full hover:bg-marine-dark transition-colors text-sm disabled:opacity-60"
+            >
+              {loading ? 'Envoi...' : 'Envoyer le message'}
+            </button>
+          </form>
+        )}
+      </div>
+    </div>
+  );
+}
+
+═══════════════════════════════════════════════════════════
+📄 apps/web/src/components/association/DonateModal.tsx
+═══════════════════════════════════════════════════════════
+'use client';
+
+import { useState } from 'react';
+import {
+  X,
+  Check,
+  Heart,
+  ExternalLink,
+  Mail,
+  CreditCard,
+  Lock,
+} from 'lucide-react';
+import { submitDonation, type DonationLink } from '@/lib/mock-data';
+import { incrementSupports } from '@/lib/stats-tracker';
+import { cn } from '@/lib/utils';
+
+interface DonateModalProps {
+  associationSlug: string;
+  associationName: string;
+  donationLink?: DonationLink | null;
+  onClose: () => void;
+}
+
+const AMOUNTS = [10, 25, 50, 100];
+
+export default function DonateModal({
+  associationSlug,
+  associationName,
+  donationLink,
+  onClose,
+}: DonateModalProps) {
+  const [mode, setMode] = useState<'choice' | 'form' | 'sent'>(
+    donationLink ? 'choice' : 'form'
+  );
+  const [amount, setAmount] = useState<number | 'custom'>(25);
+  const [customAmount, setCustomAmount] = useState('');
+  const [frequency, setFrequency] = useState<'unique' | 'mensuel'>('unique');
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [message, setMessage] = useState('');
+  const [anonymous, setAnonymous] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  const finalAmount = amount === 'custom' ? Number(customAmount) || 0 : amount;
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+  
+    submitDonation({
+      association_slug: associationSlug,
+      amount: finalAmount,
+      frequency,
+      name: anonymous ? 'Anonyme' : name,
+      email,
+      phone: phone || undefined,
+      message: message || undefined,
+      anonymous,
+    });
+  
+    // ===== Incrémente les soutiens AVANT le changement d'état =====
+    const newCount = incrementSupports(associationSlug);
+    console.log('❤️ Soutiens mis à jour :', newCount);
+    window.dispatchEvent(new Event('stats-updated'));
+  
+    setTimeout(() => {
+      setLoading(false);
+      setMode('sent');
+    }, 600);
+  };
+
+  const openDonationLink = () => {
+    if (donationLink?.url) {
+      window.open(donationLink.url, '_blank', 'noopener,noreferrer');
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+      <div
+        className="absolute inset-0 bg-ink/70 backdrop-blur-sm"
+        onClick={onClose}
+      />
+
+      <div className="relative bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
+        <button
+          onClick={onClose}
+          aria-label="Fermer"
+          className="absolute top-4 right-4 w-9 h-9 rounded-full bg-gris-fond hover:bg-gris-ligne flex items-center justify-center transition-colors z-10"
+        >
+          <X size={18} className="text-marine" />
+        </button>
+
+        {/* ============ CHOIX ============ */}
+        {mode === 'choice' && donationLink && (
+          <div className="p-8">
+            <div className="w-14 h-14 rounded-full bg-khmer/15 flex items-center justify-center mb-5">
+              <Heart size={26} className="fill-khmer text-khmer" />
+            </div>
+            <h3 className="text-2xl font-extrabold text-marine mb-2">
+              Soutenir {associationName}
+            </h3>
+            <p className="text-sm text-gris-texte leading-relaxed mb-6">
+              Choisissez la façon qui vous convient le mieux pour soutenir cette
+              association.
+            </p>
+
+            <button
+              onClick={openDonationLink}
+              className="w-full flex items-start gap-4 p-5 bg-marine text-white rounded-xl hover:bg-marine-dark transition-colors mb-3 text-left"
+            >
+              <div className="w-11 h-11 rounded-lg bg-white/15 flex items-center justify-center flex-shrink-0">
+                <CreditCard size={20} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="font-extrabold text-base mb-1 flex items-center gap-2">
+                  {donationLink.label}
+                  <ExternalLink size={14} />
+                </div>
+                <div className="text-xs text-white/80 leading-relaxed">
+                  {donationLink.description ||
+                    'Paiement sécurisé par carte bancaire'}
+                </div>
+              </div>
+            </button>
+
+            <div className="flex items-center gap-3 my-5">
+              <div className="flex-1 h-px bg-gris-ligne" />
+              <span className="text-[10px] uppercase tracking-[0.25em] text-gris-doux font-bold">
+                ou
+              </span>
+              <div className="flex-1 h-px bg-gris-ligne" />
+            </div>
+
+            <button
+              onClick={() => setMode('form')}
+              className="w-full flex items-start gap-4 p-5 bg-gris-fond hover:bg-gris-ligne rounded-xl transition-colors text-left"
+            >
+              <div className="w-11 h-11 rounded-lg bg-white flex items-center justify-center flex-shrink-0">
+                <Mail size={20} className="text-marine" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="font-extrabold text-marine text-base mb-1">
+                  Être contacté(e) par l&apos;association
+                </div>
+                <div className="text-xs text-gris-texte leading-relaxed">
+                  L&apos;association vous répondra sous 48h pour convenir du
+                  mode de paiement (virement, ABA, Wing…)
+                </div>
+              </div>
+            </button>
+
+            <div className="mt-6 flex items-center gap-2 text-xs text-gris-doux justify-center">
+              <Lock size={12} />
+              <span>
+                Aucun paiement sur myCAMBO — mise en relation uniquement
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* ============ FORMULAIRE ============ */}
+        {mode === 'form' && (
+          <form onSubmit={handleSubmit} className="p-8">
+            <div className="w-14 h-14 rounded-full bg-khmer/15 flex items-center justify-center mb-5">
+              <Heart size={26} className="fill-khmer text-khmer" />
+            </div>
+            <h3 className="text-2xl font-extrabold text-marine mb-2">
+              Faire un don
+            </h3>
+            <p className="text-sm text-gris-texte leading-relaxed mb-6">
+              Remplissez ce formulaire, {associationName} vous contactera pour
+              finaliser votre don.
+            </p>
+
+            <label className="block text-xs font-bold text-ink mb-2 uppercase tracking-wider">
+              Montant envisagé *
+            </label>
+            <div className="flex flex-wrap gap-2 mb-3">
+              {AMOUNTS.map((a) => (
+                <button
+                  key={a}
+                  type="button"
+                  onClick={() => setAmount(a)}
+                  className={cn(
+                    'px-4 py-2.5 rounded-lg text-sm font-bold transition-colors',
+                    amount === a
+                      ? 'bg-marine text-white'
+                      : 'bg-gris-fond text-gris-texte hover:bg-gris-ligne'
+                  )}
+                >
+                  {a} $
+                </button>
+              ))}
+              <button
+                type="button"
+                onClick={() => setAmount('custom')}
+                className={cn(
+                  'px-4 py-2.5 rounded-lg text-sm font-bold transition-colors',
+                  amount === 'custom'
+                    ? 'bg-marine text-white'
+                    : 'bg-gris-fond text-gris-texte hover:bg-gris-ligne'
+                )}
+              >
+                Autre
+              </button>
+            </div>
+            {amount === 'custom' && (
+              <input
+                type="number"
+                min="1"
+                value={customAmount}
+                onChange={(e) => setCustomAmount(e.target.value)}
+                placeholder="Montant en $"
+                className="w-full border border-gris-ligne rounded-lg px-4 py-3 text-sm mb-5 focus:border-marine focus:outline-none"
+                required
+              />
+            )}
+
+            <label className="block text-xs font-bold text-ink mb-2 uppercase tracking-wider mt-3">
+              Fréquence
+            </label>
+            <div className="grid grid-cols-2 gap-2 mb-5">
+              <button
+                type="button"
+                onClick={() => setFrequency('unique')}
+                className={cn(
+                  'py-3 rounded-lg text-sm font-bold transition-colors',
+                  frequency === 'unique'
+                    ? 'bg-marine text-white'
+                    : 'bg-gris-fond text-gris-texte hover:bg-gris-ligne'
+                )}
+              >
+                Don ponctuel
+              </button>
+              <button
+                type="button"
+                onClick={() => setFrequency('mensuel')}
+                className={cn(
+                  'py-3 rounded-lg text-sm font-bold transition-colors',
+                  frequency === 'mensuel'
+                    ? 'bg-marine text-white'
+                    : 'bg-gris-fond text-gris-texte hover:bg-gris-ligne'
+                )}
+              >
+                Don mensuel
+              </button>
+            </div>
+
+            <div className="space-y-3 mb-5">
+              {!anonymous && (
+                <input
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Votre nom *"
+                  required
+                  className="w-full border border-gris-ligne rounded-lg px-4 py-3 text-sm focus:border-marine focus:outline-none"
+                />
+              )}
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="Votre email *"
+                required
+                className="w-full border border-gris-ligne rounded-lg px-4 py-3 text-sm focus:border-marine focus:outline-none"
+              />
+              <input
+                type="tel"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="Téléphone (optionnel)"
+                className="w-full border border-gris-ligne rounded-lg px-4 py-3 text-sm focus:border-marine focus:outline-none"
+              />
+            </div>
+
+            <textarea
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              placeholder="Message de soutien (optionnel)"
+              rows={3}
+              className="w-full border border-gris-ligne rounded-lg px-4 py-3 text-sm mb-3 focus:border-marine focus:outline-none resize-none"
+            />
+
+            <label className="flex items-center gap-2 text-xs text-gris-texte cursor-pointer mb-5">
+              <input
+                type="checkbox"
+                checked={anonymous}
+                onChange={(e) => setAnonymous(e.target.checked)}
+                className="w-4 h-4 accent-marine"
+              />
+              Rester anonyme
+            </label>
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full bg-khmer text-white font-bold py-3 rounded-full hover:bg-khmer/90 transition-colors text-sm disabled:opacity-60"
+            >
+              {loading ? 'Envoi...' : 'Envoyer ma demande'}
+            </button>
+
+            <div className="mt-4 text-center text-[11px] text-gris-doux flex items-center justify-center gap-2">
+              <Lock size={11} />
+              <span>
+                L&apos;association vous répondra sous 48h pour finaliser votre
+                don
+              </span>
+            </div>
+          </form>
+        )}
+
+        {/* ============ ENVOYÉ ============ */}
+        {mode === 'sent' && (
+  <div className="p-8 text-center">
+    <div className="w-16 h-16 rounded-full bg-ic-vert/15 flex items-center justify-center mx-auto mb-4">
+      <Check size={32} className="text-ic-vert" />
+    </div>
+    <h3 className="text-2xl font-extrabold text-marine mb-2">
+      Promesse de don envoyée !
+    </h3>
+    <p className="text-sm text-gris-texte leading-relaxed mb-4">
+      Merci pour votre générosité. Votre promesse a été transmise à{' '}
+      <b className="text-marine">{associationName}</b>.
+    </p>
+    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-6 text-left">
+      <p className="text-xs text-blue-800 leading-relaxed">
+        <b>Et maintenant ?</b>
+        <br />
+        L&apos;association vous contactera sous 48h par email pour finaliser
+        votre don (virement, ABA, Wing…).
+      </p>
+    </div>
+    <button
+      onClick={onClose}
+      className="bg-marine text-white font-bold px-8 py-3 rounded-full hover:bg-marine-dark transition-colors text-sm"
+    >
+      Fermer
+    </button>
+  </div>
+)}
+      </div>
+    </div>
+  );
+}
+
+
+═══════════════════════════════════════════════════════════
+📄 apps/web/src/components/association/ProjectContributionModal.tsx
+═══════════════════════════════════════════════════════════
+'use client';
+
+import { useState } from 'react';
+import { X, Check, Target } from 'lucide-react';
+import { submitContribution } from '@/lib/mock-data';
+import { cn } from '@/lib/utils';
+
+interface ProjectContributionModalProps {
+  associationSlug: string;
+  associationName: string;
+  projectTitle: string;
+  onClose: () => void;
+}
+
+const AMOUNTS = [25, 50, 100, 250];
+
+export default function ProjectContributionModal({
+  associationSlug,
+  associationName,
+  projectTitle,
+  onClose,
+}: ProjectContributionModalProps) {
+  const [amount, setAmount] = useState<number | 'custom'>(50);
+  const [customAmount, setCustomAmount] = useState('');
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [message, setMessage] = useState('');
+  const [anonymous, setAnonymous] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [sent, setSent] = useState(false);
+
+  const finalAmount =
+    amount === 'custom' ? Number(customAmount) || 0 : amount;
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    submitContribution({
+      association_slug: associationSlug,
+      project_title: projectTitle,
+      amount: finalAmount,
+      name: anonymous ? 'Anonyme' : name,
+      email,
+      message: message || undefined,
+      anonymous,
+    });
+    setTimeout(() => {
+      setLoading(false);
+      setSent(true);
+    }, 600);
+  };
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+      <div
+        className="absolute inset-0 bg-ink/70 backdrop-blur-sm"
+        onClick={onClose}
+      />
+
+      <div className="relative bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
+        <button
+          onClick={onClose}
+          aria-label="Fermer"
+          className="absolute top-4 right-4 w-9 h-9 rounded-full bg-gris-fond hover:bg-gris-ligne flex items-center justify-center transition-colors z-10"
+        >
+          <X size={18} className="text-marine" />
+        </button>
+
+        {sent ? (
+          /* ===== ENVOYÉ ===== */
+          <div className="p-8 text-center">
+            <div className="w-16 h-16 rounded-full bg-ic-vert/15 flex items-center justify-center mx-auto mb-4">
+              <Check size={32} className="text-ic-vert" />
+            </div>
+            <h3 className="text-2xl font-extrabold text-marine mb-2">
+              Merci !
+            </h3>
+            <p className="text-sm text-gris-texte leading-relaxed mb-6">
+              Votre demande de contribution au projet a bien été transmise
+              à {associationName}. Elle vous contactera pour finaliser.
+            </p>
+            <button
+              onClick={onClose}
+              className="bg-marine text-white font-bold px-8 py-3 rounded-full hover:bg-marine-dark transition-colors text-sm"
+            >
+              Fermer
+            </button>
+          </div>
+        ) : (
+          /* ===== FORMULAIRE ===== */
+          <form onSubmit={handleSubmit} className="p-8">
+            <div className="w-14 h-14 rounded-full bg-ic-or/15 flex items-center justify-center mb-5">
+              <Target size={26} className="text-ic-or" />
+            </div>
+            <h3 className="text-2xl font-extrabold text-marine mb-2">
+              Contribuer au projet
+            </h3>
+            <p className="text-sm text-gris-texte leading-relaxed mb-1">
+              {projectTitle}
+            </p>
+            <p className="text-xs text-gris-doux mb-6">
+              Proposé par {associationName}
+            </p>
+
+            {/* Montant */}
+            <label className="block text-xs font-bold text-ink mb-2 uppercase tracking-wider">
+              Contribution *
+            </label>
+            <div className="flex flex-wrap gap-2 mb-3">
+              {AMOUNTS.map((a) => (
+                <button
+                  key={a}
+                  type="button"
+                  onClick={() => setAmount(a)}
+                  className={cn(
+                    'px-4 py-2.5 rounded-lg text-sm font-bold transition-colors',
+                    amount === a
+                      ? 'bg-ic-or text-marine-dark'
+                      : 'bg-gris-fond text-gris-texte hover:bg-gris-ligne'
+                  )}
+                >
+                  {a} $
+                </button>
+              ))}
+              <button
+                type="button"
+                onClick={() => setAmount('custom')}
+                className={cn(
+                  'px-4 py-2.5 rounded-lg text-sm font-bold transition-colors',
+                  amount === 'custom'
+                    ? 'bg-ic-or text-marine-dark'
+                    : 'bg-gris-fond text-gris-texte hover:bg-gris-ligne'
+                )}
+              >
+                Autre
+              </button>
+            </div>
+            {amount === 'custom' && (
+              <input
+                type="number"
+                min="1"
+                value={customAmount}
+                onChange={(e) => setCustomAmount(e.target.value)}
+                placeholder="Montant en $"
+                className="w-full border border-gris-ligne rounded-lg px-4 py-3 text-sm mb-5 focus:border-marine focus:outline-none"
+                required
+              />
+            )}
+
+            {/* Coordonnées */}
+            <div className="space-y-3 mb-5 mt-5">
+              {!anonymous && (
+                <input
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Votre nom *"
+                  required
+                  className="w-full border border-gris-ligne rounded-lg px-4 py-3 text-sm focus:border-marine focus:outline-none"
+                />
+              )}
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="Votre email *"
+                required
+                className="w-full border border-gris-ligne rounded-lg px-4 py-3 text-sm focus:border-marine focus:outline-none"
+              />
+            </div>
+
+            {/* Message */}
+            <textarea
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              placeholder="Message de soutien (optionnel)"
+              rows={3}
+              className="w-full border border-gris-ligne rounded-lg px-4 py-3 text-sm mb-3 focus:border-marine focus:outline-none resize-none"
+            />
+
+            {/* Anonyme */}
+            <label className="flex items-center gap-2 text-xs text-gris-texte cursor-pointer mb-5">
+              <input
+                type="checkbox"
+                checked={anonymous}
+                onChange={(e) => setAnonymous(e.target.checked)}
+                className="w-4 h-4 accent-marine"
+              />
+              Rester anonyme
+            </label>
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full bg-marine text-white font-bold py-3 rounded-full hover:bg-marine-dark transition-colors text-sm disabled:opacity-60"
+            >
+              {loading ? 'Envoi...' : 'Envoyer ma contribution'}
+            </button>
+
+            <p className="mt-4 text-center text-[11px] text-gris-doux">
+              L&apos;association vous contactera pour finaliser votre contribution
+            </p>
+          </form>
+        )}
+      </div>
+    </div>
+  );
+}
+
+═══════════════════════════════════════════════════════════
+📄 apps/web/src/components/association/VolunteerModal.tsx
+═══════════════════════════════════════════════════════════
+'use client';
+
+import { useState } from 'react';
+import { X, Check } from 'lucide-react';
+import { submitVolunteer } from '@/lib/mock-data';
+import { incrementSupports } from '@/lib/stats-tracker';
+
+interface VolunteerModalProps {
+  associationSlug: string;
+  associationName: string;
+  onClose: () => void;
+}
+
+export default function VolunteerModal({
+  associationSlug,
+  associationName,
+  onClose,
+}: VolunteerModalProps) {
+  const [form, setForm] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    start_date: '',
+    end_date: '',
+    skills: '',
+    motivation: '',
+  });
+  const [loading, setLoading] = useState(false);
+  const [sent, setSent] = useState(false);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+  
+    submitVolunteer({ association_slug: associationSlug, ...form });
+  
+    const newCount = incrementSupports(associationSlug);
+    console.log('❤️ Soutiens mis à jour :', newCount);
+    window.dispatchEvent(new Event('stats-updated'));
+  
+    setTimeout(() => {
+      setLoading(false);
+      setSent(true);
+    }, 600);
+  };
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+      <div
+        className="absolute inset-0 bg-ink/70 backdrop-blur-sm"
+        onClick={onClose}
+      />
+
+      <div className="relative bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
+        <button
+          onClick={onClose}
+          aria-label="Fermer"
+          className="absolute top-4 right-4 w-9 h-9 rounded-full bg-gris-fond hover:bg-gris-ligne flex items-center justify-center transition-colors z-10"
+        >
+          <X size={18} className="text-marine" />
+        </button>
+
+        {sent ? (
+  <div className="p-8 text-center">
+    <div className="w-16 h-16 rounded-full bg-ic-vert/15 flex items-center justify-center mx-auto mb-4">
+      <Check size={32} className="text-ic-vert" />
+    </div>
+    <h3 className="text-2xl font-extrabold text-marine mb-2">
+      Candidature envoyée !
+    </h3>
+    <p className="text-sm text-gris-texte leading-relaxed mb-4">
+      Merci pour votre engagement. Votre candidature a été transmise à{' '}
+      <b className="text-marine">{associationName}</b>.
+    </p>
+    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-6 text-left">
+      <p className="text-xs text-blue-800 leading-relaxed">
+        <b>Et maintenant ?</b>
+        <br />
+        L&apos;association vous contactera rapidement pour discuter de votre venue, des dates et des modalités.
+      </p>
+    </div>
+    <button
+      onClick={onClose}
+      className="bg-marine text-white font-bold px-8 py-3 rounded-full hover:bg-marine-dark transition-colors text-sm"
+    >
+      Fermer
+    </button>
+  </div>
+) : (
+          <form onSubmit={handleSubmit} className="p-8">
+            <div className="text-4xl mb-4">🙋</div>
+            <h3 className="text-2xl font-extrabold text-marine mb-2">
+              Devenir bénévole
+            </h3>
+            <p className="text-sm text-gris-texte leading-relaxed mb-6">
+              Rejoignez l&apos;équipe de {associationName}. Remplissez ce
+              formulaire, l&apos;association vous répondra rapidement.
+            </p>
+
+            <div className="space-y-3 mb-5">
+              <input
+                type="text"
+                placeholder="Nom complet *"
+                required
+                value={form.name}
+                onChange={(e) => setForm({ ...form, name: e.target.value })}
+                className="w-full border border-gris-ligne rounded-lg px-4 py-3 text-sm focus:border-marine focus:outline-none"
+              />
+              <input
+                type="email"
+                placeholder="Email *"
+                required
+                value={form.email}
+                onChange={(e) => setForm({ ...form, email: e.target.value })}
+                className="w-full border border-gris-ligne rounded-lg px-4 py-3 text-sm focus:border-marine focus:outline-none"
+              />
+              <input
+                type="tel"
+                placeholder="Téléphone"
+                value={form.phone}
+                onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                className="w-full border border-gris-ligne rounded-lg px-4 py-3 text-sm focus:border-marine focus:outline-none"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 mb-5">
+              <div>
+                <label className="block text-[10px] font-bold text-ink mb-1.5 uppercase tracking-wider">
+                  Arrivée *
+                </label>
+                <input
+                  type="date"
+                  required
+                  value={form.start_date}
+                  onChange={(e) =>
+                    setForm({ ...form, start_date: e.target.value })
+                  }
+                  className="w-full border border-gris-ligne rounded-lg px-3 py-2.5 text-sm focus:border-marine focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-ink mb-1.5 uppercase tracking-wider">
+                  Départ *
+                </label>
+                <input
+                  type="date"
+                  required
+                  value={form.end_date}
+                  onChange={(e) =>
+                    setForm({ ...form, end_date: e.target.value })
+                  }
+                  className="w-full border border-gris-ligne rounded-lg px-3 py-2.5 text-sm focus:border-marine focus:outline-none"
+                />
+              </div>
+            </div>
+
+            <input
+              type="text"
+              placeholder="Compétences (enseignement, santé, construction…)"
+              value={form.skills}
+              onChange={(e) => setForm({ ...form, skills: e.target.value })}
+              className="w-full border border-gris-ligne rounded-lg px-4 py-3 text-sm mb-3 focus:border-marine focus:outline-none"
+            />
+
+            <textarea
+              placeholder="Pourquoi souhaitez-vous devenir bénévole ? *"
+              required
+              rows={4}
+              value={form.motivation}
+              onChange={(e) => setForm({ ...form, motivation: e.target.value })}
+              className="w-full border border-gris-ligne rounded-lg px-4 py-3 text-sm mb-5 focus:border-marine focus:outline-none resize-none"
+            />
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full bg-marine text-white font-bold py-3 rounded-full hover:bg-marine-dark transition-colors text-sm disabled:opacity-60"
+            >
+              {loading ? 'Envoi...' : 'Envoyer ma candidature'}
+            </button>
+          </form>
+        )}
+      </div>
+    </div>
+  );
+}
+
+═══════════════════════════════════════════════════════════
+📄 apps/web/src/components/commerce/AssociationActions.tsx
+═══════════════════════════════════════════════════════════
+'use client';
+
+import { useState } from 'react';
+import Image from 'next/image';
+import { MapPin, Calendar } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import type { AssociationAction } from '@/lib/mock-data';
+
+interface AssociationActionsProps {
+  actions: AssociationAction[];
+}
+
+const STATUS_LABEL = {
+  actif: { label: 'En cours', class: 'bg-ic-vert text-white' },
+  termine: { label: 'Terminé', class: 'bg-gris-doux text-white' },
+  prevu: { label: 'À venir', class: 'bg-ic-or text-marine-dark' },
+};
+
+type Filter = 'toutes' | 'actif' | 'termine' | 'prevu';
+
+export default function AssociationActions({
+  actions,
+}: AssociationActionsProps) {
+  const [filter, setFilter] = useState<Filter>('toutes');
+
+  const filtered =
+    filter === 'toutes'
+      ? actions
+      : actions.filter((a) => a.status === filter);
+
+  const counts = {
+    toutes: actions.length,
+    actif: actions.filter((a) => a.status === 'actif').length,
+    termine: actions.filter((a) => a.status === 'termine').length,
+    prevu: actions.filter((a) => a.status === 'prevu').length,
+  };
+
+  return (
+    <div>
+      {/* Filtres */}
+      <div className="flex flex-wrap gap-2 mb-6">
+        {(
+          [
+            { id: 'toutes', label: 'Toutes' },
+            { id: 'actif', label: 'En cours' },
+            { id: 'prevu', label: 'À venir' },
+            { id: 'termine', label: 'Terminées' },
+          ] as { id: Filter; label: string }[]
+        ).map((f) => (
+          <button
+            key={f.id}
+            onClick={() => setFilter(f.id)}
+            className={cn(
+              'px-4 py-2 rounded-full text-xs font-bold transition-colors',
+              filter === f.id
+                ? 'bg-marine text-white'
+                : 'bg-gris-fond text-gris-texte hover:bg-gris-ligne'
+            )}
+          >
+            {f.label} ({counts[f.id]})
+          </button>
+        ))}
+      </div>
+
+      {/* Grille */}
+      {filtered.length > 0 ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          {filtered.map((action) => {
+            const st = STATUS_LABEL[action.status];
+            return (
+              <article
+                key={action.id}
+                className="bg-white border border-gris-ligne rounded-lg overflow-hidden hover:shadow-cb-md transition-shadow"
+              >
+                <div className="relative aspect-[16/9] overflow-hidden">
+                  <Image
+                    src={action.image}
+                    alt={action.title}
+                    fill
+                    className="object-cover"
+                    sizes="(max-width: 768px) 100vw, 50vw"
+                  />
+                  <span
+                    className={cn(
+                      'absolute top-3 left-3 text-[10px] font-extrabold uppercase tracking-wider px-2.5 py-1 rounded-full',
+                      st.class
+                    )}
+                  >
+                    {st.label}
+                  </span>
+                </div>
+
+                <div className="p-5">
+                  <h3 className="font-extrabold text-marine text-base mb-2">
+                    {action.title}
+                  </h3>
+
+                  <div className="flex flex-wrap items-center gap-3 text-xs text-gris-doux mb-3">
+                    <span className="flex items-center gap-1">
+                      <MapPin size={12} />
+                      {action.location}
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <Calendar size={12} />
+                      {action.date}
+                    </span>
+                  </div>
+
+                  <p className="text-sm text-gris-texte leading-relaxed">
+                    {action.description}
+                  </p>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="text-center py-12 bg-gris-fond rounded-lg">
+          <p className="text-sm text-gris-texte">
+            Aucune action dans cette catégorie.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
