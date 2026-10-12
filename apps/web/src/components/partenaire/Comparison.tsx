@@ -1,4 +1,8 @@
-import { COMPARISON_TABLE } from '@/lib/partner-data';
+'use client';
+
+import { useEffect, useState } from 'react';
+import { Loader2 } from 'lucide-react';
+import { createBrowserClient } from '@supabase/ssr';
 import { cn } from '@/lib/utils';
 
 interface ComparisonProps {
@@ -6,6 +10,68 @@ interface ComparisonProps {
 }
 
 export default function Comparison({ compact = false }: ComparisonProps) {
+  const [plans, setPlans] = useState<any[]>([]);
+  const [features, setFeatures] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      const supabase = createBrowserClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      );
+
+      const [plansRes, versionsRes, featuresRes] = await Promise.all([
+        supabase
+          .from('plans')
+          .select('*')
+          .eq('is_active', true)
+          .eq('audience', 'business')
+          .order('position'),
+        supabase.from('plan_versions').select('*').eq('status', 'current'),
+        supabase.from('plan_features').select('*').eq('is_active', true).order('position'),
+      ]);
+
+      const merged = (plansRes.data || []).map((p: any) => {
+        const v = (versionsRes.data || []).find((ver: any) => ver.plan_id === p.id);
+        return { ...p, version: v, feature_ids: v?.feature_ids || [] };
+      });
+
+      setPlans(merged);
+      setFeatures(featuresRes.data || []);
+      setLoading(false);
+    })();
+  }, []);
+
+  if (loading) {
+    return (
+      <section className={cn('bg-gris-fond', compact ? 'py-10' : 'py-16')}>
+        <div className="max-w-wrap mx-auto px-4 md:px-6 text-center">
+          <Loader2 size={24} className="text-marine animate-spin mx-auto" />
+        </div>
+      </section>
+    );
+  }
+
+  // Regroupe les features par catégorie
+  const grouped = features.reduce((acc, f) => {
+    if (!acc[f.category]) acc[f.category] = [];
+    acc[f.category].push(f);
+    return acc;
+  }, {} as Record<string, any[]>);
+
+  const CATEGORY_LABELS: Record<string, string> = {
+    visibility: 'Visibilité',
+    media: 'Médias',
+    businesses: 'Établissements',
+    team: 'Équipe',
+    analytics: 'Statistiques',
+    support: 'Support',
+    integration: 'Intégrations',
+    communication: 'Communication',
+    general: 'Général',
+  };
+
   return (
     <section className={cn('bg-gris-fond', compact ? 'py-10' : 'py-16')}>
       <div className="max-w-wrap mx-auto px-4 md:px-6">
@@ -22,52 +88,58 @@ export default function Comparison({ compact = false }: ComparisonProps) {
           <table className="w-full border-collapse">
             <thead>
               <tr className="bg-marine text-white">
-                {COMPARISON_TABLE.headers.map((h, i) => (
+                <th className={cn('px-3 md:px-4 text-left text-sm font-bold', compact ? 'py-3' : 'py-4')}>
+                  Fonctionnalité
+                </th>
+                {plans.map((p) => (
                   <th
-                    key={i}
-                    className={cn(
-                      'px-3 md:px-4 text-sm font-bold',
-                      compact ? 'py-3' : 'py-4',
-                      i === 0 ? 'text-left' : 'text-center'
-                    )}
+                    key={p.id}
+                    className={cn('px-3 md:px-4 text-center text-sm font-bold', compact ? 'py-3' : 'py-4')}
                   >
-                    {h}
+                    {p.name}
                   </th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {COMPARISON_TABLE.rows.map((row, i) => (
-                <tr
-                  key={i}
-                  className={i % 2 === 0 ? 'bg-white' : 'bg-gris-fond/50'}
-                >
-                  <td
-                    className={cn(
-                      'px-3 md:px-4 text-sm text-ink font-medium',
-                      compact ? 'py-2' : 'py-3'
-                    )}
-                  >
-                    {row.label}
-                  </td>
-                  {row.values.map((v, j) => (
+              {Object.entries(grouped).map(([category, catFeatures], catIdx) => (
+                <>
+                  <tr key={`cat-${category}`} className="bg-marine/5">
                     <td
-                      key={j}
-                      className={cn(
-                        'px-3 md:px-4 text-sm text-center text-gris-texte',
-                        compact ? 'py-2' : 'py-3'
-                      )}
+                      colSpan={plans.length + 1}
+                      className="px-3 md:px-4 py-2 text-xs font-bold uppercase tracking-wider text-marine"
                     >
-                      {v === '✓' ? (
-                        <span className="text-ic-vert font-bold">✓</span>
-                      ) : v === '—' ? (
-                        <span className="text-gris-doux">—</span>
-                      ) : (
-                        v
-                      )}
+                      {CATEGORY_LABELS[category] || category}
                     </td>
+                  </tr>
+                  {(catFeatures as any[]).map((f, i) => (
+                    <tr key={f.id} className={i % 2 === 0 ? 'bg-white' : 'bg-gris-fond/50'}>
+                      <td className={cn('px-3 md:px-4 text-sm text-ink font-medium', compact ? 'py-2' : 'py-3')}>
+                        {f.label}
+                        {f.metadata?.max && (
+                          <span className="text-[10px] text-gris-doux ml-2">
+                            (max {f.metadata.max} {f.metadata.unit})
+                          </span>
+                        )}
+                      </td>
+                      {plans.map((p) => {
+                        const has = p.feature_ids.includes(f.id);
+                        return (
+                          <td
+                            key={p.id}
+                            className={cn('px-3 md:px-4 text-center', compact ? 'py-2' : 'py-3')}
+                          >
+                            {has ? (
+                              <span className="text-ic-vert font-bold text-base">✓</span>
+                            ) : (
+                              <span className="text-gris-doux">—</span>
+                            )}
+                          </td>
+                        );
+                      })}
+                    </tr>
                   ))}
-                </tr>
+                </>
               ))}
             </tbody>
           </table>
