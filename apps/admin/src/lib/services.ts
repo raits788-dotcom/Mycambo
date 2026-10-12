@@ -1001,3 +1001,75 @@ export async function rejectModificationRequest(requestId: string, reason: strin
   });
   if (error) throw error;
 }
+// ============================================================================
+// STORAGE SETTINGS
+// ============================================================================
+export async function getStorageSettings() {
+  const supabase = getSupabase();
+  const { data, error } = await supabase
+    .from('storage_settings')
+    .select('*')
+    .eq('is_active', true)
+    .order('bucket_name');
+  if (error) { console.error('getStorageSettings:', error); return []; }
+  return data || [];
+}
+
+export async function updateStorageSetting(payload: {
+  bucket_name: string;
+  max_size_bytes: number;
+  allowed_formats: string[];
+  recommended_width?: number;
+  recommended_height?: number;
+  description?: string;
+}) {
+  const supabase = getSupabase();
+  const { error } = await supabase.rpc('admin_update_storage_setting', {
+    p_bucket_name: payload.bucket_name,
+    p_max_size_bytes: payload.max_size_bytes,
+    p_allowed_formats: payload.allowed_formats,
+    p_recommended_width: payload.recommended_width || null,
+    p_recommended_height: payload.recommended_height || null,
+    p_description: payload.description || null,
+  });
+  if (error) throw error;
+}
+
+export async function getStorageUsage() {
+  const supabase = getSupabase();
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) throw new Error('NOT_AUTHENTICATED');
+
+  const res = await fetch(
+    `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/check-storage-usage`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session.access_token}`,
+      },
+      body: JSON.stringify({}),
+    }
+  );
+
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'STORAGE_CHECK_FAILED');
+  return data as {
+    success: boolean;
+    total_size_mb: string;
+    file_count: number;
+    percentage: string;
+    alerts_sent: number[];
+  };
+}
+
+export async function getStorageAlerts(limit = 20) {
+  const supabase = getSupabase();
+  const { data, error } = await supabase
+    .from('storage_alerts')
+    .select('*')
+    .order('notified_at', { ascending: false })
+    .limit(limit);
+  if (error) { console.error('getStorageAlerts:', error); return []; }
+  return data || [];
+}

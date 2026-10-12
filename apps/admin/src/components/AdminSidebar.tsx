@@ -24,6 +24,7 @@ import {
   ShieldCheck,
   Gift,
   Loader2,
+  HardDrive,
 } from 'lucide-react';
 import { cn } from '@my-cambo/utils';
 import { getCurrentAdmin, getInitials } from '@/lib/auth';
@@ -83,6 +84,7 @@ const NAV_SECTIONS: NavSection[] = [
       { id: 'logs', label: 'Logs & audit', icon: ScrollText, href: '/logs' },
       { id: 'roles', label: 'Rôles', icon: Users, href: '/roles' },
       { id: 'parametres', label: 'Paramètres', icon: Settings, href: '/parametres' },
+      { id: 'storage', label: 'Stockage', icon: HardDrive, href: '/storage' },
     ],
   },
 ];
