@@ -406,7 +406,7 @@ export default function CommerceTabs({
               Équipements & services
             </h2>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-              {commerce.amenities.map((a, i) => (
+              {(commerce.amenities || []).map((a, i) => (
                 <div
                   key={i}
                   className="flex items-center gap-2 text-sm text-gris-texte"

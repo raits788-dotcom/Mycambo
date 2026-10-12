@@ -4,7 +4,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { Loader2, Search } from 'lucide-react';
 import { createBrowserClient } from '@supabase/ssr';
 import EtablissementCard from './EtablissementCard';
-import FiltersBar from './FiltersBar';
+import FiltersBar, { type Filters } from './FiltersBar';
 import { getLabelCatalog } from '@/lib/levels';
 
 interface Props {
@@ -17,11 +17,7 @@ export default function EtablissementGrid({ typeSlug, initialData }: Props) {
   const [labelCatalog, setLabelCatalog] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [filters, setFilters] = useState<{
-    city?: string;
-    level?: string;
-    labels?: string[];
-  }>({});
+  const [filters, setFilters] = useState<Filters>({});
 
   useEffect(() => {
     (async () => {
@@ -30,12 +26,11 @@ export default function EtablissementGrid({ typeSlug, initialData }: Props) {
         process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
       );
 
-      // 1. Charge les établissements approuvés
       let query = supabase
         .from('businesses')
         .select(`
           id, slug, name, description, city, photos, tenant_id,
-          categories!inner(name, slug, icon),
+          categories!inner(name, slug, icon, color),
           tenants!inner(id, name, verification_level)
         `)
         .eq('status', 'approved')
@@ -54,7 +49,6 @@ export default function EtablissementGrid({ typeSlug, initialData }: Props) {
         return;
       }
 
-      // 2. Charge les labels de tous les tenants
       const tenantIds = [...new Set((rows || []).map((b: any) => b.tenant_id))];
       const { data: allLabels } = await supabase
         .from('tenant_labels')
@@ -67,7 +61,6 @@ export default function EtablissementGrid({ typeSlug, initialData }: Props) {
         if (l.label) labelsByTenant[l.tenant_id].push(l.label);
       });
 
-      // 3. Fusionne
       const enriched = (rows || []).map((b: any) => ({
         id: b.id,
         slug: b.slug,
@@ -77,13 +70,14 @@ export default function EtablissementGrid({ typeSlug, initialData }: Props) {
         image: b.photos?.[0],
         typeLabel: b.categories?.name,
         categorySlug: b.categories?.slug,
+        categoryName: b.categories?.name,
+        categoryIcon: b.categories?.icon,
         level: b.tenants?.verification_level || 'inscrit',
         labels: labelsByTenant[b.tenant_id] || [],
       }));
 
       setBusinesses(enriched);
 
-      // 4. Charge le catalogue de labels pour les filtres
       const catalog = await getLabelCatalog();
       setLabelCatalog(catalog);
 
@@ -91,15 +85,31 @@ export default function EtablissementGrid({ typeSlug, initialData }: Props) {
     })();
   }, [typeSlug]);
 
-  // Liste des villes disponibles
+  // Villes disponibles
   const cities = useMemo(() => {
     return [...new Set(businesses.map((b) => b.city).filter(Boolean))].sort();
+  }, [businesses]);
+
+  // Sous-catégories disponibles (avec compteur)
+  const subcategories = useMemo(() => {
+    const map = new Map<string, { id: string; name: string; icon?: string; count: number }>();
+    businesses.forEach((b) => {
+      if (!b.categorySlug) return;
+      const existing = map.get(b.categorySlug);
+      if (existing) existing.count += 1;
+      else map.set(b.categorySlug, {
+        id: b.categorySlug,
+        name: b.categoryName || b.categorySlug,
+        icon: b.categoryIcon,
+        count: 1,
+      });
+    });
+    return [...map.values()].sort((a, b) => a.name.localeCompare(b.name));
   }, [businesses]);
 
   // Filtrage
   const filtered = useMemo(() => {
     return businesses.filter((b) => {
-      // Recherche texte
       if (search) {
         const s = search.toLowerCase();
         const matchSearch =
@@ -109,13 +119,10 @@ export default function EtablissementGrid({ typeSlug, initialData }: Props) {
         if (!matchSearch) return false;
       }
 
-      // Ville
       if (filters.city && b.city !== filters.city) return false;
-
-      // Niveau
       if (filters.level && b.level !== filters.level) return false;
+      if (filters.subcategory && b.categorySlug !== filters.subcategory) return false;
 
-      // Labels (tous les labels sélectionnés doivent être présents)
       if (filters.labels && filters.labels.length > 0) {
         const businessLabelCodes = b.labels.map((l: any) => l.code);
         const hasAllLabels = filters.labels.every((code) =>
@@ -139,7 +146,6 @@ export default function EtablissementGrid({ typeSlug, initialData }: Props) {
 
   return (
     <>
-      {/* Barre de recherche */}
       <div className="relative mb-4">
         <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gris-doux" />
         <input
@@ -151,15 +157,14 @@ export default function EtablissementGrid({ typeSlug, initialData }: Props) {
         />
       </div>
 
-      {/* Filtres */}
       <FiltersBar
         filters={filters}
         onChange={setFilters}
         cities={cities}
         labels={labelCatalog}
+        subcategories={subcategories}
       />
 
-      {/* Résultats */}
       <div className="mb-4 text-xs text-gris-texte">
         {filtered.length} résultat{filtered.length > 1 ? 's' : ''}
         {businesses.length !== filtered.length && ` sur ${businesses.length}`}

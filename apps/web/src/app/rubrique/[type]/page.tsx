@@ -4,7 +4,6 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import FeaturedCarousel from '@/components/rubrique/FeaturedCarousel';
 import EtablissementGrid from '@/components/rubrique/EtablissementGrid';
-import { CATEGORIES_RUBRIQUE, ETABLISSEMENTS } from '@/lib/mock-data';
 
 const SECTEURS: Record<
   string,
@@ -91,27 +90,6 @@ export default async function RubriquePage({ params, searchParams }: Props) {
   const secteur = SECTEURS[type];
   if (!secteur) notFound();
 
-  const cats = CATEGORIES_RUBRIQUE[type] || [];
-  const allEtablissements = ETABLISSEMENTS[type] || [];
-
-  // Slug de catégorie normalisé pour comparaison
-  const catSlug = cat ? cat.toLowerCase() : null;
-
-  // Établissements filtrés par catégorie
-  const filteredEtablissements = catSlug
-    ? allEtablissements.filter(
-        (e) => e.category.toLowerCase() === catSlug
-      )
-    : allEtablissements;
-
-  // Slugs des coups de cœur (top 3 par note)
-  const featuredSlugs = [...allEtablissements]
-    .sort((a, b) => b.rating - a.rating)
-    .slice(0, 3)
-    .map((e) => e.slug);
-
-  const hasFilter = !!catSlug;
-
   return (
     <>
       {/* ===== HERO ===== */}
@@ -150,7 +128,7 @@ export default async function RubriquePage({ params, searchParams }: Props) {
 
               <div className="flex flex-wrap gap-3 mb-6">
                 <Link
-                  href="#categories"
+                  href="#resultats"
                   className="inline-flex items-center gap-2 bg-white text-marine font-bold px-4 py-2.5 rounded-full hover:bg-white/90 transition-colors text-sm"
                 >
                   Voir toutes les adresses
@@ -174,92 +152,12 @@ export default async function RubriquePage({ params, searchParams }: Props) {
         </div>
       </section>
 
-      {/* ===== CATÉGORIES COMPACTES ===== */}
-      {cats.length > 0 && (
-        <section id="categories" className="bg-gris-fond py-6">
-          <div className="max-w-wrap mx-auto px-4 md:px-8 lg:px-12 xl:px-20">
-            <div className="flex items-center gap-3 mb-3">
-              <span className="h-px w-8 bg-marine" />
-              <span className="text-[11px] uppercase tracking-[0.3em] text-marine font-bold">
-                Parcourir par catégorie
-              </span>
-            </div>
-
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2">
-            {cats.map((c) => {
-  const catSlugItem = c.label.toLowerCase();
-  const isActive = catSlug === catSlugItem;
-  const count = allEtablissements.filter(
-    (e) => e.category.toLowerCase() === catSlugItem
-  ).length;
-
-  return (
-    <Link
-      key={c.label}
-      href={
-        isActive
-          ? `/rubrique/${type}#categories`
-          : `/rubrique/${type}?cat=${encodeURIComponent(
-              catSlugItem
-            )}#categories`
-      }
-      className={`group bg-white rounded-lg p-2.5 flex items-center gap-2.5 transition-all border-2 ${
-        isActive
-          ? 'border-marine shadow-cb-sm'
-          : 'border-gris-ligne hover:border-marine'
-      }`}
-    >
-      <div
-        className={`w-8 h-8 rounded-md flex items-center justify-center text-base flex-shrink-0 ${
-          isActive ? 'bg-marine/10' : 'bg-gris-fond'
-        }`}
-      >
-        {c.icon}
-      </div>
-      <div className="flex-1 min-w-0 text-left">
-        <div className="font-bold text-marine text-[11px] truncate flex items-center gap-1">
-          {c.label}
-          {isActive && <span className="text-ic-vert text-[10px]">✓</span>}
+      {/* ===== GRILLE D'ÉTABLISSEMENTS (avec filtres intégrés) ===== */}
+      <section id="resultats" className="bg-gris-fond py-8">
+        <div className="max-w-wrap mx-auto px-4 md:px-8 lg:px-12 xl:px-20">
+          <EtablissementGrid typeSlug={type} />
         </div>
-        <div className="text-[9px] text-gris-doux">
-          {count} adresse{count > 1 ? 's' : ''}
-        </div>
-      </div>
-    </Link>
-  );
-})}
-            </div>
-          </div>
-        </section>
-      )}
-
-      {/* ===== GRILLE D'ÉTABLISSEMENTS ===== */}
-      {filteredEtablissements.length > 0 && (
-        <EtablissementGrid
-        etablissements={filteredEtablissements.map((e) => ({
-          ...e,
-          isFeatured: featuredSlugs.includes(e.slug),
-        }))}
-        categoriesFeatured={featuredSlugs}
-        title={
-          hasFilter && cat
-            ? `${cats.find((c) => c.label.toLowerCase() === catSlug)?.icon || ''} ${
-                cats.find((c) => c.label.toLowerCase() === catSlug)?.label || cat
-              }`
-            : `Toutes les ${secteur.label.toLowerCase()}`
-        }
-        subtitle={
-          hasFilter
-            ? `${filteredEtablissements.length} ${
-                filteredEtablissements.length > 1
-                  ? secteur.label.toLowerCase()
-                  : secteur.singular
-              } dans cette catégorie`
-            : `${filteredEtablissements.length} adresses disponibles`
-        }
-        clearFilterHref={hasFilter ? `/rubrique/${type}#categories` : undefined}
-      />
-      )}
+      </section>
     </>
   );
 }
