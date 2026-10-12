@@ -5,7 +5,7 @@ import Link from 'next/link';
 import {
   ArrowLeft, Shield, KeyRound, Mail, Phone, MapPin, Building2,
   CreditCard, CheckCircle2, XCircle, Clock, Store, Loader2,
-  Award, Plus, X,
+  Award, Plus, X, Pencil,
 } from 'lucide-react';
 import {
   getTenant, getTenantBusinesses, getTenantPayments, getTenantSubscription,
@@ -13,6 +13,7 @@ import {
   approveTenant, suspendTenant,
   changeVerificationLevel, getVerificationHistory,
   getLabelCatalog, getTenantLabels, toggleTenantLabel,
+  updateTenantEmail,
   VERIFICATION_LEVELS, type VerificationLevel,
 } from '@/lib/services';
 
@@ -46,6 +47,9 @@ export default function TenantDetailPage({
 const [tenantLabels, setTenantLabels] = useState<any[]>([]);
 const [showLabels, setShowLabels] = useState(false);
 const [changingLevel, setChangingLevel] = useState(false);
+const [showEmailModal, setShowEmailModal] = useState(false);
+const [newEmail, setNewEmail] = useState('');
+const [savingEmail, setSavingEmail] = useState(false);
 
 useEffect(() => {
   (async () => {
@@ -107,6 +111,31 @@ useEffect(() => {
       setImpersonating(false);
     }
   };
+
+  const handleUpdateEmail = async () => {
+  if (!newEmail || newEmail === tenant.email) {
+    alert('Entrez une nouvelle adresse email différente.');
+    return;
+  }
+  if (!newEmail.includes('@')) {
+    alert('Adresse email invalide.');
+    return;
+  }
+  if (!confirm(`Changer l'email de "${tenant.name}"\n\nAncien : ${tenant.email}\nNouveau : ${newEmail}\n\nUn email d'alerte sera envoyé à l'ancienne adresse.`)) return;
+
+  setSavingEmail(true);
+  try {
+    await updateTenantEmail(tenant.id, newEmail);
+    setTenant({ ...tenant, email: newEmail });
+    setShowEmailModal(false);
+    setNewEmail('');
+    alert('✅ Email modifié avec succès');
+  } catch (err) {
+    alert('Erreur : ' + (err as Error).message);
+  } finally {
+    setSavingEmail(false);
+  }
+};
 
   const handleChangeLevel = async (newLevel: VerificationLevel) => {
   if (!confirm(`Passer "${tenant.name}" au niveau ${VERIFICATION_LEVELS[newLevel].label} ?`)) return;
@@ -332,6 +361,14 @@ const handleSuspend = async () => {
     <KeyRound size={14} />
     {resetting ? 'Envoi...' : 'Reset MDP admin'}
   </button>
+          <button
+            onClick={() => { setNewEmail(tenant.email); setShowEmailModal(true); }}
+            className="flex items-center gap-2 border border-gris-ligne text-marine font-bold text-sm px-4 py-2.5 rounded-full hover:border-marine"
+          >
+            <Pencil size={14} />
+            Modifier l&apos;email
+          </button>
+
 </div>
         </div>
       </div>
@@ -530,6 +567,66 @@ const handleSuspend = async () => {
     </div>
   </div>
 )}
+      {/* MODALE CHANGEMENT EMAIL */}
+      {showEmailModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-extrabold text-marine">Modifier l&apos;email</h2>
+              <button
+                onClick={() => setShowEmailModal(false)}
+                className="w-8 h-8 rounded-lg hover:bg-gris-fond flex items-center justify-center"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4">
+              <p className="text-xs text-amber-800">
+                ⚠️ Cette action modifie l&apos;email de connexion du partenaire.
+                Un email d&apos;alerte sera envoyé à l&apos;ancienne adresse.
+              </p>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-gris-texte uppercase mb-1">
+                  Email actuel
+                </label>
+                <input
+                  type="email"
+                  value={tenant.email}
+                  disabled
+                  className="w-full px-3 py-2 text-sm rounded-lg border border-gris-ligne bg-gris-fond text-gris-texte"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gris-texte uppercase mb-1">
+                  Nouvel email *
+                </label>
+                <input
+                  type="email"
+                  value={newEmail}
+                  onChange={(e) => setNewEmail(e.target.value)}
+                  placeholder="nouveau@exemple.com"
+                  className="w-full px-3 py-2 text-sm rounded-lg border border-gris-ligne focus:border-marine focus:outline-none"
+                  autoFocus
+                />
+              </div>
+
+              <button
+                onClick={handleUpdateEmail}
+                disabled={savingEmail}
+                className="w-full flex items-center justify-center gap-2 bg-marine text-white font-bold py-3 rounded-full hover:bg-marine-dark disabled:opacity-50"
+              >
+                {savingEmail ? <Loader2 size={14} className="animate-spin" /> : <Mail size={14} />}
+                {savingEmail ? 'Modification...' : 'Confirmer le changement'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

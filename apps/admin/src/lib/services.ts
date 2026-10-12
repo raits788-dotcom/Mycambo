@@ -872,3 +872,132 @@ export async function getPendingCount() {
     .eq('verification_level', 'inscrit');
   return count || 0;
 }
+// ============================================================================
+// CHANGEMENT EMAIL PARTENAIRE
+// ============================================================================
+export async function updateTenantEmail(tenantId: string, newEmail: string) {
+  const supabase = getSupabase();
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) throw new Error('NOT_AUTHENTICATED');
+
+  const res = await fetch(
+    `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/admin-update-tenant-email`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session.access_token}`,
+      },
+      body: JSON.stringify({ tenant_id: tenantId, new_email: newEmail }),
+    }
+  );
+
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'EMAIL_UPDATE_FAILED');
+  return data;
+}
+// ============================================================================
+// DOSSIERS DE VÉRIFICATION (soumis pour révision)
+// ============================================================================
+export async function getSubmittedVerifications() {
+  const supabase = getSupabase();
+  const { data, error } = await supabase
+    .from('tenant_verifications')
+    .select(`
+      *,
+      tenant:tenants!tenant_verifications_tenant_id_fkey(
+        id, name, email, city, phone, address, status, verification_level
+      )
+    `)
+    .eq('status', 'submitted')
+    .order('last_submitted_at', { ascending: false });
+  if (error) { console.error('getSubmittedVerifications:', error); return []; }
+  return data || [];
+}
+
+export async function getVerificationById(verifId: string) {
+  const supabase = getSupabase();
+  const { data, error } = await supabase
+    .from('tenant_verifications')
+    .select(`*, tenant:tenants!tenant_verifications_tenant_id_fkey(*)`)
+    .eq('id', verifId)
+    .single();
+  if (error) { console.error('getVerificationById:', error); return null; }
+  return data;
+}
+
+export async function approveVerification(verifId: string, tenantId: string, notes?: string) {
+  const supabase = getSupabase();
+
+  // 1. Approuve la vérification
+  await supabase
+    .from('tenant_verifications')
+    .update({
+      status: 'approved',
+      reviewed_at: new Date().toISOString(),
+      reviewer_notes: notes || null,
+    })
+    .eq('id', verifId);
+
+  // 2. Passe le tenant en vérifié
+  await changeVerificationLevel(tenantId, 'verifie', notes || 'Approuvé via vérification');
+}
+
+export async function rejectVerification(verifId: string, reason: string) {
+  const supabase = getSupabase();
+  await supabase
+    .from('tenant_verifications')
+    .update({
+      status: 'rejected',
+      reviewed_at: new Date().toISOString(),
+      rejection_reason: reason,
+    })
+    .eq('id', verifId);
+}
+// ============================================================================
+// MODIFICATION REQUESTS
+// ============================================================================
+export async function getModificationRequests(status?: string) {
+  const supabase = getSupabase();
+  let query = supabase
+    .from('modification_requests')
+    .select(`
+      *,
+      tenant:tenants!modification_requests_tenant_id_fkey(id, name, email),
+      business:businesses!modification_requests_business_id_fkey(id, name, slug)
+    `)
+    .order('created_at', { ascending: false });
+
+  if (status) query = query.eq('status', status);
+
+  const { data, error } = await query;
+  if (error) { console.error('getModificationRequests:', error); return []; }
+  return data || [];
+}
+
+export async function getModificationRequestsCount() {
+  const supabase = getSupabase();
+  const { count } = await supabase
+    .from('modification_requests')
+    .select('*', { count: 'exact', head: true })
+    .eq('status', 'pending');
+  return count || 0;
+}
+
+export async function approveModificationRequest(requestId: string, notes?: string) {
+  const supabase = getSupabase();
+  const { error } = await supabase.rpc('admin_approve_modification_request', {
+    p_request_id: requestId,
+    p_notes: notes || null,
+  });
+  if (error) throw error;
+}
+
+export async function rejectModificationRequest(requestId: string, reason: string) {
+  const supabase = getSupabase();
+  const { error } = await supabase.rpc('admin_reject_modification_request', {
+    p_request_id: requestId,
+    p_reason: reason,
+  });
+  if (error) throw error;
+}

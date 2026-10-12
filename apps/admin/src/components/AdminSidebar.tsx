@@ -14,6 +14,7 @@ import {
   DollarSign,
   TrendingUp,
   FileText,
+  FileEdit,
   Image as ImageIcon,
   BarChart3,
   ScrollText,
@@ -47,6 +48,7 @@ const NAV_SECTIONS: NavSection[] = [
       { id: 'dashboard', label: "Vue d'ensemble", icon: LayoutDashboard, href: '/dashboard' },
       { id: 'demandes', label: 'Demandes', icon: Inbox, href: '/demandes' },
       { id: 'verifications', label: 'Vérifications', icon: ShieldCheck, href: '/verifications' },
+      { id: 'modifications', label: 'Modifications', icon: FileEdit, href: '/modifications' },
     ],
   },
   {
