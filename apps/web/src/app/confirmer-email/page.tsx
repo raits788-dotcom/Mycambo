@@ -3,36 +3,59 @@
 import { useEffect, useState, Suspense } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { Check, AlertCircle } from 'lucide-react';
-import { confirmEmailMock } from '@/lib/auth-mock';
+import { Check, AlertCircle, Loader2 } from 'lucide-react';
+import { createBrowserClient } from '@supabase/ssr';
 
 function ConfirmEmailContent() {
   const searchParams = useSearchParams();
-  const token = searchParams.get('token');
   const [state, setState] = useState<'loading' | 'ok' | 'error'>('loading');
   const [error, setError] = useState('');
 
   useEffect(() => {
-    if (!token) {
-      setState('error');
-      setError('Aucun token fourni.');
-      return;
-    }
-    const result = confirmEmailMock(token);
-    if (result.ok) {
+    (async () => {
+      const supabase = createBrowserClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      );
+
+      // Supabase gère automatiquement la confirmation via les magic links
+      // On vérifie simplement que la session est active
+      const { data: { session }, error: sessionErr } = await supabase.auth.getSession();
+
+      if (sessionErr || !session) {
+        // Pas de session → probablement un vieux lien ou un token invalide
+        // On regarde s'il y a un code d'erreur dans l'URL (Supabase le met souvent)
+        const errCode = searchParams.get('error');
+        const errDesc = searchParams.get('error_description');
+
+        if (errCode || errDesc) {
+          setState('error');
+          setError(errDesc || 'Lien invalide ou expiré.');
+          return;
+        }
+
+        // Sinon on considère que l'utilisateur n'a pas encore confirmé
+        // → on l'invite à se connecter
+        setState('error');
+        setError(
+          'Votre email n\'a pas encore été confirmé ou le lien a expiré. ' +
+          'Vérifiez votre boîte mail ou reconnectez-vous.'
+        );
+        return;
+      }
+
+      // Session active → email confirmé
       setState('ok');
-    } else {
-      setState('error');
-      setError(result.error || 'Erreur de confirmation.');
-    }
-  }, [token]);
+    })();
+  }, [searchParams]);
 
   return (
     <section className="min-h-[calc(100vh-160px)] bg-gris-fond flex items-center justify-center px-4 py-12">
       <div className="max-w-md w-full bg-white rounded-2xl shadow-lg p-8 text-center">
         {state === 'loading' && (
           <>
-            <div className="text-sm text-gris-texte">Vérification...</div>
+            <Loader2 size={32} className="text-marine animate-spin mx-auto mb-4" />
+            <div className="text-sm text-gris-texte">Vérification en cours...</div>
           </>
         )}
 
@@ -45,13 +68,13 @@ function ConfirmEmailContent() {
               Email confirmé !
             </h1>
             <p className="text-sm text-gris-texte leading-relaxed mb-6">
-              Votre compte est maintenant actif. Vous pouvez vous connecter.
+              Votre compte est maintenant actif. Vous pouvez accéder à votre espace.
             </p>
             <Link
-              href="/connexion"
+              href="/mon-compte"
               className="inline-flex items-center justify-center gap-2 bg-marine text-white font-bold px-6 py-3 rounded-full hover:bg-marine-dark transition-colors text-sm w-full"
             >
-              Se connecter
+              Accéder à mon compte
             </Link>
           </>
         )}
@@ -68,10 +91,10 @@ function ConfirmEmailContent() {
               {error}
             </p>
             <Link
-              href="/inscription"
+              href="/connexion"
               className="inline-flex items-center justify-center gap-2 bg-marine text-white font-bold px-6 py-3 rounded-full hover:bg-marine-dark transition-colors text-sm w-full"
             >
-              Créer un nouveau compte
+              Se connecter
             </Link>
           </>
         )}

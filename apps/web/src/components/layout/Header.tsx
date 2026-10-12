@@ -1,39 +1,30 @@
 'use client';
 
 import Link from 'next/link';
-import Image from 'next/image';
 import { useState, useEffect } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import {
-  Search,
-  User,
-  ChevronDown,
-  Star,
-  LogOut,
-  Heart,
-  MessageSquare,
-  Inbox,
-  Building2,
-  LayoutDashboard,
-  BarChart3,
-  Shield,
-  UserCircle,
+  Search, User, ChevronDown, Star, LogOut, Heart,
+  MessageSquare, Inbox, Building2, LayoutDashboard, Shield, UserCircle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import Sidebar from './Sidebar';
 import {
-  SECTORS,
-  DISCOVER,
-  HUBS,
-  FIXED_LEFT,
-  FIXED_RIGHT,
+  SECTORS, DISCOVER, HUBS, FIXED_LEFT, FIXED_RIGHT,
 } from '@/lib/nav-config';
-import { getCurrentUserMock, logoutMock, type MockUser } from '@/lib/auth-mock';
+import { createBrowserClient } from '@supabase/ssr';
+
+interface HeaderUser {
+  id: string;
+  email: string;
+  name: string;
+  role: 'user' | 'partner' | 'admin';
+}
 
 export default function Header() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
-  const [user, setUser] = useState<MockUser | null>(null);
+  const [user, setUser] = useState<HeaderUser | null>(null);
   const [mounted, setMounted] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
@@ -46,14 +37,56 @@ export default function Header() {
     ...FIXED_RIGHT,
   ];
 
-  // ===== Récupère l'utilisateur au montage =====
+  // Charge l'utilisateur connecté
   useEffect(() => {
-    setUser(getCurrentUserMock());
-    setMounted(true);
+    (async () => {
+      const supabase = createBrowserClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      );
+
+      const { data: { session } } = await supabase.auth.getSession();
+
+      if (!session?.user) {
+        setUser(null);
+        setMounted(true);
+        return;
+      }
+
+      const u = session.user;
+      const appMeta = u.app_metadata || {};
+      let role: HeaderUser['role'] = 'user';
+
+      // Détermine le rôle
+      if (appMeta.role === 'superadmin' || appMeta.role === 'admin') {
+        role = 'admin';
+      } else {
+        // Vérifie si membre d'un tenant
+        const { data: tenantUser } = await supabase
+          .from('tenant_users')
+          .select('tenant_id')
+          .eq('user_id', u.id)
+          .maybeSingle();
+
+        if (tenantUser) role = 'partner';
+      }
+
+      setUser({
+        id: u.id,
+        email: u.email || '',
+        name: u.user_metadata?.name || u.email?.split('@')[0] || 'Utilisateur',
+        role,
+      });
+      setMounted(true);
+    })();
   }, [pathname]);
 
-  const handleLogout = () => {
-    logoutMock();
+  const handleLogout = async () => {
+    const supabase = createBrowserClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    );
+    await supabase.auth.signOut();
     setUser(null);
     setAccountOpen(false);
     router.push('/');
@@ -62,7 +95,6 @@ export default function Header() {
   return (
     <>
       <header className="sticky top-0 z-50 bg-white border-b border-gris-ligne">
-        {/* Barre supérieure */}
         <div className="max-w-wrap mx-auto px-4 md:px-8 lg:px-12 xl:px-20">
           <div className="flex items-center justify-between gap-4 py-3">
             <div className="flex items-center gap-3 md:gap-5 min-w-0">
@@ -77,11 +109,11 @@ export default function Header() {
               </button>
 
               <Link href="/" className="flex items-center flex-shrink-0">
-<img
-  src="/logo-cambo.png"
-  alt="myCAMBO"
-  className="h-14 md:h-20 w-auto object-contain"
-/>
+                <img
+                  src="/logo-cambo.png"
+                  alt="myCAMBO"
+                  className="h-14 md:h-20 w-auto object-contain"
+                />
               </Link>
             </div>
 
@@ -93,7 +125,6 @@ export default function Header() {
                 <Search size={20} />
               </button>
 
-              {/* ===== MENU COMPTE ===== */}
               <div className="relative">
                 <button
                   onClick={() => setAccountOpen(!accountOpen)}
@@ -130,16 +161,11 @@ export default function Header() {
           </div>
         </div>
 
-        {/* Barre de navigation bleue */}
         <nav className="bg-marine border-b border-marine-dark">
           <div className="max-w-wrap mx-auto px-4 md:px-8 lg:px-12 xl:px-20">
             <div className="flex items-center gap-1 overflow-x-auto scrollbar-hide">
               {allItems.map((item) => (
-                <NavItemLink
-                  key={item.id}
-                  item={item}
-                  pathname={pathname}
-                />
+                <NavItemLink key={item.id} item={item} pathname={pathname} />
               ))}
             </div>
           </div>
@@ -158,13 +184,10 @@ export default function Header() {
 // ============================================================================
 // DROPDOWN DU MENU COMPTE
 // ============================================================================
-
 function AccountDropdown({
-  user,
-  onClose,
-  onLogout,
+  user, onClose, onLogout,
 }: {
-  user: MockUser | null;
+  user: HeaderUser | null;
   onClose: () => void;
   onLogout: () => void;
 }) {
@@ -172,38 +195,22 @@ function AccountDropdown({
   if (!user) {
     return (
       <div className="absolute top-full right-0 mt-2 min-w-[240px] bg-white border border-gris-ligne rounded-md shadow-cb-md py-2 z-50">
-        <Link
-          href="/connexion"
-          className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-marine hover:bg-gris-fond"
-          onClick={onClose}
-        >
+        <Link href="/connexion" className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-marine hover:bg-gris-fond" onClick={onClose}>
           <UserCircle size={16} className="text-gris-doux" />
           Connexion
         </Link>
-        <Link
-          href="/inscription"
-          className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-marine hover:bg-gris-fond"
-          onClick={onClose}
-        >
+        <Link href="/inscription" className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-marine hover:bg-gris-fond" onClick={onClose}>
           <Star size={16} className="text-gris-doux" />
           Créer un compte
         </Link>
 
         <div className="border-t border-gris-ligne my-1.5" />
 
-        <Link
-          href="/espace-partenaire/connexion"
-          className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-marine hover:bg-gris-fond"
-          onClick={onClose}
-        >
+        <Link href="/espace-partenaire/connexion" className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-marine hover:bg-gris-fond" onClick={onClose}>
           <Building2 size={16} className="text-gris-doux" />
           Espace partenaire
         </Link>
-        <Link
-          href="/partenaire"
-          className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-ic-or font-bold hover:bg-gris-fond"
-          onClick={onClose}
-        >
+        <Link href="/partenaire" className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-ic-or font-bold hover:bg-gris-fond" onClick={onClose}>
           <Star size={16} className="fill-ic-or text-ic-or" />
           Devenir partenaire
         </Link>
@@ -211,59 +218,36 @@ function AccountDropdown({
     );
   }
 
-  // Connecté en tant que PARTENAIRE
+  // Partenaire
   if (user.role === 'partner') {
     return (
       <div className="absolute top-full right-0 mt-2 min-w-[240px] bg-white border border-gris-ligne rounded-md shadow-cb-md py-2 z-50">
         <div className="px-4 py-2 border-b border-gris-ligne mb-1">
           <div className="text-xs text-gris-doux">Connecté en tant que</div>
-          <div className="text-sm font-bold text-marine truncate">
-            {user.name}
-          </div>
-          <div className="text-[10px] text-ic-or font-bold uppercase tracking-wider mt-0.5">
-            Partenaire
-          </div>
+          <div className="text-sm font-bold text-marine truncate">{user.name}</div>
+          <div className="text-[10px] text-ic-or font-bold uppercase tracking-wider mt-0.5">Partenaire</div>
         </div>
 
-        <Link
-          href="/espace-partenaire/dashboard"
-          className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-marine hover:bg-gris-fond"
-          onClick={onClose}
-        >
+        <Link href="/espace-partenaire/dashboard" className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-marine hover:bg-gris-fond" onClick={onClose}>
           <LayoutDashboard size={16} className="text-gris-doux" />
           Vue d&apos;ensemble
         </Link>
-        <Link
-          href="/espace-partenaire/etablissements"
-          className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-marine hover:bg-gris-fond"
-          onClick={onClose}
-        >
+        <Link href="/espace-partenaire/etablissements" className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-marine hover:bg-gris-fond" onClick={onClose}>
           <Building2 size={16} className="text-gris-doux" />
           Mes établissements
         </Link>
-        <Link
-          href="/espace-partenaire/demandes"
-          className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-marine hover:bg-gris-fond"
-          onClick={onClose}
-        >
+        <Link href="/espace-partenaire/demandes" className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-marine hover:bg-gris-fond" onClick={onClose}>
           <Inbox size={16} className="text-gris-doux" />
           Demandes reçues
         </Link>
-        <Link
-          href="/espace-partenaire/avis"
-          className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-marine hover:bg-gris-fond"
-          onClick={onClose}
-        >
+        <Link href="/espace-partenaire/avis" className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-marine hover:bg-gris-fond" onClick={onClose}>
           <Star size={16} className="text-gris-doux" />
           Avis
         </Link>
 
         <div className="border-t border-gris-ligne my-1.5" />
 
-        <button
-          onClick={onLogout}
-          className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 text-left"
-        >
+        <button onClick={onLogout} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 text-left">
           <LogOut size={16} />
           Déconnexion
         </button>
@@ -271,43 +255,24 @@ function AccountDropdown({
     );
   }
 
-  // Connecté en tant qu'ADMIN
+  // Admin
   if (user.role === 'admin') {
     return (
       <div className="absolute top-full right-0 mt-2 min-w-[240px] bg-white border border-gris-ligne rounded-md shadow-cb-md py-2 z-50">
         <div className="px-4 py-2 border-b border-gris-ligne mb-1">
           <div className="text-xs text-gris-doux">Connecté en tant que</div>
-          <div className="text-sm font-bold text-marine truncate">
-            {user.name}
-          </div>
-          <div className="text-[10px] text-red-600 font-bold uppercase tracking-wider mt-0.5">
-            Administrateur
-          </div>
+          <div className="text-sm font-bold text-marine truncate">{user.name}</div>
+          <div className="text-[10px] text-red-600 font-bold uppercase tracking-wider mt-0.5">Administrateur</div>
         </div>
 
-        <Link
-          href="/admin/dashboard"
-          className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-marine hover:bg-gris-fond"
-          onClick={onClose}
-        >
+        <a href="/admin/dashboard" className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-marine hover:bg-gris-fond" onClick={onClose}>
           <Shield size={16} className="text-gris-doux" />
           Console admin
-        </Link>
-        <Link
-          href="/admin/moderation"
-          className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-marine hover:bg-gris-fond"
-          onClick={onClose}
-        >
-          <Star size={16} className="text-gris-doux" />
-          Modération
-        </Link>
+        </a>
 
         <div className="border-t border-gris-ligne my-1.5" />
 
-        <button
-          onClick={onLogout}
-          className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 text-left"
-        >
+        <button onClick={onLogout} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 text-left">
           <LogOut size={16} />
           Déconnexion
         </button>
@@ -315,58 +280,35 @@ function AccountDropdown({
     );
   }
 
-  // Connecté en tant qu'UTILISATEUR (par défaut)
+  // Utilisateur standard
   return (
     <div className="absolute top-full right-0 mt-2 min-w-[240px] bg-white border border-gris-ligne rounded-md shadow-cb-md py-2 z-50">
       <div className="px-4 py-2 border-b border-gris-ligne mb-1">
         <div className="text-xs text-gris-doux">Connecté en tant que</div>
-        <div className="text-sm font-bold text-marine truncate">
-          {user.name}
-        </div>
-        <div className="text-[10px] text-marine font-bold uppercase tracking-wider mt-0.5">
-          Utilisateur
-        </div>
+        <div className="text-sm font-bold text-marine truncate">{user.name}</div>
+        <div className="text-[10px] text-marine font-bold uppercase tracking-wider mt-0.5">Utilisateur</div>
       </div>
 
-      <Link
-        href="/mon-compte"
-        className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-marine hover:bg-gris-fond"
-        onClick={onClose}
-      >
+      <Link href="/mon-compte" className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-marine hover:bg-gris-fond" onClick={onClose}>
         <LayoutDashboard size={16} className="text-gris-doux" />
         Mon espace
       </Link>
-      <Link
-        href="/mon-compte/favoris"
-        className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-marine hover:bg-gris-fond"
-        onClick={onClose}
-      >
+      <Link href="/mon-compte/favoris" className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-marine hover:bg-gris-fond" onClick={onClose}>
         <Heart size={16} className="text-gris-doux" />
         Mes favoris
       </Link>
-      <Link
-        href="/mon-compte/avis"
-        className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-marine hover:bg-gris-fond"
-        onClick={onClose}
-      >
+      <Link href="/mon-compte/avis" className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-marine hover:bg-gris-fond" onClick={onClose}>
         <Star size={16} className="text-gris-doux" />
         Mes avis
       </Link>
-      <Link
-        href="/mon-compte/demandes"
-        className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-marine hover:bg-gris-fond"
-        onClick={onClose}
-      >
+      <Link href="/mon-compte/demandes" className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-marine hover:bg-gris-fond" onClick={onClose}>
         <MessageSquare size={16} className="text-gris-doux" />
         Mes demandes
       </Link>
 
       <div className="border-t border-gris-ligne my-1.5" />
 
-      <button
-        onClick={onLogout}
-        className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 text-left"
-      >
+      <button onClick={onLogout} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 text-left">
         <LogOut size={16} />
         Déconnexion
       </button>
@@ -375,9 +317,8 @@ function AccountDropdown({
 }
 
 // ============================================================================
-// LIEN DE NAVIGATION (inchangé)
+// LIEN DE NAVIGATION
 // ============================================================================
-
 function NavItemLink({ item, pathname }: { item: any; pathname: string }) {
   const isActive = (() => {
     if (item.href === '/rubrique/hotel' && pathname.startsWith('/rubrique/hotel')) return true;
@@ -407,24 +348,16 @@ function NavItemLink({ item, pathname }: { item: any; pathname: string }) {
           href={item.href}
           className={cn(
             'relative flex items-center gap-1.5 px-3 md:px-4 py-3 text-xs md:text-sm font-semibold transition-colors whitespace-nowrap',
-            isActive
-              ? 'text-white'
-              : 'text-white/90 hover:text-white hover:bg-white/10'
+            isActive ? 'text-white' : 'text-white/90 hover:text-white hover:bg-white/10'
           )}
         >
           {item.label}
           <ChevronDown size={12} />
-          {isActive && (
-            <span className="absolute bottom-0 left-3 right-3 h-0.5 bg-ic-or rounded-t-full" />
-          )}
+          {isActive && <span className="absolute bottom-0 left-3 right-3 h-0.5 bg-ic-or rounded-t-full" />}
         </Link>
         <div className="absolute top-full left-0 min-w-[200px] bg-white border border-gris-ligne rounded-md shadow-cb-md py-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
           {item.submenu.map((sub: any, i: number) => (
-            <Link
-              key={i}
-              href={sub.href}
-              className="block px-4 py-2.5 text-sm text-marine hover:bg-gris-fond"
-            >
+            <Link key={i} href={sub.href} className="block px-4 py-2.5 text-sm text-marine hover:bg-gris-fond">
               {sub.label}
             </Link>
           ))}
