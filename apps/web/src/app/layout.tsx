@@ -1,9 +1,7 @@
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import './globals.css';
-import Header from '@/components/layout/Header';
-import Footer from '@/components/layout/Footer';
-import BottomNav from '@/components/layout/BottomNav';
+import ConditionalLayout from '@/components/layout/ConditionalLayout';
 
 const inter = Inter({
   subsets: ['latin'],
@@ -35,10 +33,7 @@ export default function RootLayout({
         />
       </head>
       <body className="pb-16 md:pb-0">
-        <Header />
-        <main className="min-h-[60vh]">{children}</main>
-        <Footer />
-        <BottomNav />
+        <ConditionalLayout>{children}</ConditionalLayout>
       </body>
     </html>
   );

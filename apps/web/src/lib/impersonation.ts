@@ -3,19 +3,36 @@
 // ============================================================================
 import { createBrowserClient } from '@supabase/ssr';
 
+const TOKEN_KEY = 'mycambo_impersonate_token';
+
 export function getImpersonateToken(): string | null {
   if (typeof window === 'undefined') return null;
+
+  // 1. Récupère le token depuis l'URL (sans modifier l'URL tout de suite)
   const url = new URL(window.location.href);
-  const token = url.searchParams.get('impersonate');
-  if (token) {
-    // Écrase TOUJOURS l'ancien token
-    sessionStorage.setItem('mycambo_impersonate_token', token);
-    // Nettoie l'URL
+  const urlToken = url.searchParams.get('impersonate');
+
+  if (urlToken) {
+    // Stocke D'ABORD
+    sessionStorage.setItem(TOKEN_KEY, urlToken);
+    return urlToken;
+  }
+
+  // 2. Sinon, récupère depuis la session
+  return sessionStorage.getItem(TOKEN_KEY);
+}
+
+/**
+ * Nettoie l'URL en enlevant ?impersonate=xxx
+ * À appeler UNIQUEMENT quand on est sûr d'avoir fini de lire le token
+ */
+export function cleanImpersonateParamFromUrl() {
+  if (typeof window === 'undefined') return;
+  const url = new URL(window.location.href);
+  if (url.searchParams.has('impersonate')) {
     url.searchParams.delete('impersonate');
     window.history.replaceState({}, '', url.toString());
-    return token;
   }
-  return sessionStorage.getItem('mycambo_impersonate_token');
 }
 
 export async function getImpersonatedTenant(): Promise<any | null> {
@@ -34,25 +51,28 @@ export async function getImpersonatedTenant(): Promise<any | null> {
     .maybeSingle();
 
   if (tokenErr || !tokenData) {
-    sessionStorage.removeItem('mycambo_impersonate_token');
+    sessionStorage.removeItem(TOKEN_KEY);
     return null;
   }
 
   if (new Date(tokenData.expires_at) < new Date()) {
-    sessionStorage.removeItem('mycambo_impersonate_token');
+    sessionStorage.removeItem(TOKEN_KEY);
     return null;
   }
+
+  // ✅ Nettoie l'URL seulement APRÈS avoir validé le token
+  cleanImpersonateParamFromUrl();
 
   return tokenData.tenants;
 }
 
 export function clearImpersonation() {
   if (typeof window !== 'undefined') {
-    sessionStorage.removeItem('mycambo_impersonate_token');
+    sessionStorage.removeItem(TOKEN_KEY);
   }
 }
 
 export function isImpersonating(): boolean {
   if (typeof window === 'undefined') return false;
-  return !!sessionStorage.getItem('mycambo_impersonate_token');
+  return !!sessionStorage.getItem(TOKEN_KEY);
 }
