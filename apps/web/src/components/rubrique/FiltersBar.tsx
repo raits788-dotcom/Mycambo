@@ -1,86 +1,72 @@
 'use client';
 
-import { Star, Heart, X, SlidersHorizontal } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { Filter, X } from 'lucide-react';
 
-export type SortOption =
-  | 'rating-desc'
-  | 'rating-asc'
-  | 'name-asc'
-  | 'recent';
-
-export interface Filters {
-  sort: SortOption;
-  ratingMin: number | null;
-  city: string | null;
-  onlyFeatured: boolean;
+interface Filters {
+  city?: string;
+  level?: string;
+  labels?: string[];
+  priceRange?: string;
+  rating?: number;
 }
 
-interface FiltersBarProps {
+interface Props {
   filters: Filters;
   onChange: (filters: Filters) => void;
   cities: string[];
-  featuredCount: number;
-  totalCount: number;
-  hasActiveFilter: boolean;
+  labels: any[];
 }
 
-export default function FiltersBar({
-  filters,
-  onChange,
-  cities,
-  featuredCount,
-  totalCount,
-  hasActiveFilter,
-}: FiltersBarProps) {
-  const update = (partial: Partial<Filters>) => {
-    onChange({ ...filters, ...partial });
+export default function FiltersBar({ filters, onChange, cities, labels }: Props) {
+  const LEVELS = [
+    { id: '', label: 'Tous niveaux' },
+    { id: 'verifie', label: '🥉 Vérifié (Bronze)' },
+    { id: 'premium', label: '🥈 Premium (Silver)' },
+    { id: 'exception', label: '🥇 Exception (Gold)' },
+    { id: 'legende', label: '💎 Légende (Platine)' },
+  ];
+
+  const hasFilters =
+    filters.city ||
+    filters.level ||
+    (filters.labels && filters.labels.length > 0);
+
+  const toggleLabel = (labelCode: string) => {
+    const current = filters.labels || [];
+    const updated = current.includes(labelCode)
+      ? current.filter((l) => l !== labelCode)
+      : [...current, labelCode];
+    onChange({ ...filters, labels: updated });
   };
 
   return (
-    <section className="bg-white border-b border-gris-ligne py-3 sticky top-[160px] z-20">
-      <div className="max-w-wrap mx-auto px-4 md:px-8 lg:px-12 xl:px-20">
-        <div className="flex items-center gap-2 flex-wrap">
-          {/* Tri */}
-          <div className="flex items-center gap-2">
-            <SlidersHorizontal size={14} className="text-gris-doux" />
-            <select
-              value={filters.sort}
-              onChange={(e) =>
-                update({ sort: e.target.value as SortOption })
-              }
-              className="text-xs border border-gris-ligne rounded-lg px-3 py-2 font-semibold text-marine outline-none focus:border-marine cursor-pointer"
-            >
-              <option value="rating-desc">Trier : Note ↓</option>
-              <option value="rating-asc">Trier : Note ↑</option>
-              <option value="name-asc">Trier : Nom (A-Z)</option>
-              <option value="recent">Trier : Plus récent</option>
-            </select>
-          </div>
-
-          {/* Note minimum */}
-          <select
-            value={filters.ratingMin ?? ''}
-            onChange={(e) =>
-              update({
-                ratingMin: e.target.value ? Number(e.target.value) : null,
-              })
-            }
-            className="text-xs border border-gris-ligne rounded-lg px-3 py-2 font-semibold text-gris-texte outline-none focus:border-marine cursor-pointer"
+    <div className="bg-white rounded-xl border border-gris-ligne p-4 mb-6 shadow-cb-sm">
+      <div className="flex items-center gap-2 mb-3">
+        <Filter size={14} className="text-gris-doux" />
+        <span className="text-xs font-bold text-gris-texte uppercase tracking-wider">
+          Filtres
+        </span>
+        {hasFilters && (
+          <button
+            onClick={() => onChange({})}
+            className="ml-auto flex items-center gap-1 text-xs text-red-500 hover:underline font-bold"
           >
-            <option value="">Toutes les notes</option>
-            <option value="4.5">⭐ 4.5 et plus</option>
-            <option value="4">⭐ 4 et plus</option>
-            <option value="3">⭐ 3 et plus</option>
-          </select>
+            <X size={11} />
+            Réinitialiser
+          </button>
+        )}
+      </div>
 
-          {/* Ville */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        {/* Ville */}
+        <div>
+          <label className="block text-[10px] font-bold text-gris-texte uppercase tracking-wider mb-1">
+            Ville
+          </label>
           <select
-            value={filters.city ?? ''}
-            onChange={(e) =>
-              update({ city: e.target.value || null })
-            }
-            className="text-xs border border-gris-ligne rounded-lg px-3 py-2 font-semibold text-gris-texte outline-none focus:border-marine cursor-pointer"
+            value={filters.city || ''}
+            onChange={(e) => onChange({ ...filters, city: e.target.value || undefined })}
+            className="w-full px-3 py-2 text-sm rounded-lg border border-gris-ligne focus:border-marine focus:outline-none"
           >
             <option value="">Toutes les villes</option>
             {cities.map((c) => (
@@ -89,63 +75,55 @@ export default function FiltersBar({
               </option>
             ))}
           </select>
+        </div>
 
-          {/* Filtre Coups de cœur */}
-          <button
-            onClick={() => update({ onlyFeatured: !filters.onlyFeatured })}
-            className={cn(
-              'text-xs rounded-lg px-3 py-2 font-semibold flex items-center gap-2 transition-colors border',
-              filters.onlyFeatured
-                ? 'bg-ic-or text-marine-dark border-ic-or'
-                : 'bg-white border-gris-ligne text-gris-texte hover:text-marine hover:border-marine'
-            )}
+        {/* Niveau */}
+        <div>
+          <label className="block text-[10px] font-bold text-gris-texte uppercase tracking-wider mb-1">
+            Niveau de vérification
+          </label>
+          <select
+            value={filters.level || ''}
+            onChange={(e) => onChange({ ...filters, level: e.target.value || undefined })}
+            className="w-full px-3 py-2 text-sm rounded-lg border border-gris-ligne focus:border-marine focus:outline-none"
           >
-            <Heart
-              size={12}
-              className={cn(
-                filters.onlyFeatured ? 'fill-marine-dark' : 'fill-khmer text-khmer'
-              )}
-            />
-            Coups de cœur
-            <span
-              className={cn(
-                'text-[10px] px-1.5 py-0.5 rounded-full',
-                filters.onlyFeatured
-                  ? 'bg-white/40 text-marine-dark'
-                  : 'bg-gris-fond text-gris-doux'
-              )}
-            >
-              {featuredCount}
-            </span>
-            {filters.onlyFeatured && <X size={10} />}
-          </button>
-
-          {/* Compteur + bouton tout voir */}
-          <div className="ml-auto flex items-center gap-3">
-            <span className="text-xs text-gris-doux">
-              <b className="text-marine">{totalCount}</b>{' '}
-              résultat{totalCount > 1 ? 's' : ''}
-            </span>
-
-            {hasActiveFilter && (
-              <button
-                onClick={() =>
-                  onChange({
-                    sort: 'rating-desc',
-                    ratingMin: null,
-                    city: null,
-                    onlyFeatured: false,
-                  })
-                }
-                className="text-xs font-bold border border-gris-ligne rounded-full px-3.5 py-1.5 text-marine hover:border-marine flex items-center gap-1.5 transition-colors"
-              >
-                <X size={11} />
-                Réinitialiser
-              </button>
-            )}
-          </div>
+            {LEVELS.map((l) => (
+              <option key={l.id} value={l.id}>
+                {l.label}
+              </option>
+            ))}
+          </select>
         </div>
       </div>
-    </section>
+
+      {/* Sous-labels */}
+      {labels.length > 0 && (
+        <div className="mt-3 pt-3 border-t border-gris-ligne">
+          <div className="text-[10px] font-bold text-gris-texte uppercase tracking-wider mb-2">
+            Labels
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {labels.map((l) => {
+              const active = (filters.labels || []).includes(l.code);
+              return (
+                <button
+                  key={l.id}
+                  onClick={() => toggleLabel(l.code)}
+                  className={
+                    'inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold transition-all ' +
+                    (active
+                      ? 'text-white'
+                      : 'bg-gris-fond text-gris-texte hover:bg-gris-ligne')
+                  }
+                  style={active ? { backgroundColor: l.color || '#1B3A6B' } : {}}
+                >
+                  {l.icon} {l.name}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
   );
 }

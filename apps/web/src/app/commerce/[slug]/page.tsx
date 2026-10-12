@@ -5,96 +5,76 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import {
-  MapPin,
-  Phone,
-  Globe,
-  Clock,
-  Heart,
-  Share2,
-  Star,
-  Facebook,
-  Instagram,
+  MapPin, Phone, Globe, Clock, Heart, Share2, Star,
 } from 'lucide-react';
 import CommerceTabs from '@/components/commerce/CommerceTabs';
 import AssociationActionsBar from '@/components/association/AssociationActionsBar';
 import StatsBlock from '@/components/commerce/StatsBlock';
-import {
-  getRatingStats,
-  getAssociationEnriched,
-  ETABLISSEMENTS,
-} from '@/lib/mock-data';
+import { LevelBadge, SubLabels } from '@/components/ui/LevelBadge';
+import { createBrowserClient } from '@supabase/ssr';
 
 export default function CommercePage() {
   const params = useParams();
   const slug = params?.slug as string;
+
   const [commerce, setCommerce] = useState<any>(null);
+  const [tenantLevel, setTenantLevel] = useState<string | null>(null);
+  const [tenantLabels, setTenantLabels] = useState<any[]>([]);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     if (!slug) return;
 
-    // 1. Cherche dans le localStorage (données partenaire)
-    try {
-      const stored = localStorage.getItem('mycambo_partner_establishments');
-      if (stored) {
-        const list = JSON.parse(stored);
-        const found = list.find((e: any) => e.slug === slug);
-        if (found) {
-          // Normalise les données
-          setCommerce({
-            ...found,
-            typeLabel: found.typeLabel || 'Établissement',
-            rating: found.rating || 0,
-            reviews: found.reviewsCount || 0,
-            gallery: found.photos || [],
-            image:
-              found.photos?.[0] ||
-              'https://images.unsplash.com/photo-1497486751825-1233686d5d80?q=85&w=1600&auto=format&fit=crop',
-            amenities: found.amenities || [],
-            mission: found.mission,
-            impact: found.impact,
-            project: found.project,
-            howToHelp: found.howToHelp,
-          });
-          setMounted(true);
-          return;
-        }
+    (async () => {
+      const supabase = createBrowserClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      );
+
+      // 1. Charge l'établissement depuis Supabase
+      const { data: business, error } = await supabase
+        .from('businesses')
+        .select(`
+          *,
+          categories(name, icon, color),
+          tenants(id, name, verification_level, city, email)
+        `)
+        .eq('slug', slug)
+        .eq('status', 'approved')
+        .maybeSingle();
+
+      if (error || !business) {
+        setCommerce(null);
+        setMounted(true);
+        return;
       }
-    } catch (e) {
-      // ignore
-    }
 
-    // 2. Si pas trouvé dans localStorage, cherche dans les données mock
-    const mockEtab = ETABLISSEMENTS[slug] || [];
-const foundMock: any = Object.values(ETABLISSEMENTS)
-  .flat()
-  .find((e: any) => e.slug === slug);
-
-    if (foundMock) {
-      // Données mock basiques
+      // 2. Formate l'objet commerce
       setCommerce({
-        slug,
-        name: foundMock.name,
-        type: foundMock.type || 'association',
-        typeLabel: 'Association',
-        category: foundMock.category,
-        city: foundMock.city,
-        address: '',
-        phone: '',
-        website: '',
-        hours: '',
-        description: foundMock.description,
-        longDescription: foundMock.description,
-        image: foundMock.image,
-        gallery: [],
-        rating: foundMock.rating,
-        reviews: foundMock.reviews || foundMock.reviewsCount || 0,
-        price: '',
-        amenities: [],
+        ...business,
+        type: business.categories?.name?.toLowerCase() || 'commerce',
+        typeLabel: business.categories?.name || 'Établissement',
+        category: business.categories?.name,
+        city: business.city || business.tenants?.city,
+        image: business.photos?.[0]
+          || 'https://images.unsplash.com/photo-1497486751825-1233686d5d80?q=85&w=1600&auto=format&fit=crop',
+        gallery: business.photos || [],
+        rating: 0,
+        reviews: 0,
       });
-    }
 
-    setMounted(true);
+      // 3. Charge le niveau + labels du tenant
+      setTenantLevel(business.tenants?.verification_level || 'inscrit');
+
+      const { data: labels } = await supabase
+        .from('tenant_labels')
+        .select('*, label:label_catalog(*)')
+        .eq('tenant_id', business.tenant_id);
+
+      setTenantLabels((labels || []).map((l: any) => l.label).filter(Boolean));
+
+      setMounted(true);
+    })();
   }, [slug]);
 
   if (!mounted) {
@@ -125,8 +105,6 @@ const foundMock: any = Object.values(ETABLISSEMENTS)
   }
 
   const isAssociation = commerce.type === 'association';
-  const stats = isAssociation ? getRatingStats(slug) : null;
-  const enriched = isAssociation ? getAssociationEnriched(slug) : null;
 
   return (
     <>
@@ -165,18 +143,20 @@ const foundMock: any = Object.values(ETABLISSEMENTS)
                 <span className="bg-ic-or text-marine-dark font-bold px-2.5 py-1 rounded-full">
                   {commerce.typeLabel}
                 </span>
-                <span>{commerce.category}</span>
-                {commerce.foundedYear && (
-                  <>
-                    <span className="text-white/40">·</span>
-                    <span>Depuis {commerce.foundedYear}</span>
-                  </>
-                )}
+                {commerce.city && <span>{commerce.city}</span>}
               </div>
 
               <h1 className="text-2xl md:text-4xl font-extrabold leading-tight mb-2">
                 {commerce.name}
               </h1>
+
+              {/* NIVEAU + SOUS-LABELS */}
+              <div className="flex items-center gap-2 flex-wrap mb-2">
+                <LevelBadge level={tenantLevel} size="md" />
+                {tenantLabels.length > 0 && (
+                  <SubLabels labels={tenantLabels} size="sm" />
+                )}
+              </div>
 
               <div className="flex flex-wrap items-center gap-4 text-sm text-white/90">
                 {commerce.rating > 0 && (
@@ -188,10 +168,12 @@ const foundMock: any = Object.values(ETABLISSEMENTS)
                     </span>
                   </span>
                 )}
-                <span className="flex items-center gap-1.5">
-                  <MapPin size={15} />
-                  {commerce.city}
-                </span>
+                {commerce.city && (
+                  <span className="flex items-center gap-1.5">
+                    <MapPin size={15} />
+                    {commerce.city}
+                  </span>
+                )}
               </div>
             </div>
           </div>
@@ -205,17 +187,15 @@ const foundMock: any = Object.values(ETABLISSEMENTS)
             <CommerceTabs
               commerce={commerce}
               isAssociation={isAssociation}
-              stats={stats}
-              enriched={enriched}
+              stats={null}
+              enriched={null}
             />
           </div>
 
           <aside className="lg:sticky lg:top-[180px] self-start space-y-4">
             <div className="bg-white border border-gris-ligne rounded-lg p-5 shadow-cb-sm">
               <div className="text-base font-extrabold text-marine mb-4">
-                {isAssociation
-                  ? '💛 Nous soutenir'
-                  : commerce.price || 'Contact'}
+                {isAssociation ? '💛 Nous soutenir' : 'Contact'}
               </div>
 
               {isAssociation ? (
@@ -223,7 +203,7 @@ const foundMock: any = Object.values(ETABLISSEMENTS)
                   <AssociationActionsBar
                     associationSlug={slug}
                     associationName={commerce.name}
-donationLink={(enriched as any)?.donation_link}
+                    donationLink={undefined}
                     variant="sidebar"
                   />
                 </div>
@@ -232,29 +212,32 @@ donationLink={(enriched as any)?.donation_link}
                   <button className="w-full bg-marine text-white font-bold py-3 rounded-full hover:bg-marine-dark transition-colors text-sm">
                     Contacter
                   </button>
-                  <button className="w-full border-[1.5px] border-gris-ligne text-marine font-bold py-3 rounded-full hover:border-marine transition-colors text-sm">
-                    Voir sur la carte
-                  </button>
+                  {commerce.city && (
+                    <a
+                      href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+                        [commerce.address, commerce.city].filter(Boolean).join(', ')
+                      )}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block w-full text-center border-[1.5px] border-gris-ligne text-marine font-bold py-3 rounded-full hover:border-marine transition-colors text-sm"
+                    >
+                      Voir sur la carte
+                    </a>
+                  )}
                 </div>
               )}
 
               <div className="pt-4 border-t border-gris-ligne space-y-3 text-sm text-gris-texte">
                 {commerce.address && (
                   <div className="flex items-start gap-2.5">
-                    <MapPin
-                      size={15}
-                      className="text-gris-doux mt-0.5 flex-shrink-0"
-                    />
+                    <MapPin size={15} className="text-gris-doux mt-0.5 flex-shrink-0" />
                     <span>{commerce.address}</span>
                   </div>
                 )}
                 {commerce.phone && (
                   <div className="flex items-center gap-2.5">
                     <Phone size={15} className="text-gris-doux flex-shrink-0" />
-                    <a
-                      href={`tel:${commerce.phone}`}
-                      className="hover:text-marine"
-                    >
+                    <a href={`tel:${commerce.phone}`} className="hover:text-marine">
                       {commerce.phone}
                     </a>
                   </div>
@@ -263,7 +246,7 @@ donationLink={(enriched as any)?.donation_link}
                   <div className="flex items-center gap-2.5">
                     <Globe size={15} className="text-gris-doux flex-shrink-0" />
                     <a
-                      href={`https://${commerce.website}`}
+                      href={commerce.website.startsWith('http') ? commerce.website : `https://${commerce.website}`}
                       target="_blank"
                       rel="noopener"
                       className="hover:text-marine truncate"
@@ -272,21 +255,13 @@ donationLink={(enriched as any)?.donation_link}
                     </a>
                   </div>
                 )}
-                {commerce.hours && (
+                {commerce.hours && typeof commerce.hours === 'object' && (
                   <div className="flex items-center gap-2.5">
                     <Clock size={15} className="text-gris-doux flex-shrink-0" />
-                    <span>{commerce.hours}</span>
+                    <span>Horaires disponibles</span>
                   </div>
                 )}
               </div>
-
-              {isAssociation && enriched?.stats && (
-                <StatsBlock
-                  slug={slug}
-                  initialViews={enriched.stats.views}
-                  initialSupports={enriched.stats.supports}
-                />
-              )}
             </div>
 
             <div className="text-[11px] text-gris-doux text-center">

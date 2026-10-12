@@ -1,83 +1,95 @@
-import Image from 'next/image';
-import Link from 'next/link';
-import { Star, MapPin, Heart, ArrowRight } from 'lucide-react';
-import type { Etablissement } from '@/lib/mock-data';
+'use client';
 
-interface EtablissementCardProps {
-  etablissement: Etablissement;
-  isFeatured?: boolean;
+import Link from 'next/link';
+import Image from 'next/image';
+import { MapPin, Star } from 'lucide-react';
+import { LevelBadge, SubLabels } from '@/components/ui/LevelBadge';
+
+interface Props {
+  etablissement: {
+    id?: string;
+    slug: string;
+    name: string;
+    typeLabel?: string;
+    category?: string;
+    city?: string;
+    image?: string;
+    rating?: number;
+    reviews?: number;
+    description?: string;
+    level?: string;
+    labels?: any[];
+  };
 }
 
-export default function EtablissementCard({
-  etablissement: e,
-  isFeatured = false,
-}: EtablissementCardProps) {
-  // Extraire l'année "depuis" depuis la description si présente
-  // (à terme : champ dédié depuis Supabase)
-  const sinceMatch = e.description?.match(/Depuis (\d{4})/);
-  const since = sinceMatch ? sinceMatch[1] : null;
-
+export default function EtablissementCard({ etablissement: e }: Props) {
   return (
     <Link
       href={`/commerce/${e.slug}`}
-      className="group bg-white border border-gris-ligne rounded-lg overflow-hidden hover:shadow-cb-lg hover:-translate-y-1 transition-all duration-300 flex flex-col"
+      className="group bg-white rounded-xl border border-gris-ligne overflow-hidden hover:border-marine hover:shadow-cb-md transition-all"
     >
-      {/* Image */}
-      <div className="relative aspect-[4/3] overflow-hidden bg-gris-fond flex-shrink-0">
-        <Image
-          src={e.image}
-          alt={e.name}
-          fill
-          className="object-cover transition-transform duration-500 group-hover:scale-105"
-          sizes="(max-width: 768px) 50vw, (max-width: 1280px) 33vw, 20vw"
-        />
-
-        {/* Badge Coup de cœur */}
-        {isFeatured && (
-          <div className="absolute top-2.5 left-2.5 bg-khmer text-white text-[9px] font-bold px-2 py-1 rounded-full flex items-center gap-1 shadow-md">
-            <Heart size={9} className="fill-white" />
-            Coup de cœur
+      <div className="relative aspect-[4/3] bg-gris-fond overflow-hidden">
+        {e.image ? (
+          <Image
+            src={e.image}
+            alt={e.name}
+            fill
+            className="object-cover group-hover:scale-105 transition-transform duration-300"
+            sizes="(max-width: 768px) 100vw, 33vw"
+            unoptimized
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center text-gris-doux text-xs">
+            Pas de photo
           </div>
         )}
 
-        {/* Badge catégorie */}
-        <span className="absolute top-2.5 right-2.5 bg-white/95 text-marine text-[9px] font-bold px-2 py-1 rounded-full shadow-sm uppercase tracking-wider">
-          {e.category}
-        </span>
+        {/* Badge niveau en haut à droite */}
+        <div className="absolute top-3 right-3 z-10">
+          <LevelBadge level={e.level} size="sm" showLabel={false} />
+        </div>
       </div>
 
-      {/* Contenu */}
-      <div className="p-3.5 flex flex-col flex-1">
-        <h3 className="font-extrabold text-marine text-sm mb-1.5 group-hover:text-marine-light transition-colors line-clamp-1 min-h-[20px]">
+      <div className="p-4">
+        <div className="flex items-center gap-2 mb-1 flex-wrap">
+          {e.typeLabel && (
+            <span className="text-[10px] font-bold text-marine uppercase tracking-wider">
+              {e.typeLabel}
+            </span>
+          )}
+        </div>
+
+        <h3 className="font-bold text-marine text-base leading-tight mb-1 line-clamp-1">
           {e.name}
         </h3>
 
-        <div className="flex items-center gap-2 text-[10px] text-gris-texte mb-2 min-h-[16px]">
-          <span className="flex items-center gap-1">
-            <Star size={11} className="fill-ic-or text-ic-or" />
-            <b className="text-ink">{e.rating}</b>
-            <span className="text-gris-doux">({e.reviews})</span>
-          </span>
-          <span className="flex items-center gap-1 truncate">
-            <MapPin size={10} />
+        {e.city && (
+          <div className="flex items-center gap-1 text-xs text-gris-texte mb-2">
+            <MapPin size={11} />
             {e.city}
-          </span>
-        </div>
+          </div>
+        )}
 
-        <p className="text-[10px] text-gris-texte line-clamp-2 mb-3 leading-relaxed flex-1">
-          {e.description}
-        </p>
+        {/* Sous-labels */}
+        {e.labels && e.labels.length > 0 && (
+          <div className="mb-3">
+            <SubLabels labels={e.labels.slice(0, 3)} size="sm" />
+          </div>
+        )}
 
-        {/* Footer */}
-        <div className="pt-2.5 border-t border-gris-ligne flex items-center justify-between">
-          <span className="text-[10px] text-gris-doux">
-            {since ? `Depuis ${since}` : e.price || ''}
-          </span>
-          <ArrowRight
-            size={12}
-            className="text-marine group-hover:translate-x-1 transition-transform"
-          />
-        </div>
+        {e.description && (
+          <p className="text-xs text-gris-texte line-clamp-2 mb-3">
+            {e.description}
+          </p>
+        )}
+
+        {e.rating !== undefined && e.rating > 0 && (
+          <div className="flex items-center gap-1 text-xs text-gris-texte pt-3 border-t border-gris-ligne">
+            <Star size={11} className="fill-ic-or text-ic-or" />
+            <b className="text-marine">{e.rating}</b>
+            <span className="text-gris-doux">({e.reviews || 0})</span>
+          </div>
+        )}
       </div>
     </Link>
   );
