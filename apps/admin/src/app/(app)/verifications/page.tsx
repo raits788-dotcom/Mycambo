@@ -323,9 +323,9 @@ export default function VerificationsPage() {
       {/* ─── MODALE EXAMEN ─── */}
       {selected && selectedType && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-start justify-center p-4 overflow-y-auto">
-          <div className="bg-white rounded-2xl max-w-4xl w-full my-8">
+          <div className="bg-white rounded-2xl max-w-4xl w-full my-8 max-h-[calc(100vh-4rem)] flex flex-col">
 
-            <div className="flex items-center justify-between p-6 border-b border-gris-ligne sticky top-0 bg-white z-10 rounded-t-2xl">
+            <div className="flex items-center justify-between p-6 border-b border-gris-ligne bg-white z-10 rounded-t-2xl shrink-0">
               <div>
                 <h2 className="text-xl font-extrabold text-marine">
                   {selectedType === 'submitted' ? selected.tenant?.name : selected.name}
@@ -343,7 +343,7 @@ export default function VerificationsPage() {
             </div>
 
             {selectedType === 'inscrit' ? (
-              <div className="p-6 space-y-5">
+              <div className="p-6 space-y-5 overflow-y-auto flex-1">
                 <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
                   <p className="text-sm text-amber-800">
                     ⚠️ Ce tenant vient de s&apos;inscrire. Il n&apos;a pas encore soumis de dossier de vérification.
@@ -401,7 +401,7 @@ export default function VerificationsPage() {
                 </div>
               </div>
             ) : (
-              <div className="p-6 space-y-6">
+              <div className="p-6 space-y-6 overflow-y-auto flex-1">
 
                 {/* Informations légales */}
                 <section>
@@ -514,7 +514,7 @@ export default function VerificationsPage() {
                 </section>
 
                 {/* Actions */}
-                <div className="flex justify-end gap-3 pt-4 border-t border-gris-ligne">
+                <div className="flex justify-end gap-3 pt-4 border-t border-gris-ligne sticky bottom-0 bg-white pb-2">
                   <button
                     onClick={handleRejectSubmitted}
                     disabled={processing === selected.id}
