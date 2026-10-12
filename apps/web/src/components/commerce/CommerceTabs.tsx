@@ -13,10 +13,10 @@ import VolunteerModal from '@/components/association/VolunteerModal';
 import ContactModal from '@/components/association/ContactModal';
 import { cn } from '@/lib/utils';
 import type {
-  getRatingStats,
+  RatingStats,
   AssociationEnriched,
   DonationLink,
-} from '@/lib/mock-data';
+} from '@/lib/associations';
 
 type ModalType =
   | 'donate'
@@ -54,7 +54,7 @@ interface Commerce {
 interface CommerceTabsProps {
   commerce: Commerce;
   isAssociation: boolean;
-  stats: ReturnType<typeof getRatingStats> | null;
+  stats: RatingStats | null;
   enriched: AssociationEnriched | null;
 }
 

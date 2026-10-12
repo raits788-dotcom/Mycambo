@@ -179,3 +179,119 @@ export function incrementSupports(_slug: string): number {
   }
   return 0;
 }
+// ═══════════════════════════════════════════════════════════
+// TYPES COMPLÉMENTAIRES
+// ═══════════════════════════════════════════════════════════
+
+export interface AssociationTeamMember {
+  id: string;
+  name: string;
+  role: string;
+  photo: string;
+  bio?: string;
+}
+
+export interface AssociationPhoto {
+  id: string;
+  url: string;
+  caption?: string;
+}
+
+export interface AssociationValue {
+  id: string;
+  icon: string;
+  title: string;
+  description: string;
+}
+
+export interface Review {
+  id: string;
+  author: string;
+  rating: number;
+  text: string;
+  date: string;
+  avatar?: string;
+}
+// ═══════════════════════════════════════════════════════════
+// ENRICHISSEMENT ASSOCIATION
+// ═══════════════════════════════════════════════════════════
+
+export interface AssociationEnriched {
+  founded_year?: number;
+  stats?: {
+    views: number;
+    supports: number;
+  };
+  donation_link?: DonationLink;
+  values?: AssociationValue[];
+  actions?: AssociationAction[];
+  team?: AssociationTeamMember[];
+  photos?: string[];
+  photos_limit?: number;
+}
+
+export interface RatingStats {
+  average: number;
+  total: number;
+  distribution: { stars: number; count: number }[];
+}
+
+export async function getReviewsForAssociation(businessIdOrSlug: string): Promise<Review[]> {
+  const supabaseClient = supabase();
+
+  // Récupère l'ID du business à partir du slug (ou utilise directement l'ID)
+  let businessId = businessIdOrSlug;
+
+  if (businessIdOrSlug.includes('-') && businessIdOrSlug.length < 40) {
+    // C'est probablement un slug
+    const { data: business } = await supabaseClient
+      .from('businesses')
+      .select('id')
+      .eq('slug', businessIdOrSlug)
+      .maybeSingle();
+    if (business) businessId = business.id;
+  }
+
+  const { data, error } = await supabaseClient
+    .from('reviews')
+    .select('*')
+    .eq('business_id', businessId)
+    .eq('status', 'published')
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('getReviewsForAssociation:', error);
+    return [];
+  }
+
+  return (data || []).map((r: any) => ({
+    id: r.id,
+    author: r.author_name,
+    rating: r.rating,
+    text: r.text || '',
+    date: new Date(r.created_at).toLocaleDateString('fr-FR'),
+  }));
+}
+
+export async function getRatingStats(businessIdOrSlug: string): Promise<RatingStats> {
+  const reviews = await getReviewsForAssociation(businessIdOrSlug);
+
+  if (reviews.length === 0) {
+    return {
+      average: 0,
+      total: 0,
+      distribution: [5, 4, 3, 2, 1].map((s) => ({ stars: s, count: 0 })),
+    };
+  }
+
+  const total = reviews.length;
+  const sum = reviews.reduce((acc, r) => acc + r.rating, 0);
+  const average = sum / total;
+
+  const distribution = [5, 4, 3, 2, 1].map((s) => ({
+    stars: s,
+    count: reviews.filter((r) => r.rating === s).length,
+  }));
+
+  return { average, total, distribution };
+}

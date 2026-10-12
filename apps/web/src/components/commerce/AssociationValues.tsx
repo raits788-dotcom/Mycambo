@@ -1,4 +1,4 @@
-import type { AssociationValue } from '@/lib/mock-data';
+import type { AssociationValue } from '@/lib/associations';
 
 interface AssociationValuesProps {
   values: AssociationValue[];

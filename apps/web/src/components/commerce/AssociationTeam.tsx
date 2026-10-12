@@ -1,5 +1,5 @@
 import Image from 'next/image';
-import type { AssociationTeamMember } from '@/lib/mock-data';
+import type { AssociationTeamMember } from '@/lib/associations';
 
 interface AssociationTeamProps {
   team: AssociationTeamMember[];

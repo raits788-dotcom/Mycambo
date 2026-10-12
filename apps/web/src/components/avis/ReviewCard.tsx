@@ -1,7 +1,7 @@
 import { formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import RatingStars from './RatingStars';
-import type { Review } from '@/lib/mock-data';
+import type { Review } from '@/lib/associations';
 
 interface ReviewCardProps {
   review: Review;

@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Image from 'next/image';
 import { X } from 'lucide-react';
-import type { AssociationPhoto } from '@/lib/mock-data';
+import type { AssociationPhoto } from '@/lib/associations';
 
 interface AssociationPhotosProps {
   photos: AssociationPhoto[];

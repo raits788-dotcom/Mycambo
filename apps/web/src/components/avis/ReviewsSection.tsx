@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Star, Lock } from 'lucide-react';
 import RatingStars from './RatingStars';
 import ReviewCard from './ReviewCard';
@@ -8,7 +8,9 @@ import ReviewRequestModal from './ReviewRequestModal';
 import {
   getReviewsForAssociation,
   getRatingStats,
-} from '@/lib/mock-data';
+  type Review,
+  type RatingStats,
+} from '@/lib/associations';
 
 interface ReviewsSectionProps {
   associationSlug: string;
@@ -21,10 +23,27 @@ export default function ReviewsSection({
   associationName,
   isLoggedIn = false,
 }: ReviewsSectionProps) {
-  const reviews = getReviewsForAssociation(associationSlug);
-  const stats = getRatingStats(associationSlug);
+  const [reviews, setReviews] = useState<Review[]>([]);
+  const [stats, setStats] = useState<RatingStats>({
+    average: 0,
+    total: 0,
+    distribution: [5, 4, 3, 2, 1].map((s) => ({ stars: s, count: 0 })),
+  });
+  const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [visibleCount, setVisibleCount] = useState(3);
+
+  useEffect(() => {
+    (async () => {
+      const [r, s] = await Promise.all([
+        getReviewsForAssociation(associationSlug),
+        getRatingStats(associationSlug),
+      ]);
+      setReviews(r);
+      setStats(s);
+      setLoading(false);
+    })();
+  }, [associationSlug]);
 
   const visible = reviews.slice(0, visibleCount);
   const hasMore = reviews.length > visibleCount;
