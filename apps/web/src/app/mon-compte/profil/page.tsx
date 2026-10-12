@@ -2,82 +2,105 @@
 
 import { useEffect, useState } from 'react';
 import {
-  User,
-  Mail,
-  Save,
-  Check,
-  Lock,
-  Info,
-  History,
-  ArrowRight,
+  User, Mail, Save, Check, Lock, Info, History, ArrowRight, Loader2,
 } from 'lucide-react';
-import { getCurrentUserMock, type MockUser } from '@/lib/auth-mock';
+import { createBrowserClient } from '@supabase/ssr';
 import {
   getProfileHistory,
   addProfileChange,
   PROFILE_CHANGE_LABELS,
   timeAgo,
-} from '@/lib/user-mock';
+  type CurrentUser,
+  type ProfileHistoryEntry,
+} from '@/lib/user';
 
 export default function ProfilPage() {
-  const [user, setUser] = useState<MockUser | null>(null);
+  const [user, setUser] = useState<CurrentUser | null>(null);
   const [form, setForm] = useState({ name: '', email: '' });
   const [saved, setSaved] = useState(false);
   const [showEmailModal, setShowEmailModal] = useState(false);
-  const [history, setHistory] = useState(getProfileHistory());
+  const [history, setHistory] = useState<ProfileHistoryEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    const u = getCurrentUserMock();
-    setUser(u);
-    if (u) setForm({ name: u.name, email: u.email });
+    (async () => {
+      const supabase = createBrowserClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      );
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) {
+        setLoading(false);
+        return;
+      }
+
+      const u = session.user;
+      const current: CurrentUser = {
+        id: u.id,
+        name: u.user_metadata?.name || u.email?.split('@')[0] || 'Utilisateur',
+        email: u.email || '',
+        created_at: u.created_at,
+      };
+      setUser(current);
+      setForm({ name: current.name, email: current.email });
+
+      const h = await getProfileHistory(u.id);
+      setHistory(h);
+      setLoading(false);
+    })();
   }, []);
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-
     if (!user) return;
+    setSaving(true);
 
-    // Détecte si le nom a changé
     if (form.name !== user.name) {
-      addProfileChange({
-        type: 'name_changed',
-        label: PROFILE_CHANGE_LABELS.name_changed.label,
-        icon: PROFILE_CHANGE_LABELS.name_changed.icon,
-        color: PROFILE_CHANGE_LABELS.name_changed.color,
-        oldValue: user.name,
-        newValue: form.name,
-        changedBy: 'user',
+      const supabase = createBrowserClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      );
+
+      // Met à jour le user_metadata
+      await supabase.auth.updateUser({
+        data: { name: form.name },
       });
 
-      // Met à jour la session (mock)
-      const updated = { ...user, name: form.name };
-      localStorage.setItem('mycambo_mock_session', JSON.stringify(updated));
-      setUser(updated);
+      // Log l'historique
+      await addProfileChange(user.id, 'name', user.name, form.name);
 
-      // Rafraîchit l'historique
-      setHistory(getProfileHistory());
+      setUser({ ...user, name: form.name });
+      const h = await getProfileHistory(user.id);
+      setHistory(h);
     }
 
+    setSaving(false);
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   };
 
-  const handleEmailChangeRequest = () => {
-    addProfileChange({
-      type: 'email_change_requested',
-      label: PROFILE_CHANGE_LABELS.email_change_requested.label,
-      icon: PROFILE_CHANGE_LABELS.email_change_requested.icon,
-      color: PROFILE_CHANGE_LABELS.email_change_requested.color,
-      changedBy: 'user',
-    });
-    setHistory(getProfileHistory());
+  const handleEmailChangeRequest = async () => {
+    if (user) {
+      await addProfileChange(user.id, 'email_change_requested', user.email, null);
+      const h = await getProfileHistory(user.id);
+      setHistory(h);
+    }
     setShowEmailModal(true);
   };
+
+  if (loading) {
+    return (
+      <div className="p-12 text-center">
+        <Loader2 size={24} className="text-marine animate-spin mx-auto" />
+      </div>
+    );
+  }
 
   if (!user) {
     return (
       <div className="bg-white rounded-lg border border-gris-ligne p-12 text-center">
-        <p className="text-sm text-gris-texte">Chargement...</p>
+        <p className="text-sm text-gris-texte">Vous devez être connecté.</p>
       </div>
     );
   }
@@ -95,7 +118,6 @@ export default function ProfilPage() {
 
       {/* Carte profil */}
       <div className="bg-white rounded-lg border border-gris-ligne p-6 mb-6">
-        {/* Avatar */}
         <div className="flex items-center gap-4 mb-6 pb-6 border-b border-gris-ligne">
           <div className="w-16 h-16 rounded-full bg-marine text-white flex items-center justify-center text-2xl font-bold flex-shrink-0">
             {user.name.charAt(0).toUpperCase()}
@@ -104,26 +126,18 @@ export default function ProfilPage() {
             <div className="font-bold text-marine text-lg">{user.name}</div>
             <div className="text-xs text-gris-texte">{user.email}</div>
             <div className="text-[10px] text-gris-doux mt-1">
-              Compte créé le{' '}
-              {new Date(user.createdAt).toLocaleDateString('fr-FR')}
+              Compte créé le {new Date(user.created_at).toLocaleDateString('fr-FR')}
             </div>
           </div>
         </div>
 
         <form onSubmit={handleSave} className="space-y-5">
-          {/* Nom */}
           <div>
-            <label
-              htmlFor="name"
-              className="block text-xs font-bold text-ink mb-1.5 uppercase tracking-wider"
-            >
+            <label htmlFor="name" className="block text-xs font-bold text-ink mb-1.5 uppercase tracking-wider">
               Nom complet
             </label>
             <div className="relative">
-              <User
-                size={16}
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-gris-doux"
-              />
+              <User size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gris-doux" />
               <input
                 id="name"
                 type="text"
@@ -137,19 +151,12 @@ export default function ProfilPage() {
             </p>
           </div>
 
-          {/* Email (lecture seule) */}
           <div>
-            <label
-              htmlFor="email"
-              className="block text-xs font-bold text-ink mb-1.5 uppercase tracking-wider"
-            >
+            <label htmlFor="email" className="block text-xs font-bold text-ink mb-1.5 uppercase tracking-wider">
               Adresse email
             </label>
             <div className="relative">
-              <Mail
-                size={16}
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-gris-doux"
-              />
+              <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gris-doux" />
               <input
                 id="email"
                 type="email"
@@ -158,10 +165,7 @@ export default function ProfilPage() {
                 disabled
                 className="w-full border border-gris-ligne rounded-lg pl-10 pr-10 py-3 text-sm bg-gris-fond text-gris-texte cursor-not-allowed"
               />
-              <Lock
-                size={14}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gris-doux"
-              />
+              <Lock size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gris-doux" />
             </div>
 
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mt-2 flex items-start gap-2">
@@ -183,22 +187,18 @@ export default function ProfilPage() {
             </button>
           </div>
 
-          {/* Enregistrer */}
           <div className="pt-4 border-t border-gris-ligne flex justify-end">
             <button
               type="submit"
-              className="inline-flex items-center gap-2 bg-marine text-white font-bold px-6 py-3 rounded-full hover:bg-marine-dark transition-colors text-sm"
+              disabled={saving}
+              className="inline-flex items-center gap-2 bg-marine text-white font-bold px-6 py-3 rounded-full hover:bg-marine-dark transition-colors text-sm disabled:opacity-50"
             >
-              {saved ? (
-                <>
-                  <Check size={14} />
-                  Enregistré
-                </>
+              {saving ? (
+                <><Loader2 size={14} className="animate-spin" /> Enregistrement...</>
+              ) : saved ? (
+                <><Check size={14} /> Enregistré</>
               ) : (
-                <>
-                  <Save size={14} />
-                  Enregistrer
-                </>
+                <><Save size={14} /> Enregistrer</>
               )}
             </button>
           </div>
@@ -215,57 +215,45 @@ export default function ProfilPage() {
           Toutes les modifications apportées à votre compte.
         </p>
 
-        <div className="space-y-1">
-          {history.map((entry) => (
-            <div
-              key={entry.id}
-              className="flex items-start gap-3 py-3 border-b border-gris-ligne last:border-0"
-            >
-              <div className="text-lg flex-shrink-0">{entry.icon}</div>
-              <div className="flex-1 min-w-0">
-                <div className={`text-sm font-bold ${entry.color}`}>
-                  {entry.label}
-                </div>
-                {entry.oldValue && entry.newValue && (
-                  <div className="text-xs text-gris-texte mt-0.5">
-                    <span className="line-through text-gris-doux">
-                      {entry.oldValue}
-                    </span>{' '}
-                    <span className="text-marine">→ {entry.newValue}</span>
+        {history.length === 0 ? (
+          <p className="text-xs text-gris-doux italic">Aucun historique pour le moment.</p>
+        ) : (
+          <div className="space-y-1">
+            {history.map((entry) => (
+              <div key={entry.id} className="flex items-start gap-3 py-3 border-b border-gris-ligne last:border-0">
+                <div className="text-lg flex-shrink-0">📝</div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-bold text-marine">
+                    {PROFILE_CHANGE_LABELS[entry.field] || entry.field}
                   </div>
-                )}
-                <div className="text-[10px] text-gris-doux mt-1">
-                  {timeAgo(entry.createdAt)} ·{' '}
-                  {entry.changedBy === 'user'
-                    ? 'Par vous'
-                    : 'Par le support'}
+                  {entry.old_value && entry.new_value && (
+                    <div className="text-xs text-gris-texte mt-0.5">
+                      <span className="line-through text-gris-doux">{entry.old_value}</span>{' '}
+                      <span className="text-marine">→ {entry.new_value}</span>
+                    </div>
+                  )}
+                  <div className="text-[10px] text-gris-doux mt-1">
+                    {timeAgo(entry.created_at)}
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
 
-      {/* Modale email */}
-      {showEmailModal && (
-        <EmailChangeModal onClose={() => setShowEmailModal(false)} />
-      )}
+      {showEmailModal && <EmailChangeModal onClose={() => setShowEmailModal(false)} />}
     </>
   );
 }
 
-// ============================================================================
-// MODALE DEMANDE DE CHANGEMENT D'EMAIL
-// ============================================================================
-
+// ═══════════════════════════════════════════════════════════
+// MODALE DEMANDE CHANGEMENT EMAIL
+// ═══════════════════════════════════════════════════════════
 function EmailChangeModal({ onClose }: { onClose: () => void }) {
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-      <div
-        className="absolute inset-0 bg-ink/70 backdrop-blur-sm"
-        onClick={onClose}
-      />
-
+      <div className="absolute inset-0 bg-ink/70 backdrop-blur-sm" onClick={onClose} />
       <div className="relative bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
         <div className="p-8">
           <div className="w-14 h-14 rounded-full bg-marine/10 flex items-center justify-center mb-5">
@@ -281,35 +269,19 @@ function EmailChangeModal({ onClose }: { onClose: () => void }) {
           </p>
 
           <div className="bg-gris-fond rounded-lg p-4 mb-5">
-            <div className="text-xs font-bold text-marine mb-3">
-              Comment ça marche ?
-            </div>
+            <div className="text-xs font-bold text-marine mb-3">Comment ça marche ?</div>
             <ol className="text-xs text-gris-texte space-y-2">
-              <li className="flex gap-2">
-                <span className="font-bold text-marine">1.</span>
-                Contactez le support myCAMBO par email
-              </li>
-              <li className="flex gap-2">
-                <span className="font-bold text-marine">2.</span>
-                Nous vous enverrons un lien de vérification à votre{' '}
-                <b>ancien email</b>
-              </li>
-              <li className="flex gap-2">
-                <span className="font-bold text-marine">3.</span>
-                Puis un second lien à votre <b>nouvel email</b>
-              </li>
-              <li className="flex gap-2">
-                <span className="font-bold text-marine">4.</span>
-                Une fois les 2 confirmations validées, l&apos;email est modifié
-              </li>
+              <li className="flex gap-2"><span className="font-bold text-marine">1.</span>Contactez le support myCAMBO par email</li>
+              <li className="flex gap-2"><span className="font-bold text-marine">2.</span>Nous vous enverrons un lien à votre <b>ancien email</b></li>
+              <li className="flex gap-2"><span className="font-bold text-marine">3.</span>Puis un second lien à votre <b>nouvel email</b></li>
+              <li className="flex gap-2"><span className="font-bold text-marine">4.</span>Une fois les 2 confirmations validées, l&apos;email est modifié</li>
             </ol>
           </div>
 
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-6 flex items-start gap-2">
             <Info size={14} className="text-blue-600 flex-shrink-0 mt-0.5" />
             <p className="text-xs text-blue-800 leading-relaxed">
-              Cette procédure garantit qu&apos;aucun tiers ne peut modifier
-              votre email à votre insu.
+              Cette procédure garantit qu&apos;aucun tiers ne peut modifier votre email à votre insu.
             </p>
           </div>
 
@@ -321,7 +293,7 @@ function EmailChangeModal({ onClose }: { onClose: () => void }) {
               Annuler
             </button>
             <a
-              href="mailto:support@mycambo.app?subject=Demande%20de%20changement%20d'email&body=Bonjour,%0A%0AJe%20souhaite%20changer%20mon%20email%20de%20connexion.%0A%0AMon%20email%20actuel%20:%20%0AMon%20nouvel%20email%20:%20%0A%0AMerci."
+              href="mailto:contact@mycambo.net?subject=Demande%20de%20changement%20d'email"
               className="flex-1 inline-flex items-center justify-center gap-2 bg-marine text-white font-bold rounded-full py-3 hover:bg-marine-dark transition-colors text-sm"
             >
               <Mail size={14} />

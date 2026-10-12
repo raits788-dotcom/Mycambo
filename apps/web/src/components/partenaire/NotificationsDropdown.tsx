@@ -16,7 +16,7 @@ import {
   getUnreadNotificationsCount,
   type PartnerNotification,
 } from '@/lib/partner-mock';
-import { timeAgo } from '@/lib/user-mock';
+import { timeAgo } from '@/lib/user';
 
 const TYPE_ICONS: Record<PartnerNotification['type'], typeof Star> = {
   review: Star,

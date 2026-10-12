@@ -6,7 +6,7 @@ import {
   REJECTION_CATEGORIES,
   type PartnerReviewToModerate,
 } from '@/lib/partner-mock';
-import { timeAgo } from '@/lib/user-mock';
+import { timeAgo } from '@/lib/user';
 
 interface ReviewModerationCardProps {
   review: PartnerReviewToModerate;
