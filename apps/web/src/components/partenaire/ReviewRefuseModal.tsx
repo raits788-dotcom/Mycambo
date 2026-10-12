@@ -5,7 +5,7 @@ import { X, AlertCircle, XCircle } from 'lucide-react';
 import {
   REJECTION_CATEGORIES,
   type RejectionCategory,
-} from '@/lib/partner-mock';
+} from '@/lib/partner';
 
 interface ReviewRefuseModalProps {
   authorName: string;

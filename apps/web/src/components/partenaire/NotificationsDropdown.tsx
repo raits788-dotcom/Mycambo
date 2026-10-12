@@ -15,7 +15,7 @@ import {
   MOCK_PARTNER_NOTIFICATIONS,
   getUnreadNotificationsCount,
   type PartnerNotification,
-} from '@/lib/partner-mock';
+} from '@/lib/partner';
 import { timeAgo } from '@/lib/user';
 
 const TYPE_ICONS: Record<PartnerNotification['type'], typeof Star> = {

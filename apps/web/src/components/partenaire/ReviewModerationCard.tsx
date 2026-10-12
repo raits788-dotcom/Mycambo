@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils';
 import {
   REJECTION_CATEGORIES,
   type PartnerReviewToModerate,
-} from '@/lib/partner-mock';
+} from '@/lib/partner';
 import { timeAgo } from '@/lib/user';
 
 interface ReviewModerationCardProps {
