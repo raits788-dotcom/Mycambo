@@ -1073,3 +1073,95 @@ export async function getStorageAlerts(limit = 20) {
   if (error) { console.error('getStorageAlerts:', error); return []; }
   return data || [];
 }
+
+// ============================================================================
+// PARTNER REQUESTS — Approbation / Refus
+// ============================================================================
+
+export async function approvePartnerRequest(requestId: string) {
+  const supabase = getSupabase();
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) throw new Error('NOT_AUTHENTICATED');
+
+  // 1. Met à jour le statut de la demande
+  const { error: updateErr } = await supabase
+    .from('partner_requests')
+    .update({
+      status: 'approved',
+      reviewed_by: session.user.id,
+      reviewed_at: new Date().toISOString(),
+    })
+    .eq('id', requestId);
+
+  if (updateErr) throw updateErr;
+
+  // 2. Crée le tenant via Edge Function
+  const tenantRes = await fetch(
+    `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/create-tenant-from-request`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session.access_token}`,
+      },
+      body: JSON.stringify({ request_id: requestId }),
+    }
+  );
+
+  const tenantData = await tenantRes.json();
+  if (!tenantRes.ok) throw new Error(tenantData.error || 'TENANT_CREATE_FAILED');
+
+  // 3. Envoie l'email au partenaire
+  await fetch(
+    `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/notify-partner-decision`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ request_id: requestId, decision: 'approved' }),
+    }
+  );
+
+  return tenantData;
+}
+
+export async function rejectPartnerRequest(requestId: string, reason: string) {
+  const supabase = getSupabase();
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) throw new Error('NOT_AUTHENTICATED');
+
+  const { error } = await supabase
+    .from('partner_requests')
+    .update({
+      status: 'rejected',
+      rejection_reason: reason,
+      reviewed_by: session.user.id,
+      reviewed_at: new Date().toISOString(),
+    })
+    .eq('id', requestId);
+
+  if (error) throw error;
+
+  await fetch(
+    `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/notify-partner-decision`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        request_id: requestId,
+        decision: 'rejected',
+        rejection_reason: reason,
+      }),
+    }
+  );
+}
+
+export async function getPartnerRequestById(id: string) {
+  const supabase = getSupabase();
+  const { data, error } = await supabase
+    .from('partner_requests')
+    .select('*')
+    .eq('id', id)
+    .maybeSingle();
+  if (error) { console.error('getPartnerRequestById:', error); return null; }
+  return data;
+}
