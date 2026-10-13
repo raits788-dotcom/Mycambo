@@ -4,11 +4,15 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Eye, Heart, Star, Inbox, ArrowRight, Loader2, Bell } from 'lucide-react';
 import { getImpersonatedTenant } from '@/lib/impersonation';
+import { PlanUpgradeBanner } from '@/components/partenaire/PlanUpgradeBanner';
 
 export default function PartnerDashboardPage() {
   const [tenant, setTenant] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [isImpersonating, setIsImpersonating] = useState(false);
+  const [planName, setPlanName] = useState('');
+  const [maxPhotos, setMaxPhotos] = useState(0);
+  const [maxEstablishments, setMaxEstablishments] = useState(1);
 
   useEffect(() => {
     (async () => {
@@ -40,7 +44,27 @@ export default function PartnerDashboardPage() {
         .eq('user_id', user.id)
         .maybeSingle();
 
-      setTenant(tenantUser?.tenants || null);
+      const t = tenantUser?.tenants as any;
+      setTenant(t);
+      
+      // Charge la formule du tenant
+      if (t?.plan_id) {
+        const { data: plan } = await supabase
+          .from('plans')
+          .select('name, max_businesses, slug')
+          .eq('id', t.plan_id)
+          .single();
+        
+        if (plan) {
+          setPlanName(plan.name);
+          setMaxEstablishments(plan.max_businesses);
+          // Photos max selon formule
+          if (plan.slug === 'decouverte') setMaxPhotos(0);
+          else if (plan.slug === 'essentiel') setMaxPhotos(20);
+          else setMaxPhotos(999);
+        }
+      }
+      
       setLoading(false);
     })();
   }, []);
@@ -72,6 +96,12 @@ export default function PartnerDashboardPage() {
           Voici l&apos;activité de vos établissements.
         </p>
       </div>
+
+      <PlanUpgradeBanner
+        planName={planName}
+        maxPhotos={maxPhotos}
+        maxEstablishments={maxEstablishments}
+      />
 
       {/* KPIs (données mockées pour l'instant) */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">

@@ -5,13 +5,14 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import {
-  MapPin, Phone, Globe, Clock, Heart, Share2, Star,
+  MapPin, Phone, Globe, Clock, Heart, Share2, Star, Lock,
 } from 'lucide-react';
 import CommerceTabs from '@/components/commerce/CommerceTabs';
 import AssociationActionsBar from '@/components/association/AssociationActionsBar';
 import StatsBlock from '@/components/commerce/StatsBlock';
 import { LevelBadge, SubLabels } from '@/components/ui/LevelBadge';
 import { createBrowserClient } from '@supabase/ssr';
+import { getPlanPermissions } from '@/lib/plan-permissions';
 
 export default function CommercePage() {
   const params = useParams();
@@ -20,6 +21,7 @@ export default function CommercePage() {
   const [commerce, setCommerce] = useState<any>(null);
   const [tenantLevel, setTenantLevel] = useState<string | null>(null);
   const [tenantLabels, setTenantLabels] = useState<any[]>([]);
+  const [planSlug, setPlanSlug] = useState<string>('decouverte');
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -31,13 +33,16 @@ export default function CommercePage() {
         process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
       );
 
-      // 1. Charge l'établissement depuis Supabase
+      // 1. Charge l'établissement + le plan du tenant
       const { data: business, error } = await supabase
         .from('businesses')
         .select(`
           *,
           categories(name, icon, color),
-          tenants(id, name, verification_level, city, email)
+          tenants(
+            id, name, verification_level, city, email, plan_id,
+            plans(slug, name)
+          )
         `)
         .eq('slug', slug)
         .eq('status', 'approved')
@@ -49,13 +54,17 @@ export default function CommercePage() {
         return;
       }
 
-      // 2. Formate l'objet commerce
+      // 2. Détermine le plan
+      const tenantPlan = (business.tenants as any)?.plans?.slug || 'decouverte';
+      setPlanSlug(tenantPlan);
+
+      // 3. Formate l'objet commerce
       setCommerce({
         ...business,
         type: business.categories?.name?.toLowerCase() || 'commerce',
         typeLabel: business.categories?.name || 'Établissement',
         category: business.categories?.name,
-        city: business.city || business.tenants?.city,
+        city: business.city || (business.tenants as any)?.city,
         image: business.photos?.[0]
           || 'https://images.unsplash.com/photo-1497486751825-1233686d5d80?q=85&w=1600&auto=format&fit=crop',
         gallery: business.photos || [],
@@ -63,8 +72,8 @@ export default function CommercePage() {
         reviews: 0,
       });
 
-      // 3. Charge le niveau + labels du tenant
-      setTenantLevel(business.tenants?.verification_level || 'inscrit');
+      // 4. Charge le niveau + labels
+      setTenantLevel((business.tenants as any)?.verification_level || 'inscrit');
 
       const { data: labels } = await supabase
         .from('tenant_labels')
@@ -105,13 +114,20 @@ export default function CommercePage() {
   }
 
   const isAssociation = commerce.type === 'association';
+  const permissions = getPlanPermissions(planSlug);
+
+  // Filtre les photos : affichées seulement si autorisées par la formule
+  const visiblePhotos = permissions.canShowPhotos ? commerce.gallery : [];
+  const heroImage = permissions.canShowPhotos && commerce.image
+    ? commerce.image
+    : 'https://images.unsplash.com/photo-1497486751825-1233686d5d80?q=85&w=1600&auto=format&fit=crop';
 
   return (
     <>
       {/* HERO */}
       <section className="relative h-[240px] md:h-[280px] overflow-hidden">
         <Image
-          src={commerce.image}
+          src={heroImage}
           alt={commerce.name}
           fill
           priority
@@ -180,15 +196,32 @@ export default function CommercePage() {
         </div>
       </section>
 
+      {/* Bandeau informatif si formule Découverte */}
+      {!permissions.canShowPhotos && (
+        <div className="bg-blue-50 border-b border-blue-200">
+          <div className="max-w-wrap mx-auto px-4 md:px-8 lg:px-12 xl:px-20 py-3 flex items-center gap-2">
+            <Lock size={14} className="text-blue-600" />
+            <p className="text-xs text-blue-800">
+              <b>Cette fiche est en formule Découverte.</b> Les photos, description et
+              informations détaillées ne sont pas disponibles.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* CONTENU */}
       <section className="max-w-wrap mx-auto px-4 md:px-8 lg:px-12 xl:px-20 py-6">
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-10">
           <div>
             <CommerceTabs
-              commerce={commerce}
+              commerce={{
+                ...commerce,
+                gallery: visiblePhotos,
+              }}
               isAssociation={isAssociation}
               stats={null}
               enriched={null}
+              permissions={permissions}
             />
           </div>
 
@@ -242,7 +275,9 @@ export default function CommercePage() {
                     </a>
                   </div>
                 )}
-                {commerce.website && (
+
+                {/* Site web / Horaires : seulement si autorisé */}
+                {permissions.canShowSocialLinks && commerce.website && (
                   <div className="flex items-center gap-2.5">
                     <Globe size={15} className="text-gris-doux flex-shrink-0" />
                     <a
@@ -255,13 +290,28 @@ export default function CommercePage() {
                     </a>
                   </div>
                 )}
-                {commerce.hours && typeof commerce.hours === 'object' && (
+                {permissions.canShowHours && commerce.hours && typeof commerce.hours === 'object' && (
                   <div className="flex items-center gap-2.5">
                     <Clock size={15} className="text-gris-doux flex-shrink-0" />
                     <span>Horaires disponibles</span>
                   </div>
                 )}
+
+                {!permissions.canShowSocialLinks && (
+                  <div className="flex items-center gap-2.5 text-gris-doux italic text-xs">
+                    <Lock size={12} />
+                    Site web et horaires masqués (formule Découverte)
+                  </div>
+                )}
               </div>
+
+              {isAssociation && permissions.canShowStats && (
+                <StatsBlock
+                  slug={slug}
+                  initialViews={0}
+                  initialSupports={0}
+                />
+              )}
             </div>
 
             <div className="text-[11px] text-gris-doux text-center">

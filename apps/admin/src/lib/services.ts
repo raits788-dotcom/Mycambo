@@ -1095,7 +1095,7 @@ export async function approvePartnerRequest(requestId: string) {
 
   if (updateErr) throw updateErr;
 
-  // 2. Crée le tenant via Edge Function
+  // 2. Crée le tenant + user + lien (via Edge Function)
   const tenantRes = await fetch(
     `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/create-tenant-from-request`,
     {
@@ -1111,13 +1111,17 @@ export async function approvePartnerRequest(requestId: string) {
   const tenantData = await tenantRes.json();
   if (!tenantRes.ok) throw new Error(tenantData.error || 'TENANT_CREATE_FAILED');
 
-  // 3. Envoie l'email au partenaire
+  // 3. Envoie l'email au partenaire avec les credentials
   await fetch(
     `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/notify-partner-decision`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ request_id: requestId, decision: 'approved' }),
+      body: JSON.stringify({
+        request_id: requestId,
+        decision: 'approved',
+        temp_password: tenantData.temp_password || null,
+      }),
     }
   );
 

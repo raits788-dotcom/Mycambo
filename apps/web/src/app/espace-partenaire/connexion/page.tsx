@@ -67,8 +67,14 @@ export default function PartnerLoginPage() {
         return;
       }
 
-      // Succès → redirection
-      router.replace('/espace-partenaire/dashboard');
+      // Vérifie si l'utilisateur doit changer son mot de passe
+      const mustChange = data.user?.user_metadata?.must_change_password === true;
+
+      if (mustChange) {
+        router.replace('/espace-partenaire/changer-mot-de-passe');
+      } else {
+        router.replace('/espace-partenaire/dashboard');
+      }
     } catch (err) {
       setError((err as Error).message);
       setLoading(false);
