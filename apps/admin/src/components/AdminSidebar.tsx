@@ -23,8 +23,9 @@ import {
   Shield,
   ShieldCheck,
   Gift,
-  Loader2,
+  Bell,
   HardDrive,
+  Loader2,
 } from 'lucide-react';
 import { cn } from '@my-cambo/utils';
 import { getCurrentAdmin, getInitials } from '@/lib/auth';
@@ -47,6 +48,7 @@ const NAV_SECTIONS: NavSection[] = [
     title: 'Pilotage',
     items: [
       { id: 'dashboard', label: "Vue d'ensemble", icon: LayoutDashboard, href: '/dashboard' },
+      { id: 'notifications', label: 'Notifications', icon: Bell, href: '/notifications' },
       { id: 'demandes', label: 'Demandes', icon: Inbox, href: '/demandes' },
       { id: 'verifications', label: 'Vérifications', icon: ShieldCheck, href: '/verifications' },
       { id: 'modifications', label: 'Modifications', icon: FileEdit, href: '/modifications' },

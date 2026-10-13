@@ -1293,3 +1293,51 @@ export async function rejectVerification(verifId: string, reason: string) {
     })
     .eq('id', verifId);
 }
+// ============================================================================
+// NOTIFICATIONS ADMIN
+// ============================================================================
+export async function getAdminNotifications(filter?: 'all' | 'unread') {
+  const supabase = getSupabase();
+  let query = supabase
+    .from('notifications')
+    .select('*')
+    .eq('recipient_type', 'superadmin')
+    .order('created_at', { ascending: false })
+    .limit(200);
+
+  if (filter === 'unread') {
+    query = query.eq('is_read', false);
+  }
+
+  const { data, error } = await query;
+  if (error) { console.error('getAdminNotifications:', error); return []; }
+  return data || [];
+}
+
+export async function markNotificationAsRead(id: string) {
+  const supabase = getSupabase();
+  const { error } = await supabase
+    .from('notifications')
+    .update({ is_read: true, read_at: new Date().toISOString() })
+    .eq('id', id);
+  if (error) throw error;
+}
+
+export async function markAllNotificationsAsRead(recipientType: 'superadmin' | 'tenant' | 'user') {
+  const supabase = getSupabase();
+  const { error } = await supabase
+    .from('notifications')
+    .update({ is_read: true, read_at: new Date().toISOString() })
+    .eq('recipient_type', recipientType)
+    .eq('is_read', false);
+  if (error) throw error;
+}
+
+export async function deleteNotification(id: string) {
+  const supabase = getSupabase();
+  const { error } = await supabase
+    .from('notifications')
+    .delete()
+    .eq('id', id);
+  if (error) throw error;
+}
