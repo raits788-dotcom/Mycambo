@@ -13,6 +13,7 @@ import {
   SECTORS, DISCOVER, HUBS, FIXED_LEFT, FIXED_RIGHT,
 } from '@/lib/nav-config';
 import { createBrowserClient } from '@supabase/ssr';
+import { NotificationBell } from '@my-cambo/ui';
 
 interface HeaderUser {
   id: string;
@@ -124,6 +125,15 @@ export default function Header() {
               >
                 <Search size={20} />
               </button>
+
+              {/* ▼▼▼ NOTIFICATION BELL (si connecté) ▼▼▼ */}
+              {user && mounted && (
+                <NotificationBell
+                  recipientType="user"
+                  recipientId={user.id}
+                />
+              )}
+              {/* ▲▲▲ FIN NOTIFICATION BELL ▲▲▲ */}
 
               <div className="relative">
                 <button

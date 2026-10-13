@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { LogOut, Bell, ChevronDown, ExternalLink, Loader2, Home } from 'lucide-react';
+import { LogOut, ChevronDown, ExternalLink, Loader2, Home } from 'lucide-react';
+import { NotificationBell } from '@my-cambo/ui';
 import { getCurrentAdmin, getInitials, getDisplayName } from '@/lib/auth';
 
 interface AdminUser {
@@ -26,7 +27,6 @@ export default function AdminTopBar() {
   }, []);
 
   const handleViewSite = () => {
-    // Ouvre le site public dans un nouvel onglet (session intacte)
     const siteUrl = process.env.NODE_ENV === 'production'
       ? 'https://mycambo.net'
       : window.location.origin.replace('-3001', '-3000');
@@ -34,7 +34,6 @@ export default function AdminTopBar() {
   };
 
   const handleLeaveConsole = async () => {
-    // Déconnecte ET redirige vers le site public
     const { signOutAdmin } = await import('@/lib/auth');
     await signOutAdmin();
 
@@ -58,7 +57,6 @@ export default function AdminTopBar() {
   return (
     <header className="bg-white border-b border-gris-ligne sticky top-0 z-40">
       <div className="px-6 py-3 flex items-center justify-between gap-4">
-        {/* Titre contextuel */}
         <div className="flex items-center gap-3">
           <h1 className="text-sm font-bold text-marine">
             Console d&apos;administration
@@ -68,10 +66,8 @@ export default function AdminTopBar() {
           </span>
         </div>
 
-        {/* Actions */}
         <div className="flex items-center gap-3">
 
-          {/* Bouton "Voir le site" (nouvel onglet) */}
           <button
             onClick={handleViewSite}
             className="hidden md:flex items-center gap-1.5 text-xs text-gris-texte hover:text-marine transition-colors px-3 py-1.5 rounded-lg hover:bg-gris-fond"
@@ -81,7 +77,6 @@ export default function AdminTopBar() {
             Voir le site
           </button>
 
-          {/* Bouton "Quitter la console" (déconnexion + redirect) */}
           <button
             onClick={handleLeaveConsole}
             className="flex items-center gap-1.5 text-xs font-bold text-marine bg-marine/10 hover:bg-marine/20 transition-colors px-3 py-1.5 rounded-lg"
@@ -91,15 +86,13 @@ export default function AdminTopBar() {
             Quitter la console
           </button>
 
-          <button
-            aria-label="Notifications"
-            className="relative w-9 h-9 rounded-full bg-gris-fond hover:bg-gris-ligne flex items-center justify-center transition-colors"
-          >
-            <Bell size={15} className="text-gris-texte" />
-            <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-red-500" />
-          </button>
+          {/* ▼▼▼ NOTIFICATION BELL ▼▼▼ */}
+          <NotificationBell
+            recipientType="superadmin"
+            onViewAll={() => router.push('/notifications')}
+          />
+          {/* ▲▲▲ FIN NOTIFICATION BELL ▲▲▲ */}
 
-          {/* Profil */}
           <div className="flex items-center gap-2 pl-3 border-l border-gris-ligne">
             {loading ? (
               <Loader2 size={16} className="animate-spin text-gris-doux" />
@@ -121,7 +114,6 @@ export default function AdminTopBar() {
             )}
           </div>
 
-          {/* Déconnexion simple */}
           <button
             onClick={handleLogout}
             aria-label="Se déconnecter"

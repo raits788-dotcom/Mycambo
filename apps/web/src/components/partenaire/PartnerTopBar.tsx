@@ -1,9 +1,9 @@
 'use client';
 
-import Link from 'next/link';
-import { Bell, LogOut, Loader2 } from 'lucide-react';
+import { LogOut, Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { createBrowserClient } from '@supabase/ssr';
+import { NotificationBell } from '@my-cambo/ui';
 import { useCurrentTenant } from '@/lib/use-current-tenant';
 
 function getInitials(name: string): string {
@@ -37,12 +37,15 @@ export default function PartnerTopBar() {
       </div>
 
       <div className="flex items-center gap-3">
-        <button
-          aria-label="Notifications"
-          className="relative w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors"
-        >
-          <Bell size={15} />
-        </button>
+        {/* ▼▼▼ NOTIFICATION BELL ▼▼▼ */}
+        {tenant && (
+          <NotificationBell
+            recipientType="tenant"
+            recipientId={tenant.id}
+            onViewAll={() => router.push('/espace-partenaire/notifications')}
+          />
+        )}
+        {/* ▲▲▲ FIN NOTIFICATION BELL ▲▲▲ */}
 
         {loading ? (
           <Loader2 size={16} className="animate-spin text-white/60" />
