@@ -59,10 +59,13 @@ export default function Step3Photos({ data, updateData }: Props) {
     }
 
     try {
+      // Détecte si on est sur mobile
+      const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+
       const compressed = await imageCompression(file, {
         maxSizeMB: config.target_size_kb / 1024,  // 0.5 MB = 500 KB
-        maxWidthOrHeight: 1920,
-        useWebWorker: true,
+        maxWidthOrHeight: isMobile ? 1280 : 1920,
+        useWebWorker: !isMobile, // ← Désactive worker sur mobile
         initialQuality: 0.85,
       });
 

@@ -12,6 +12,8 @@ import Step5Verification from './components/Step5Verification';
 
 export interface WizardData {
   // Étape 1
+  structure_type: string;
+  registration_authority: string;
   legal_name: string;
   registration_number: string;
   legal_representative_name: string;
@@ -42,6 +44,8 @@ export interface WizardData {
 }
 
 const INITIAL_DATA: WizardData = {
+  structure_type: '',
+  registration_authority: '',
   legal_name: '',
   registration_number: '',
   legal_representative_name: '',
@@ -77,9 +81,12 @@ export default function PartnerRequestWizard() {
 
   const canGoNext = (): boolean => {
     if (step === 1) {
+      // N° d'enregistrement requis uniquement pour company + ngo
+      const requiresReg = data.structure_type === 'company' || data.structure_type === 'ngo';
       return !!(
+        data.structure_type &&
         data.legal_name &&
-        data.registration_number &&
+        (!requiresReg || data.registration_number) &&
         data.legal_representative_name &&
         data.legal_representative_phone &&
         data.email &&
@@ -132,8 +139,10 @@ export default function PartnerRequestWizard() {
         p_phone: data.phone || data.legal_representative_phone,
         p_city: data.city,
         p_category: data.category,
+        p_structure_type: data.structure_type,
+        p_registration_authority: data.registration_authority || null,
         p_legal_name: data.legal_name,
-        p_registration_number: data.registration_number,
+        p_registration_number: data.registration_number || null,
         p_legal_representative_name: data.legal_representative_name,
         p_legal_representative_phone: data.legal_representative_phone,
         p_establishment_type: data.category,
