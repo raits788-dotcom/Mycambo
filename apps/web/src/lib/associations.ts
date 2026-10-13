@@ -186,8 +186,9 @@ export function incrementSupports(_slug: string): number {
 export interface AssociationTeamMember {
   id: string;
   name: string;
-  role: string;
-  photo: string;
+  role: 'bureau' | 'terrain' | 'benevole' | string;
+  position?: string;
+  photo?: string;
   bio?: string;
 }
 
@@ -206,11 +207,19 @@ export interface AssociationValue {
 
 export interface Review {
   id: string;
-  author: string;
+  business_id?: string;
+  author_name: string;
+  author_initial: string;
+  author_email?: string | null;
   rating: number;
-  text: string;
-  date: string;
-  avatar?: string;
+  title: string | null;
+  content: string;
+  visit_type: string | null;
+  org_response: string | null;
+  org_response_at?: string | null;
+  status: 'pending' | 'published' | 'rejected';
+  created_at: string;
+  updated_at?: string;
 }
 // ═══════════════════════════════════════════════════════════
 // ENRICHISSEMENT ASSOCIATION

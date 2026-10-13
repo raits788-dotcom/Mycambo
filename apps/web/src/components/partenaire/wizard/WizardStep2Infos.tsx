@@ -15,10 +15,9 @@ export default function WizardStep2Infos({
   data,
   onChange,
 }: WizardStep2InfosProps) {
-  const categories =
-    data.type && data.type !== ''
-      ? ESTABLISHMENT_TYPES[data.type as EstablishmentType].categories
-      : [];
+  const categories = data.type
+    ? ESTABLISHMENT_TYPES[data.type as EstablishmentType].categories
+    : [];
 
   return (
     <div>

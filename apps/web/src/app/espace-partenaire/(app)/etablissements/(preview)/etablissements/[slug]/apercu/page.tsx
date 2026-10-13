@@ -32,8 +32,10 @@ export default function ApercuPublicPage() {
 
   useEffect(() => {
     if (slug) {
-      setEstablishment(getEstablishmentBySlug(slug));
-      setMounted(true);
+      getEstablishmentBySlug(slug).then((data) => {
+        setEstablishment(data);
+        setMounted(true);
+      });
     }
   }, [slug]);
 
@@ -67,7 +69,7 @@ export default function ApercuPublicPage() {
       ? establishment.photos[0]
       : 'https://images.unsplash.com/photo-1497486751825-1233686d5d80?q=85&w=1600&auto=format&fit=crop';
 
-  const isAssociation = establishment.type === 'association';
+  const isAssociation = establishment.categories?.name === 'Association';
 
   const tabs = isAssociation
     ? [
@@ -78,7 +80,7 @@ export default function ApercuPublicPage() {
         { id: 'photos', label: 'Photos' },
         {
           id: 'reviews',
-          label: `Avis (${establishment.reviewsCount || 0})`,
+          label: `Avis (${(establishment as any).reviewsCount || 0})`,
         },
         { id: 'help', label: 'Comment aider' },
       ]
@@ -190,13 +192,13 @@ export default function ApercuPublicPage() {
             <div className="text-white">
               <div className="flex items-center gap-2 text-xs text-white/85 mb-2 flex-wrap">
                 <span className="bg-ic-or text-marine-dark font-bold px-2.5 py-1 rounded-full">
-                  {establishment.typeLabel}
+                  {establishment.categories?.name || 'Établissement'}
                 </span>
-                <span>{establishment.category}</span>
-                {(establishment as any).foundedYear && (
+                <span>{establishment.categories?.name}</span>
+                {establishment.founded_year && (
                   <>
                     <span className="text-white/40">·</span>
-                    <span>Depuis {(establishment as any).foundedYear}</span>
+                    <span>Depuis {establishment.founded_year}</span>
                   </>
                 )}
               </div>
@@ -206,12 +208,14 @@ export default function ApercuPublicPage() {
               </h1>
 
               <div className="flex flex-wrap items-center gap-4 text-sm text-white/90">
-                {establishment.rating > 0 && (
+                {((establishment as any).rating || 0) > 0 && (
                   <span className="flex items-center gap-1.5">
                     <Star size={15} className="fill-ic-or text-ic-or" />
-                    <b className="text-base">{establishment.rating}</b>
+                    <b className="text-base">
+                      {(establishment as any).rating || 0}
+                    </b>
                     <span className="text-white/70">
-                      ({establishment.reviewsCount} avis)
+                      ({(establishment as any).reviewsCount || 0} avis)
                     </span>
                   </span>
                 )}
@@ -252,17 +256,17 @@ export default function ApercuPublicPage() {
                   À propos
                 </h2>
                 <p className="text-gris-texte leading-relaxed mb-6">
-                  {establishment.longDescription ||
-                    establishment.shortDescription}
+                  {establishment.long_description ||
+                    establishment.short_description}
                 </p>
 
-                {establishment.foundedYear && (
+                {establishment.founded_year && (
                   <div className="bg-gris-fond rounded-lg p-5 flex items-center gap-4">
                     <div className="text-3xl">📅</div>
                     <div>
                       <div className="text-sm text-gris-texte">Fondée en</div>
                       <div className="text-xl font-extrabold text-marine">
-                        {establishment.foundedYear}
+                        {establishment.founded_year}
                       </div>
                     </div>
                   </div>
@@ -377,7 +381,7 @@ export default function ApercuPublicPage() {
                 {establishment.hours && (
                   <div className="flex items-center gap-2.5">
                     <Clock size={15} className="text-gris-doux" />
-                    <span>{establishment.hours}</span>
+                    <span>{JSON.stringify(establishment.hours)}</span>
                   </div>
                 )}
               </div>

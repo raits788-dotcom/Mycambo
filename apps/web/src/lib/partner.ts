@@ -8,22 +8,6 @@
 //   - audit_logs (notifications système)
 // ============================================================================
 
-// ─── Avis à modérer ─────────────────────────────────────────────────────
-export interface PartnerReviewToModerate {
-  id: string;
-  authorName: string;
-  authorInitials: string;
-  rating: number;
-  title: string;
-  content: string;
-  createdAt: string;
-  status: 'pending' | 'published' | 'rejected';
-  businessName: string;
-  businessSlug: string;
-  reply?: string;
-  repliedAt?: string;
-}
-
 // ─── Catégories de refus d'avis ─────────────────────────────────────────
 export type RejectionCategory =
   | 'inappropriate'
@@ -63,8 +47,43 @@ export const REJECTION_CATEGORIES: Record<
   },
 };
 
+// ─── Avis à modérer ─────────────────────────────────────────────────────
+export interface PartnerReviewToModerate {
+  id: string;
+  authorName: string;
+  authorInitials: string;
+  author_initial?: string;
+  author_name?: string;
+  rating: number;
+  title: string;
+  content: string;
+  created_at: string;
+  createdAt?: string;
+  visit_type?: string;
+  org_response?: string | null;
+  status:
+    | 'pending'
+    | 'published'
+    | 'rejected'
+    | 'rejected_pending_admin'
+    | 'rejected_by_org_final'
+    | 'forced_by_admin'
+    | 'auto_rejected';
+  businessName: string;
+  businessSlug: string;
+  reply?: string;
+  repliedAt?: string;
+  rejection_reason?: string;
+  rejection_category?: RejectionCategory;
+  auto_rejection_reason?: string;
+}
+
 // ─── Notifications partenaire ───────────────────────────────────────────
-export type PartnerNotificationType = 'review' | 'request' | 'system' | 'subscription';
+export type PartnerNotificationType =
+  | 'review'
+  | 'request'
+  | 'system'
+  | 'subscription';
 
 export interface PartnerNotification {
   id: string;

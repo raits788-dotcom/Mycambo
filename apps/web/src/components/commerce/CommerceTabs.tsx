@@ -4,11 +4,11 @@ import { useState } from 'react';
 import { Info, Image as ImageIcon, Gift, Star, CreditCard, Lock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { StoredEstablishment } from '@/lib/establishment-storage';
-import InfoTab from './InfoTab';
-import PhotosTab from './PhotosTab';
-import ServicesTab from './ServicesTab';
-import StatsTab from './StatsTab';
-import SubscriptionTab from './SubscriptionTab';
+import InfoTab from '@/components/partenaire/establishment/InfoTab';
+import PhotosTab from '@/components/partenaire/establishment/PhotosTab';
+import ServicesTab from '@/components/partenaire/establishment/ServicesTab';
+import StatsTab from '@/components/partenaire/establishment/StatsTab';
+import SubscriptionTab from '@/components/partenaire/establishment/SubscriptionTab';
 import ReviewsSection from '@/components/avis/ReviewsSection';
 
 type TabId = 'info' | 'photos' | 'services' | 'stats' | 'reviews' | 'subscription';

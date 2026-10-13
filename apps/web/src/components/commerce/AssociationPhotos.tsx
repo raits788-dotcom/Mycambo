@@ -41,14 +41,14 @@ export default function AssociationPhotos({
             >
               <Image
                 src={photo.url}
-                alt={photo.caption}
+                alt={photo.caption || ''}
                 fill
                 className="object-cover group-hover:scale-105 transition-transform duration-300"
                 sizes="(max-width: 768px) 50vw, 33vw"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-ink/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
               <div className="absolute bottom-0 left-0 right-0 p-3 text-left text-white text-xs font-semibold opacity-0 group-hover:opacity-100 transition-opacity">
-                {photo.caption}
+                {photo.caption || ''}
               </div>
             </button>
           ))}
@@ -76,7 +76,7 @@ export default function AssociationPhotos({
           <div className="relative max-w-4xl w-full aspect-[4/3]">
             <Image
               src={photos[selected].url}
-              alt={photos[selected].caption}
+              alt={photos[selected].caption || ''}
               fill
               className="object-contain"
               sizes="100vw"
@@ -84,7 +84,7 @@ export default function AssociationPhotos({
           </div>
 
           <div className="absolute bottom-6 left-1/2 -translate-x-1/2 text-white text-sm text-center px-4">
-            {photos[selected].caption}
+            {photos[selected].caption || ''}
           </div>
         </div>
       )}

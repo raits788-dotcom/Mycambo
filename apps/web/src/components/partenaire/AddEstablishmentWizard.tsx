@@ -12,7 +12,10 @@ import {
   validateStep,
   type WizardData,
   type EstablishmentType,
+  ESTABLISHMENT_TYPES,
 } from '@/lib/establishment-wizard';
+import { addEstablishment } from '@/lib/establishment-storage';
+import { useCurrentTenant } from '@/lib/use-current-tenant';
 
 const STEP_LABELS = [
   'Type',
@@ -20,14 +23,10 @@ const STEP_LABELS = [
   'Localisation',
   'Légal & Photos',
 ];
-import {
-  addEstablishment,
-  generateSlug,
-} from '@/lib/establishment-storage';
-import { ESTABLISHMENT_TYPES } from '@/lib/establishment-wizard';
 
 export default function AddEstablishmentWizard() {
   const router = useRouter();
+  const { tenant } = useCurrentTenant();
   const [step, setStep] = useState(1);
   const [data, setData] = useState<WizardData>(WIZARD_INITIAL_DATA);
   const [errors, setErrors] = useState<string[]>([]);
@@ -54,61 +53,43 @@ export default function AddEstablishmentWizard() {
     setErrors([]);
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     const result = validateStep(4, data);
     if (!result.ok) {
       setErrors(result.errors);
       return;
     }
 
+    if (!tenant?.id) {
+      setErrors(['Tenant introuvable. Veuillez vous reconnecter.']);
+      return;
+    }
+
     setSubmitting(true);
 
-    // ===== Enregistrement dans localStorage =====
     try {
-      const slug = generateSlug(data.name);
-      const typeInfo = ESTABLISHMENT_TYPES[data.type as EstablishmentType];
-
       // Récupère les URLs des photos
       const photos: string[] = [];
       Object.values(data.photos).forEach((p) => {
         if (p) photos.push(p.url);
       });
 
-      addEstablishment({
-        slug,
+      await addEstablishment(tenant.id, {
         name: data.name,
-        type: data.type,
-        typeLabel: typeInfo.label,
-        category: data.category,
-        city: data.city,
+        category_id: undefined,
+        description: data.shortDescription || data.longDescription,
         address: data.address,
-        phone: '',
-        email: '',
+        city: data.city,
+        phone: undefined,
+        email: undefined,
         website: data.website,
-        hours: '',
-        shortDescription: data.shortDescription,
-        longDescription: data.longDescription,
-        status: 'pending',
-        rating: 0,
-        reviewsCount: 0,
-        views: 0,
-        supports: 0,
-        photosCount: photos.length,
-        photosLimit: 5,
-        createdAt: new Date().toISOString(),
-        submittedAt: new Date().toISOString(),
         photos,
-        documents: data.documents.map((d) => ({
-          name: d.name,
-          url: d.url,
-          size: d.size,
-        })),
       });
 
       console.log('📤 Établissement enregistré :', data);
     } catch (err) {
       console.error('Erreur enregistrement :', err);
-      setErrors(['Une erreur est survenue lors de l\'enregistrement.']);
+      setErrors(["Une erreur est survenue lors de l'enregistrement."]);
       setSubmitting(false);
       return;
     }
