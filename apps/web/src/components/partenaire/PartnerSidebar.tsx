@@ -4,13 +4,14 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard, Store, Inbox, Star, BarChart3,
-  Users, User, Settings, Loader2, Gift, ShieldCheck,
+  Users, User, Settings, Loader2, Gift, ShieldCheck, Bell,
 } from 'lucide-react';
 import { cn } from '@my-cambo/utils';
 import { useCurrentTenant } from '@/lib/use-current-tenant';
 
 const NAV_ITEMS = [
   { id: 'dashboard', label: "Vue d'ensemble", icon: LayoutDashboard, href: '/espace-partenaire/dashboard' },
+  { id: 'notifications', label: 'Notifications', icon: Bell, href: '/espace-partenaire/notifications' },
   { id: 'etablissements', label: 'Mes établissements', icon: Store, href: '/espace-partenaire/etablissements' },
   { id: 'demandes', label: 'Demandes reçues', icon: Inbox, href: '/espace-partenaire/demandes' },
   { id: 'avis', label: 'Avis', icon: Star, href: '/espace-partenaire/avis' },
