@@ -13,14 +13,7 @@ export async function getTenants() {
     .from('tenants')
     .select('*, plans(name)')
     .order('created_at', { ascending: false });
-if (error) { 
-  console.error('getTenants error:', JSON.stringify(error, null, 2));
-  console.error('error.message:', error.message);
-  console.error('error.code:', error.code);
-  console.error('error.details:', error.details);
-  console.error('error.hint:', error.hint);
-  return []; 
-}
+  if (error) { console.error('getTenants error:', error); return []; }
   return data || [];
 }
 
@@ -81,7 +74,7 @@ export async function getBusinesses() {
 }
 
 // ============================================================================
-// PARTNER REQUESTS
+// PARTNER REQUESTS (liste)
 // ============================================================================
 export async function getPartnerRequests() {
   const supabase = getSupabase();
@@ -237,9 +230,9 @@ export async function getAdminUsers() {
   return data || [];
 }
 
-// ═══════════════════════════════════════════════════════════
+// ============================================================================
 // CITIES
-// ═══════════════════════════════════════════════════════════
+// ============================================================================
 export async function getCities() {
   const supabase = getSupabase();
   const { data, error } = await supabase
@@ -266,6 +259,7 @@ export async function getCities() {
 
   return citiesWithCount;
 }
+
 // ============================================================================
 // IMPERSONATION
 // ============================================================================
@@ -290,6 +284,7 @@ export async function startImpersonation(tenantId: string) {
   if (!res.ok) throw new Error(data.error || 'IMPERSONATION_FAILED');
   return data as { token: string; expiresAt: string; tenantId: string; tenantName: string };
 }
+
 // ============================================================================
 // RESET PASSWORD
 // ============================================================================
@@ -314,6 +309,7 @@ export async function resetTenantAdminPassword(tenantId: string) {
   if (!res.ok) throw new Error(data.error || 'RESET_FAILED');
   return data as { success: boolean; email: string };
 }
+
 // ============================================================================
 // TENANTS CRUD
 // ============================================================================
@@ -339,6 +335,7 @@ export async function deleteTenant(id: string) {
   const { error } = await supabase.rpc('admin_delete_tenant', { p_tenant_id: id });
   if (error) throw error;
 }
+
 // ============================================================================
 // PLANS CRUD
 // ============================================================================
@@ -385,6 +382,7 @@ export async function deletePlan(id: string) {
   const { error } = await supabase.from('plans').delete().eq('id', id);
   if (error) throw error;
 }
+
 // ============================================================================
 // PLAN FEATURES (catalogue)
 // ============================================================================
@@ -493,7 +491,6 @@ export async function createPlanWithVersion(payload: {
 }) {
   const supabase = getSupabase();
 
-  // 1. Insère le plan (audience incluse)
   const slug = payload.name
     .toLowerCase()
     .normalize('NFD')
@@ -520,7 +517,6 @@ export async function createPlanWithVersion(payload: {
 
   if (planErr) throw planErr;
 
-  // 2. Crée la version 1
   const { error: verErr } = await supabase
     .from('plan_versions')
     .insert({
@@ -536,7 +532,6 @@ export async function createPlanWithVersion(payload: {
 
   if (verErr) throw verErr;
 
-  // 3. Log audit
   await supabase.from('audit_logs').insert({
     actor_type: 'superadmin',
     action: 'plan.create',
@@ -574,6 +569,7 @@ export async function migrateSubscriptionsToCurrentVersion(planId: string) {
   if (error) throw error;
   return data as number;
 }
+
 // ============================================================================
 // REFERRAL / PARRAINAGE
 // ============================================================================
@@ -665,6 +661,7 @@ export async function getReferralCodes() {
   if (error) { console.error('getReferralCodes:', error); return []; }
   return data || [];
 }
+
 // ============================================================================
 // AUDIENCE (business / association)
 // ============================================================================
@@ -702,6 +699,7 @@ export async function getReferralBadgeForTenant(tenantId: string) {
     .rpc('count_qualified_referrals', { p_tenant_id: tenantId });
   return (data as number) || 0;
 }
+
 // ============================================================================
 // VALIDATION TENANT (approve / reject)
 // ============================================================================
@@ -738,6 +736,7 @@ export async function suspendTenant(tenantId: string) {
     entity_id: tenantId,
   });
 }
+
 // ============================================================================
 // NIVEAUX DE VÉRIFICATION
 // ============================================================================
@@ -853,17 +852,6 @@ export async function toggleTenantLabel(
 // ============================================================================
 // FILE D'ATTENTE VÉRIFICATIONS
 // ============================================================================
-export async function getPendingVerifications() {
-  const supabase = getSupabase();
-  const { data, error } = await supabase
-    .from('tenants')
-    .select('*')
-    .eq('verification_level', 'inscrit')
-    .order('created_at', { ascending: false });
-  if (error) { console.error('getPendingVerifications:', error); return []; }
-  return data || [];
-}
-
 export async function getPendingCount() {
   const supabase = getSupabase();
   const { count } = await supabase
@@ -872,6 +860,7 @@ export async function getPendingCount() {
     .eq('verification_level', 'inscrit');
   return count || 0;
 }
+
 // ============================================================================
 // CHANGEMENT EMAIL PARTENAIRE
 // ============================================================================
@@ -896,64 +885,7 @@ export async function updateTenantEmail(tenantId: string, newEmail: string) {
   if (!res.ok) throw new Error(data.error || 'EMAIL_UPDATE_FAILED');
   return data;
 }
-// ============================================================================
-// DOSSIERS DE VÉRIFICATION (soumis pour révision)
-// ============================================================================
-export async function getSubmittedVerifications() {
-  const supabase = getSupabase();
-  const { data, error } = await supabase
-    .from('tenant_verifications')
-    .select(`
-      *,
-      tenant:tenants!tenant_verifications_tenant_id_fkey(
-        id, name, email, city, phone, address, status, verification_level
-      )
-    `)
-    .eq('status', 'submitted')
-    .order('last_submitted_at', { ascending: false });
-  if (error) { console.error('getSubmittedVerifications:', error); return []; }
-  return data || [];
-}
 
-export async function getVerificationById(verifId: string) {
-  const supabase = getSupabase();
-  const { data, error } = await supabase
-    .from('tenant_verifications')
-    .select(`*, tenant:tenants!tenant_verifications_tenant_id_fkey(*)`)
-    .eq('id', verifId)
-    .single();
-  if (error) { console.error('getVerificationById:', error); return null; }
-  return data;
-}
-
-export async function approveVerification(verifId: string, tenantId: string, notes?: string) {
-  const supabase = getSupabase();
-
-  // 1. Approuve la vérification
-  await supabase
-    .from('tenant_verifications')
-    .update({
-      status: 'approved',
-      reviewed_at: new Date().toISOString(),
-      reviewer_notes: notes || null,
-    })
-    .eq('id', verifId);
-
-  // 2. Passe le tenant en vérifié
-  await changeVerificationLevel(tenantId, 'verifie', notes || 'Approuvé via vérification');
-}
-
-export async function rejectVerification(verifId: string, reason: string) {
-  const supabase = getSupabase();
-  await supabase
-    .from('tenant_verifications')
-    .update({
-      status: 'rejected',
-      reviewed_at: new Date().toISOString(),
-      rejection_reason: reason,
-    })
-    .eq('id', verifId);
-}
 // ============================================================================
 // MODIFICATION REQUESTS
 // ============================================================================
@@ -1001,6 +933,7 @@ export async function rejectModificationRequest(requestId: string, reason: strin
   });
   if (error) throw error;
 }
+
 // ============================================================================
 // STORAGE SETTINGS
 // ============================================================================
@@ -1077,13 +1010,11 @@ export async function getStorageAlerts(limit = 20) {
 // ============================================================================
 // PARTNER REQUESTS — Approbation / Refus
 // ============================================================================
-
 export async function approvePartnerRequest(requestId: string) {
   const supabase = getSupabase();
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) throw new Error('NOT_AUTHENTICATED');
 
-  // 1. Met à jour le statut de la demande
   const { error: updateErr } = await supabase
     .from('partner_requests')
     .update({
@@ -1095,7 +1026,6 @@ export async function approvePartnerRequest(requestId: string) {
 
   if (updateErr) throw updateErr;
 
-  // 2. Crée le tenant + user + lien (via Edge Function)
   const tenantRes = await fetch(
     `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/create-tenant-from-request`,
     {
@@ -1111,7 +1041,6 @@ export async function approvePartnerRequest(requestId: string) {
   const tenantData = await tenantRes.json();
   if (!tenantRes.ok) throw new Error(tenantData.error || 'TENANT_CREATE_FAILED');
 
-  // 3. Envoie l'email au partenaire avec les credentials
   await fetch(
     `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/notify-partner-decision`,
     {
@@ -1121,6 +1050,7 @@ export async function approvePartnerRequest(requestId: string) {
         request_id: requestId,
         decision: 'approved',
         temp_password: tenantData.temp_password || null,
+        is_new_user: tenantData.is_new_user || false,
       }),
     }
   );
@@ -1203,4 +1133,163 @@ export async function deletePartnerRequest(requestId: string) {
   } catch (logErr) {
     console.warn('Audit log failed:', logErr);
   }
+}
+
+// ============================================================================
+// VÉRIFICATIONS — 3 VUES
+// ============================================================================
+
+/**
+ * Onglet 1 : Dossiers soumis (à traiter en priorité)
+ */
+export async function getSubmittedVerifications() {
+  const supabase = getSupabase();
+  const { data, error } = await supabase
+    .from('tenant_verifications')
+    .select(`
+      *,
+      tenant:tenants!tenant_verifications_tenant_id_fkey(
+        id, name, email, city, phone, status, verification_level, created_at
+      )
+    `)
+    .eq('status', 'submitted')
+    .order('last_submitted_at', { ascending: false });
+
+  if (error) { console.error('getSubmittedVerifications:', error); return []; }
+  return data || [];
+}
+
+/**
+ * Onglet 2 : Tenants sans dossier soumis (en attente)
+ */
+export async function getPendingVerifications() {
+  const supabase = getSupabase();
+
+  const { data: tenants, error } = await supabase
+    .from('tenants')
+    .select(`
+      id, name, email, city, phone, status, verification_level, created_at,
+      tenant_verifications(status, last_submitted_at)
+    `)
+    .eq('status', 'active')
+    .order('created_at', { ascending: false });
+
+  if (error) { console.error('getPendingVerifications:', error); return []; }
+
+  return (tenants || []).filter((t: any) => {
+    const verif = Array.isArray(t.tenant_verifications) ? t.tenant_verifications[0] : t.tenant_verifications;
+    return !verif || verif.status === 'incomplete' || verif.status === 'rejected';
+  });
+}
+
+/**
+ * Onglet 3 : Historique des vérifications
+ */
+export async function getVerificationHistoryList(limit = 100) {
+  const supabase = getSupabase();
+  const { data, error } = await supabase
+    .from('tenant_verifications')
+    .select(`
+      *,
+      tenant:tenants!tenant_verifications_tenant_id_fkey(id, name, email)
+    `)
+    .in('status', ['approved', 'rejected'])
+    .order('reviewed_at', { ascending: false })
+    .limit(limit);
+
+  if (error) { console.error('getVerificationHistoryList:', error); return []; }
+  return data || [];
+}
+
+/**
+ * Relance par email un tenant sans dossier
+ */
+export async function remindTenantToSubmitVerification(tenantId: string) {
+  const supabase = getSupabase();
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) throw new Error('NOT_AUTHENTICATED');
+
+  const { data: tenant } = await supabase
+    .from('tenants')
+    .select('name, email')
+    .eq('id', tenantId)
+    .single();
+
+  if (!tenant) throw new Error('TENANT_NOT_FOUND');
+
+  await fetch(
+    `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/send-email`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session.access_token}`,
+      },
+      body: JSON.stringify({
+        to: tenant.email,
+        subject: `[MyCambo] Complétez votre dossier de vérification`,
+        html: `
+          <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto">
+            <div style="background:#1B3A6B;color:white;padding:24px;border-radius:8px 8px 0 0">
+              <h1 style="margin:0;font-size:20px">📋 Dossier à compléter</h1>
+            </div>
+            <div style="background:#f9fafb;padding:24px;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 8px 8px">
+              <p>Bonjour <strong>${tenant.name}</strong>,</p>
+              <p>Votre compte partenaire est actif, mais nous n'avons pas encore reçu votre dossier de vérification.</p>
+              <p>Pour apparaître dans l'annuaire et bénéficier de toutes les fonctionnalités, complétez votre dossier :</p>
+              <p style="text-align:center;margin:24px 0">
+                <a href="https://dev.mycambo.net/espace-partenaire/verification" style="display:inline-block;background:#1B3A6B;color:white;padding:12px 24px;text-decoration:none;border-radius:6px;font-weight:bold">
+                  Compléter mon dossier →
+                </a>
+              </p>
+              <p style="font-size:12px;color:#9ca3af">Pour toute question : contact@mycambo.net</p>
+            </div>
+          </div>
+        `,
+      }),
+    }
+  );
+
+  await supabase.from('audit_logs').insert({
+    actor_id: session.user.id,
+    actor_type: 'superadmin',
+    action: 'verification.reminder_sent',
+    entity_type: 'tenant',
+    entity_id: tenantId,
+  });
+
+  return { success: true };
+}
+
+/**
+ * Approuver une vérification (passe au niveau supérieur)
+ */
+export async function approveVerification(verifId: string, tenantId: string, notes?: string) {
+  const supabase = getSupabase();
+
+  await supabase
+    .from('tenant_verifications')
+    .update({
+      status: 'approved',
+      reviewed_at: new Date().toISOString(),
+      reviewer_notes: notes || null,
+    })
+    .eq('id', verifId);
+
+  await changeVerificationLevel(tenantId, 'verifie', notes || 'Approuvé via vérification');
+}
+
+/**
+ * Refuser une vérification
+ */
+export async function rejectVerification(verifId: string, reason: string) {
+  const supabase = getSupabase();
+  await supabase
+    .from('tenant_verifications')
+    .update({
+      status: 'rejected',
+      reviewed_at: new Date().toISOString(),
+      rejection_reason: reason,
+    })
+    .eq('id', verifId);
 }
