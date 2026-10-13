@@ -1165,3 +1165,38 @@ export async function getPartnerRequestById(id: string) {
   if (error) { console.error('getPartnerRequestById:', error); return null; }
   return data;
 }
+
+// ============================================================================
+// SUPPRESSION DEMANDE PARTENAIRE
+// ============================================================================
+export async function deletePartnerRequest(requestId: string) {
+  const supabase = getSupabase();
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) throw new Error('NOT_AUTHENTICATED');
+
+  const { data: req } = await supabase
+    .from('partner_requests')
+    .select('company_name, email')
+    .eq('id', requestId)
+    .maybeSingle();
+
+  const { error } = await supabase
+    .from('partner_requests')
+    .delete()
+    .eq('id', requestId);
+
+  if (error) throw error;
+
+  try {
+    await supabase.from('audit_logs').insert({
+      actor_id: session.user.id,
+      actor_type: 'superadmin',
+      action: 'partner_request.delete',
+      entity_type: 'partner_request',
+      entity_id: requestId,
+      changes: { company_name: req?.company_name, email: req?.email },
+    });
+  } catch (logErr) {
+    console.warn('Audit log failed:', logErr);
+  }
+}

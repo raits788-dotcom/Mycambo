@@ -4,12 +4,13 @@ import { useState, useEffect } from 'react';
 import {
   Search, Filter, Eye, CheckCircle2, XCircle, Briefcase, Mail, MapPin,
   Loader2, X, Building2, Phone, Globe, Image as ImageIcon,
-  AlertTriangle, FileText, ExternalLink, Calendar, Award, Target,
+  AlertTriangle, FileText, ExternalLink, Calendar, Trash2,
 } from 'lucide-react';
 import {
   getPartnerRequests,
   approvePartnerRequest,
   rejectPartnerRequest,
+  deletePartnerRequest,
 } from '@/lib/services';
 
 const STATUS_STYLES: Record<string, string> = {
@@ -46,6 +47,9 @@ export default function PartnerRequestsPage() {
   const [photoZoom, setPhotoZoom] = useState<string | null>(null);
   const [rejectionModal, setRejectionModal] = useState(false);
   const [rejectionReason, setRejectionReason] = useState('');
+  const [deleteModal, setDeleteModal] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
+  const [deleting, setDeleting] = useState(false);
 
   const reload = async () => {
     setLoading(true);
@@ -108,6 +112,28 @@ export default function PartnerRequestsPage() {
       alert('Erreur : ' + (err as Error).message);
     } finally {
       setProcessing(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!selected) return;
+    if (deleteConfirmText !== 'SUPPRIMER') {
+      alert('Tapez exactement SUPPRIMER pour confirmer.');
+      return;
+    }
+
+    setDeleting(true);
+    try {
+      await deletePartnerRequest(selected.id);
+      alert('✅ Demande supprimée définitivement.');
+      setSelected(null);
+      setDeleteModal(false);
+      setDeleteConfirmText('');
+      await reload();
+    } catch (err) {
+      alert('Erreur : ' + (err as Error).message);
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -429,32 +455,40 @@ export default function PartnerRequestsPage() {
               </div>
             </div>
 
-            {/* Actions footer */}
-            {selected.status === 'pending' && (
-              <div className="flex justify-end gap-3 p-6 border-t border-gris-ligne bg-white sticky bottom-0 rounded-b-2xl shrink-0">
-                <button
-                  onClick={() => setRejectionModal(true)}
-                  disabled={processing}
-                  className="flex items-center gap-2 border border-red-200 text-red-600 font-bold text-sm px-5 py-2.5 rounded-full hover:bg-red-50 disabled:opacity-50"
-                >
-                  <XCircle size={14} /> Refuser
-                </button>
-                <button
-                  onClick={handleApprove}
-                  disabled={processing}
-                  className="flex items-center gap-2 bg-green-600 text-white font-bold text-sm px-5 py-2.5 rounded-full hover:bg-green-700 disabled:opacity-50"
-                >
-                  {processing ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
-                  {processing ? 'Traitement...' : 'Approuver & créer le tenant'}
-                </button>
-              </div>
-            )}
+            {/* ─── FOOTER ACTIONS ─── */}
+            <div className="flex justify-between gap-3 p-6 border-t border-gris-ligne bg-white sticky bottom-0 rounded-b-2xl shrink-0 flex-wrap">
+              {/* Bouton supprimer (à gauche) */}
+              <button
+                onClick={() => setDeleteModal(true)}
+                disabled={processing || deleting}
+                className="flex items-center gap-2 text-xs text-red-500 hover:text-red-700 hover:bg-red-50 px-3 py-2 rounded-lg transition-colors disabled:opacity-50"
+                title="Supprimer définitivement"
+              >
+                <Trash2 size={12} />
+                Supprimer
+              </button>
 
-            {selected.status !== 'pending' && (
-              <div className={`p-4 rounded-b-2xl text-sm ${selected.status === 'approved' ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'}`}>
-                {selected.status === 'approved' ? '✅ Cette demande a été approuvée.' : `❌ Refusée : ${selected.rejection_reason || '—'}`}
-              </div>
-            )}
+              {/* Actions principales (à droite) */}
+              {selected.status === 'pending' && (
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setRejectionModal(true)}
+                    disabled={processing}
+                    className="flex items-center gap-2 border border-red-200 text-red-600 font-bold text-sm px-5 py-2.5 rounded-full hover:bg-red-50 disabled:opacity-50"
+                  >
+                    <XCircle size={14} /> Refuser
+                  </button>
+                  <button
+                    onClick={handleApprove}
+                    disabled={processing}
+                    className="flex items-center gap-2 bg-green-600 text-white font-bold text-sm px-5 py-2.5 rounded-full hover:bg-green-700 disabled:opacity-50"
+                  >
+                    {processing ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
+                    {processing ? 'Traitement...' : 'Approuver'}
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
@@ -498,6 +532,63 @@ export default function PartnerRequestsPage() {
               >
                 {processing ? <Loader2 size={14} className="animate-spin" /> : <XCircle size={14} />}
                 Confirmer le refus
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── MODALE SUPPRESSION ─── */}
+      {deleteModal && selected && (
+        <div className="fixed inset-0 bg-black/70 z-[70] flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-12 h-12 rounded-full bg-red-100 text-red-600 flex items-center justify-center">
+                <Trash2 size={22} />
+              </div>
+              <div>
+                <h3 className="font-bold text-marine">Supprimer la demande</h3>
+                <p className="text-xs text-gris-texte">Action irréversible</p>
+              </div>
+            </div>
+
+            <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-5">
+              <p className="text-xs text-red-800">
+                ⚠️ Cette action va <b>définitivement supprimer</b> la demande de :
+                <br />
+                <b className="text-marine">{selected.company_name}</b> ({selected.email})
+                <br />
+                <br />
+                Cette action est <b>irréversible</b>. Les données seront perdues.
+              </p>
+            </div>
+
+            <label className="block text-xs font-bold text-gris-texte uppercase mb-2">
+              Tapez <span className="text-red-600 font-mono">SUPPRIMER</span> pour confirmer
+            </label>
+            <input
+              type="text"
+              value={deleteConfirmText}
+              onChange={(e) => setDeleteConfirmText(e.target.value.toUpperCase())}
+              placeholder="SUPPRIMER"
+              className="w-full px-3 py-2 text-sm rounded-lg border border-gris-ligne focus:border-red-500 focus:outline-none font-mono mb-5"
+              autoFocus
+            />
+
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => { setDeleteModal(false); setDeleteConfirmText(''); }}
+                className="text-sm font-bold border border-gris-ligne text-marine rounded-full px-5 py-2.5 hover:border-marine"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={handleDelete}
+                disabled={deleting || deleteConfirmText !== 'SUPPRIMER'}
+                className="flex items-center gap-2 bg-red-600 text-white font-bold text-sm px-5 py-2.5 rounded-full hover:bg-red-700 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                {deleting ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                {deleting ? 'Suppression...' : 'Supprimer définitivement'}
               </button>
             </div>
           </div>
