@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Upload, Loader2, Check, X, Info } from 'lucide-react';
 import { createBrowserClient } from '@supabase/ssr';
+import imageCompression from 'browser-image-compression';
 import type { WizardData } from '../page';
 
 interface Props {
@@ -14,7 +15,8 @@ export default function Step3Photos({ data, updateData }: Props) {
   const [uploading, setUploading] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [config, setConfig] = useState({
-    max_size_kb: 256,
+    max_size_kb: 5120,        // 5 MB par défaut
+    target_size_kb: 500,       // 500 KB cible après compression
     allowed_formats: ['jpg', 'jpeg', 'png', 'webp', 'pdf'],
   });
 
@@ -34,11 +36,45 @@ export default function Step3Photos({ data, updateData }: Props) {
       if (settings) {
         setConfig({
           max_size_kb: Math.round(settings.max_size_bytes / 1024),
+          target_size_kb: 500,
           allowed_formats: settings.allowed_formats || ['jpg', 'png', 'pdf'],
         });
       }
     })();
   }, []);
+
+  /**
+   * Compresse une image en utilisant browser-image-compression
+   * Retourne le fichier compressé (ou l'original si PDF)
+   */
+  const compressImage = async (file: File): Promise<File> => {
+    // Pas de compression pour les PDF
+    if (file.type === 'application/pdf') {
+      return file;
+    }
+
+    // Si l'image est déjà sous la cible, on la garde
+    if (file.size <= config.target_size_kb * 1024) {
+      return file;
+    }
+
+    try {
+      const compressed = await imageCompression(file, {
+        maxSizeMB: config.target_size_kb / 1024,  // 0.5 MB = 500 KB
+        maxWidthOrHeight: 1920,
+        useWebWorker: true,
+        initialQuality: 0.85,
+      });
+
+      return new File([compressed], file.name, {
+        type: compressed.type || file.type,
+        lastModified: Date.now(),
+      });
+    } catch (err) {
+      console.error('Erreur compression:', err);
+      return file; // En cas d'erreur, on garde l'original
+    }
+  };
 
   const handleUpload = async (
     e: React.ChangeEvent<HTMLInputElement>,
@@ -49,12 +85,13 @@ export default function Step3Photos({ data, updateData }: Props) {
 
     setError('');
 
-    // Validation
+    // Validation : taille max autorisée (5 MB)
     if (file.size > config.max_size_kb * 1024) {
-      setError(`Le fichier ne doit pas dépasser ${config.max_size_kb} KB.`);
+      setError(`Le fichier ne doit pas dépasser ${(config.max_size_kb / 1024).toFixed(0)} MB.`);
       return;
     }
 
+    // Validation : format
     const ext = file.name.split('.').pop()?.toLowerCase() || '';
     if (!config.allowed_formats.includes(ext)) {
       setError(`Format non autorisé. Formats acceptés : ${config.allowed_formats.join(', ').toUpperCase()}`);
@@ -64,6 +101,15 @@ export default function Step3Photos({ data, updateData }: Props) {
     setUploading(slot);
 
     try {
+      // 1. Compression automatique
+      const originalSize = file.size;
+      const fileToUpload = await compressImage(file);
+      const compressedSize = fileToUpload.size;
+      const savedPercent = Math.round((1 - compressedSize / originalSize) * 100);
+
+      console.log(`📸 Compression : ${(originalSize / 1024).toFixed(0)} KB → ${(compressedSize / 1024).toFixed(0)} KB (-${savedPercent}%)`);
+
+      // 2. Upload vers Supabase
       const supabase = createBrowserClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
         process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -73,7 +119,7 @@ export default function Step3Photos({ data, updateData }: Props) {
 
       const { error: uploadErr } = await supabase.storage
         .from('partner-docs')
-        .upload(filename, file);
+        .upload(filename, fileToUpload);
 
       if (uploadErr) throw uploadErr;
 
@@ -90,6 +136,8 @@ export default function Step3Photos({ data, updateData }: Props) {
       setError((err as Error).message);
     } finally {
       setUploading(null);
+      // Reset l'input pour permettre de re-uploader le même fichier
+      e.target.value = '';
     }
   };
 
@@ -114,11 +162,17 @@ export default function Step3Photos({ data, updateData }: Props) {
       {/* Info contraintes */}
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-start gap-2">
         <Info size={14} className="text-blue-600 flex-shrink-0 mt-0.5" />
-        <p className="text-xs text-blue-800">
-          <b>Formats acceptés :</b> {config.allowed_formats.join(', ').toUpperCase()}
-          <br />
-          <b>Taille max :</b> {config.max_size_kb} KB
-        </p>
+        <div className="text-xs text-blue-800 space-y-0.5">
+          <div>
+            <b>Formats acceptés :</b> {config.allowed_formats.join(', ').toUpperCase()}
+          </div>
+          <div>
+            <b>Taille max du fichier :</b> {(config.max_size_kb / 1024).toFixed(0)} MB
+          </div>
+          <div className="text-blue-700">
+            ✨ <b>Compression automatique</b> : votre photo sera réduite à ~{config.target_size_kb} KB pour optimiser le chargement du site.
+          </div>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -202,25 +256,24 @@ function PhotoSlot({
         <label className="aspect-square rounded-lg border-2 border-dashed border-gris-ligne hover:border-marine cursor-pointer flex flex-col items-center justify-center text-gris-texte hover:text-marine transition-colors">
           <input
             type="file"
-            accept={config_formats_accept()}
+            accept="image/jpeg,image/png,image/webp,application/pdf"
             className="hidden"
             onChange={onUpload}
             disabled={uploading}
           />
           {uploading ? (
-            <Loader2 size={22} className="animate-spin mb-2" />
+            <>
+              <Loader2 size={22} className="animate-spin mb-2" />
+              <span className="text-xs font-bold">Compression...</span>
+            </>
           ) : (
-            <Upload size={22} className="mb-2" />
+            <>
+              <Upload size={22} className="mb-2" />
+              <span className="text-xs font-bold">Choisir un fichier</span>
+            </>
           )}
-          <span className="text-xs font-bold">
-            {uploading ? 'Upload...' : 'Choisir un fichier'}
-          </span>
         </label>
       )}
     </div>
   );
-}
-
-function config_formats_accept() {
-  return 'image/jpeg,image/png,image/webp,application/pdf';
 }

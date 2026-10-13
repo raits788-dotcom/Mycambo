@@ -16,6 +16,7 @@
     "@my-cambo/utils": "workspace:*",
     "@supabase/ssr": "^0.5.2",
     "@supabase/supabase-js": "^2.47.10",
+    "browser-image-compression": "^2.0.2",
     "clsx": "2.1.1",
     "date-fns": "4.4.0",
     "lucide-react": "0.400.0",
