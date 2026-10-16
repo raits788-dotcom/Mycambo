@@ -28,6 +28,37 @@ const STATUS_LABELS: Record<string, string> = {
   suspended: 'Suspendu',
 };
 
+/**
+ * Détection intelligente de l'URL du site web public
+ * - Priorité 1 : variable d'env NEXT_PUBLIC_WEB_URL (définie sur Cloudflare)
+ * - Priorité 2 : détection auto par hostname (admin.mycambo.net → dev.mycambo.net)
+ * - Priorité 3 : GitHub Codespaces (-3001 → -3000)
+ * - Fallback : localhost
+ */
+function getWebBaseUrl(): string {
+  // 1. Variable d'env prioritaire
+  if (process.env.NEXT_PUBLIC_WEB_URL) {
+    return process.env.NEXT_PUBLIC_WEB_URL;
+  }
+
+  if (typeof window !== 'undefined') {
+    const host = window.location.hostname;
+
+    // 2. Production : admin.mycambo.net → dev.mycambo.net
+    if (host === 'admin.mycambo.net') {
+      return 'https://dev.mycambo.net';
+    }
+
+    // 3. GitHub Codespaces : -3001 → -3000
+    if (host.includes('github.dev')) {
+      return window.location.origin.replace('-3001.', '-3000.');
+    }
+  }
+
+  // 4. Fallback local
+  return 'http://localhost:3000';
+}
+
 export default function TenantDetailPage({
   params,
 }: {
@@ -44,32 +75,32 @@ export default function TenantDetailPage({
   const [approving, setApproving] = useState(false);
   const [suspending, setSuspending] = useState(false);
   const [labelCatalog, setLabelCatalog] = useState<any[]>([]);
-const [tenantLabels, setTenantLabels] = useState<any[]>([]);
-const [showLabels, setShowLabels] = useState(false);
-const [changingLevel, setChangingLevel] = useState(false);
-const [showEmailModal, setShowEmailModal] = useState(false);
-const [newEmail, setNewEmail] = useState('');
-const [savingEmail, setSavingEmail] = useState(false);
+  const [tenantLabels, setTenantLabels] = useState<any[]>([]);
+  const [showLabels, setShowLabels] = useState(false);
+  const [changingLevel, setChangingLevel] = useState(false);
+  const [showEmailModal, setShowEmailModal] = useState(false);
+  const [newEmail, setNewEmail] = useState('');
+  const [savingEmail, setSavingEmail] = useState(false);
 
-useEffect(() => {
-  (async () => {
-    const [t, b, p, s, lc, tl] = await Promise.all([
-      getTenant(id),
-      getTenantBusinesses(id),
-      getTenantPayments(id),
-      getTenantSubscription(id),
-      getLabelCatalog(),
-      getTenantLabels(id),
-    ]);
-    setTenant(t);
-    setBusinesses(b);
-    setPayments(p);
-    setSubscription(s);
-    setLabelCatalog(lc);
-    setTenantLabels(tl);
-    setLoading(false);
-  })();
-}, [id]);
+  useEffect(() => {
+    (async () => {
+      const [t, b, p, s, lc, tl] = await Promise.all([
+        getTenant(id),
+        getTenantBusinesses(id),
+        getTenantPayments(id),
+        getTenantSubscription(id),
+        getLabelCatalog(),
+        getTenantLabels(id),
+      ]);
+      setTenant(t);
+      setBusinesses(b);
+      setPayments(p);
+      setSubscription(s);
+      setLabelCatalog(lc);
+      setTenantLabels(tl);
+      setLoading(false);
+    })();
+  }, [id]);
 
   if (loading) {
     return (
@@ -99,10 +130,7 @@ useEffect(() => {
     setImpersonating(true);
     try {
       const data = await startImpersonation(tenant.id);
-      const webBaseUrl = process.env.NEXT_PUBLIC_WEB_URL
-        || (typeof window !== 'undefined' && window.location.hostname.includes('github.dev')
-          ? window.location.origin.replace('-3001.', '-3000.')
-          : 'http://localhost:3000');
+      const webBaseUrl = getWebBaseUrl();
       const tenantUrl = `${webBaseUrl}/espace-partenaire/dashboard?impersonate=${data.token}`;
       window.open(tenantUrl, '_blank');
     } catch (err) {
@@ -113,82 +141,82 @@ useEffect(() => {
   };
 
   const handleUpdateEmail = async () => {
-  if (!newEmail || newEmail === tenant.email) {
-    alert('Entrez une nouvelle adresse email différente.');
-    return;
-  }
-  if (!newEmail.includes('@')) {
-    alert('Adresse email invalide.');
-    return;
-  }
-  if (!confirm(`Changer l'email de "${tenant.name}"\n\nAncien : ${tenant.email}\nNouveau : ${newEmail}\n\nUn email d'alerte sera envoyé à l'ancienne adresse.`)) return;
+    if (!newEmail || newEmail === tenant.email) {
+      alert('Entrez une nouvelle adresse email différente.');
+      return;
+    }
+    if (!newEmail.includes('@')) {
+      alert('Adresse email invalide.');
+      return;
+    }
+    if (!confirm(`Changer l'email de "${tenant.name}"\n\nAncien : ${tenant.email}\nNouveau : ${newEmail}\n\nUn email d'alerte sera envoyé à l'ancienne adresse.`)) return;
 
-  setSavingEmail(true);
-  try {
-    await updateTenantEmail(tenant.id, newEmail);
-    setTenant({ ...tenant, email: newEmail });
-    setShowEmailModal(false);
-    setNewEmail('');
-    alert('✅ Email modifié avec succès');
-  } catch (err) {
-    alert('Erreur : ' + (err as Error).message);
-  } finally {
-    setSavingEmail(false);
-  }
-};
+    setSavingEmail(true);
+    try {
+      await updateTenantEmail(tenant.id, newEmail);
+      setTenant({ ...tenant, email: newEmail });
+      setShowEmailModal(false);
+      setNewEmail('');
+      alert('✅ Email modifié avec succès');
+    } catch (err) {
+      alert('Erreur : ' + (err as Error).message);
+    } finally {
+      setSavingEmail(false);
+    }
+  };
 
   const handleChangeLevel = async (newLevel: VerificationLevel) => {
-  if (!confirm(`Passer "${tenant.name}" au niveau ${VERIFICATION_LEVELS[newLevel].label} ?`)) return;
-  setChangingLevel(true);
-  try {
-    await changeVerificationLevel(tenant.id, newLevel);
-    const [t, h] = await Promise.all([
-      getTenant(id),
-      getVerificationHistory(id),
-    ]);
-    setTenant(t);
-  } catch (err) {
-    alert('Erreur : ' + (err as Error).message);
-  } finally {
-    setChangingLevel(false);
-  }
-};
+    if (!confirm(`Passer "${tenant.name}" au niveau ${VERIFICATION_LEVELS[newLevel].label} ?`)) return;
+    setChangingLevel(true);
+    try {
+      await changeVerificationLevel(tenant.id, newLevel);
+      const [t] = await Promise.all([
+        getTenant(id),
+        getVerificationHistory(id),
+      ]);
+      setTenant(t);
+    } catch (err) {
+      alert('Erreur : ' + (err as Error).message);
+    } finally {
+      setChangingLevel(false);
+    }
+  };
 
-const handleToggleLabel = async (labelId: string, attach: boolean) => {
-  try {
-    await toggleTenantLabel(tenant.id, labelId, attach);
-    const tl = await getTenantLabels(id);
-    setTenantLabels(tl);
-  } catch (err) {
-    alert('Erreur : ' + (err as Error).message);
-  }
-};
+  const handleToggleLabel = async (labelId: string, attach: boolean) => {
+    try {
+      await toggleTenantLabel(tenant.id, labelId, attach);
+      const tl = await getTenantLabels(id);
+      setTenantLabels(tl);
+    } catch (err) {
+      alert('Erreur : ' + (err as Error).message);
+    }
+  };
 
-const handleApprove = async () => {
-  if (!confirm(`Approuver le tenant "${tenant.name}" ?`)) return;
-  setApproving(true);
-  try {
-    await approveTenant(tenant.id);
-    setTenant({ ...tenant, status: 'active' });
-  } catch (err) {
-    alert('Erreur : ' + (err as Error).message);
-  } finally {
-    setApproving(false);
-  }
-};
+  const handleApprove = async () => {
+    if (!confirm(`Approuver le tenant "${tenant.name}" ?`)) return;
+    setApproving(true);
+    try {
+      await approveTenant(tenant.id);
+      setTenant({ ...tenant, status: 'active' });
+    } catch (err) {
+      alert('Erreur : ' + (err as Error).message);
+    } finally {
+      setApproving(false);
+    }
+  };
 
-const handleSuspend = async () => {
-  if (!confirm(`Suspendre le tenant "${tenant.name}" ?`)) return;
-  setSuspending(true);
-  try {
-    await suspendTenant(tenant.id);
-    setTenant({ ...tenant, status: 'suspended' });
-  } catch (err) {
-    alert('Erreur : ' + (err as Error).message);
-  } finally {
-    setSuspending(false);
-  }
-};
+  const handleSuspend = async () => {
+    if (!confirm(`Suspendre le tenant "${tenant.name}" ?`)) return;
+    setSuspending(true);
+    try {
+      await suspendTenant(tenant.id);
+      setTenant({ ...tenant, status: 'suspended' });
+    } catch (err) {
+      alert('Erreur : ' + (err as Error).message);
+    } finally {
+      setSuspending(false);
+    }
+  };
 
   const handleResetPassword = async () => {
     if (!confirm('Envoyer un email de réinitialisation à ' + tenant.email + ' ?')) return;
@@ -210,82 +238,82 @@ const handleSuspend = async () => {
         Retour aux tenants
       </Link>
 
-{/* ─── BLOC NIVEAU & LABELS ─── */}
-<div className="bg-white rounded-xl border border-gris-ligne p-6 mb-6 shadow-cb-sm">
-  <div className="flex items-start justify-between mb-4 flex-wrap gap-3">
-    <div>
-      <h2 className="font-bold text-marine flex items-center gap-2 mb-1">
-        <Award size={16} /> Niveau de vérification
-      </h2>
-      <p className="text-xs text-gris-texte">
-        Ce niveau détermine la visibilité et les badges affichés publiquement.
-      </p>
-    </div>
-    <div className="flex gap-1.5 flex-wrap">
-      {(Object.keys(VERIFICATION_LEVELS) as VerificationLevel[]).map((lvl) => {
-        const cfg = VERIFICATION_LEVELS[lvl];
-        const isActive = tenant.verification_level === lvl;
-        return (
-          <button
-            key={lvl}
-            onClick={() => !isActive && handleChangeLevel(lvl)}
-            disabled={changingLevel || isActive}
-            className={
-              'px-3 py-1.5 rounded-full text-[11px] font-bold transition-all ' +
-              (isActive
-                ? cfg.bg + ' ' + cfg.text + ' ring-2 ring-offset-1 ring-current cursor-default'
-                : 'bg-white border border-gris-ligne text-gris-texte hover:border-marine hover:text-marine')
-            }
-          >
-            {isActive && '✓ '}
-            {cfg.label} · {cfg.badge}
-          </button>
-        );
-      })}
-    </div>
-  </div>
+      {/* ─── BLOC NIVEAU & LABELS ─── */}
+      <div className="bg-white rounded-xl border border-gris-ligne p-6 mb-6 shadow-cb-sm">
+        <div className="flex items-start justify-between mb-4 flex-wrap gap-3">
+          <div>
+            <h2 className="font-bold text-marine flex items-center gap-2 mb-1">
+              <Award size={16} /> Niveau de vérification
+            </h2>
+            <p className="text-xs text-gris-texte">
+              Ce niveau détermine la visibilité et les badges affichés publiquement.
+            </p>
+          </div>
+          <div className="flex gap-1.5 flex-wrap">
+            {(Object.keys(VERIFICATION_LEVELS) as VerificationLevel[]).map((lvl) => {
+              const cfg = VERIFICATION_LEVELS[lvl];
+              const isActive = tenant.verification_level === lvl;
+              return (
+                <button
+                  key={lvl}
+                  onClick={() => !isActive && handleChangeLevel(lvl)}
+                  disabled={changingLevel || isActive}
+                  className={
+                    'px-3 py-1.5 rounded-full text-[11px] font-bold transition-all ' +
+                    (isActive
+                      ? cfg.bg + ' ' + cfg.text + ' ring-2 ring-offset-1 ring-current cursor-default'
+                      : 'bg-white border border-gris-ligne text-gris-texte hover:border-marine hover:text-marine')
+                  }
+                >
+                  {isActive && '✓ '}
+                  {cfg.label} · {cfg.badge}
+                </button>
+              );
+            })}
+          </div>
+        </div>
 
-  {/* Labels */}
-  <div className="pt-4 border-t border-gris-ligne">
-    <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
-      <div>
-        <h3 className="font-bold text-marine text-sm">Sous-labels attribués</h3>
-        <p className="text-xs text-gris-texte">
-          {tenantLabels.length} label{tenantLabels.length > 1 ? 's' : ''} actif{tenantLabels.length > 1 ? 's' : ''}
-        </p>
-      </div>
-      <button
-        onClick={() => setShowLabels(true)}
-        className="flex items-center gap-2 text-xs font-bold text-marine bg-marine/10 hover:bg-marine/20 px-3 py-1.5 rounded-full"
-      >
-        <Plus size={12} /> Gérer les labels
-      </button>
-    </div>
-
-    {tenantLabels.length === 0 ? (
-      <div className="text-xs text-gris-doux italic">Aucun label attribué.</div>
-    ) : (
-      <div className="flex flex-wrap gap-2">
-        {tenantLabels.map((tl) => (
-          <span
-            key={tl.id}
-            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold text-white"
-            style={{ backgroundColor: tl.label?.color || '#1B3A6B' }}
-          >
-            {tl.label?.icon} {tl.label?.name}
+        {/* Labels */}
+        <div className="pt-4 border-t border-gris-ligne">
+          <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+            <div>
+              <h3 className="font-bold text-marine text-sm">Sous-labels attribués</h3>
+              <p className="text-xs text-gris-texte">
+                {tenantLabels.length} label{tenantLabels.length > 1 ? 's' : ''} actif{tenantLabels.length > 1 ? 's' : ''}
+              </p>
+            </div>
             <button
-              onClick={() => handleToggleLabel(tl.label_id, false)}
-              className="ml-1 hover:opacity-70"
-              title="Retirer"
+              onClick={() => setShowLabels(true)}
+              className="flex items-center gap-2 text-xs font-bold text-marine bg-marine/10 hover:bg-marine/20 px-3 py-1.5 rounded-full"
             >
-              <X size={10} />
+              <Plus size={12} /> Gérer les labels
             </button>
-          </span>
-        ))}
+          </div>
+
+          {tenantLabels.length === 0 ? (
+            <div className="text-xs text-gris-doux italic">Aucun label attribué.</div>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {tenantLabels.map((tl) => (
+                <span
+                  key={tl.id}
+                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold text-white"
+                  style={{ backgroundColor: tl.label?.color || '#1B3A6B' }}
+                >
+                  {tl.label?.icon} {tl.label?.name}
+                  <button
+                    onClick={() => handleToggleLabel(tl.label_id, false)}
+                    className="ml-1 hover:opacity-70"
+                    title="Retirer"
+                  >
+                    <X size={10} />
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
-    )}
-  </div>
-</div>
 
       <div className="bg-white rounded-xl border border-gris-ligne p-6 mb-6 shadow-cb-sm">
         <div className="flex items-start justify-between gap-4 flex-wrap">
@@ -310,66 +338,66 @@ const handleSuspend = async () => {
               </div>
             </div>
           </div>
-<div className="flex gap-2 flex-wrap">
-  {tenant.status === 'pending' && (
-    <button
-      onClick={handleApprove}
-      disabled={approving}
-      className="flex items-center gap-2 bg-green-600 text-white font-bold text-sm px-4 py-2.5 rounded-full hover:bg-green-700 disabled:opacity-50"
-    >
-      <CheckCircle2 size={14} />
-      {approving ? 'Approbation...' : 'Approuver'}
-    </button>
-  )}
+          <div className="flex gap-2 flex-wrap">
+            {tenant.status === 'pending' && (
+              <button
+                onClick={handleApprove}
+                disabled={approving}
+                className="flex items-center gap-2 bg-green-600 text-white font-bold text-sm px-4 py-2.5 rounded-full hover:bg-green-700 disabled:opacity-50"
+              >
+                <CheckCircle2 size={14} />
+                {approving ? 'Approbation...' : 'Approuver'}
+              </button>
+            )}
 
-  {tenant.status === 'active' && (
-    <button
-      onClick={handleSuspend}
-      disabled={suspending}
-      className="flex items-center gap-2 border border-orange-200 text-orange-600 font-bold text-sm px-4 py-2.5 rounded-full hover:bg-orange-50 disabled:opacity-50"
-    >
-      <XCircle size={14} />
-      {suspending ? 'Suspension...' : 'Suspendre'}
-    </button>
-  )}
+            {tenant.status === 'active' && (
+              <button
+                onClick={handleSuspend}
+                disabled={suspending}
+                className="flex items-center gap-2 border border-orange-200 text-orange-600 font-bold text-sm px-4 py-2.5 rounded-full hover:bg-orange-50 disabled:opacity-50"
+              >
+                <XCircle size={14} />
+                {suspending ? 'Suspension...' : 'Suspendre'}
+              </button>
+            )}
 
-  {tenant.status === 'suspended' && (
-    <button
-      onClick={handleApprove}
-      disabled={approving}
-      className="flex items-center gap-2 bg-green-600 text-white font-bold text-sm px-4 py-2.5 rounded-full hover:bg-green-700 disabled:opacity-50"
-    >
-      <CheckCircle2 size={14} />
-      {approving ? 'Réactivation...' : 'Réactiver'}
-    </button>
-  )}
+            {tenant.status === 'suspended' && (
+              <button
+                onClick={handleApprove}
+                disabled={approving}
+                className="flex items-center gap-2 bg-green-600 text-white font-bold text-sm px-4 py-2.5 rounded-full hover:bg-green-700 disabled:opacity-50"
+              >
+                <CheckCircle2 size={14} />
+                {approving ? 'Réactivation...' : 'Réactiver'}
+              </button>
+            )}
 
-  <button
-    onClick={handleImpersonate}
-    disabled={impersonating}
-    className="flex items-center gap-2 bg-purple-600 text-white font-bold text-sm px-4 py-2.5 rounded-full hover:bg-purple-700 disabled:opacity-50"
-  >
-    <Shield size={14} />
-    {impersonating ? 'Ouverture...' : 'Entrer dans le tenant'}
-  </button>
+            <button
+              onClick={handleImpersonate}
+              disabled={impersonating}
+              className="flex items-center gap-2 bg-purple-600 text-white font-bold text-sm px-4 py-2.5 rounded-full hover:bg-purple-700 disabled:opacity-50"
+            >
+              <Shield size={14} />
+              {impersonating ? 'Ouverture...' : 'Entrer dans le tenant'}
+            </button>
 
-  <button
-    onClick={handleResetPassword}
-    disabled={resetting}
-    className="flex items-center gap-2 border border-gris-ligne text-marine font-bold text-sm px-4 py-2.5 rounded-full hover:border-marine disabled:opacity-50"
-  >
-    <KeyRound size={14} />
-    {resetting ? 'Envoi...' : 'Reset MDP admin'}
-  </button>
-          <button
-            onClick={() => { setNewEmail(tenant.email); setShowEmailModal(true); }}
-            className="flex items-center gap-2 border border-gris-ligne text-marine font-bold text-sm px-4 py-2.5 rounded-full hover:border-marine"
-          >
-            <Pencil size={14} />
-            Modifier l&apos;email
-          </button>
+            <button
+              onClick={handleResetPassword}
+              disabled={resetting}
+              className="flex items-center gap-2 border border-gris-ligne text-marine font-bold text-sm px-4 py-2.5 rounded-full hover:border-marine disabled:opacity-50"
+            >
+              <KeyRound size={14} />
+              {resetting ? 'Envoi...' : 'Reset MDP admin'}
+            </button>
 
-</div>
+            <button
+              onClick={() => { setNewEmail(tenant.email); setShowEmailModal(true); }}
+              className="flex items-center gap-2 border border-gris-ligne text-marine font-bold text-sm px-4 py-2.5 rounded-full hover:border-marine"
+            >
+              <Pencil size={14} />
+              Modifier l&apos;email
+            </button>
+          </div>
         </div>
       </div>
 
@@ -518,55 +546,56 @@ const handleSuspend = async () => {
         </table>
       </div>
 
-{/* ─── MODALE GESTION LABELS ─── */}
-{showLabels && (
-  <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-    <div className="bg-white rounded-2xl max-w-lg w-full p-6 max-h-[80vh] overflow-y-auto">
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-extrabold text-marine">Gérer les labels</h2>
-        <button
-          onClick={() => setShowLabels(false)}
-          className="w-8 h-8 rounded-lg hover:bg-gris-fond flex items-center justify-center"
-        >
-          <X size={16} />
-        </button>
-      </div>
+      {/* ─── MODALE GESTION LABELS ─── */}
+      {showLabels && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 max-h-[80vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-extrabold text-marine">Gérer les labels</h2>
+              <button
+                onClick={() => setShowLabels(false)}
+                className="w-8 h-8 rounded-lg hover:bg-gris-fond flex items-center justify-center"
+              >
+                <X size={16} />
+              </button>
+            </div>
 
-      <div className="space-y-2">
-        {labelCatalog.map((label) => {
-          const isAttached = tenantLabels.some((tl) => tl.label_id === label.id);
-          return (
-            <label
-              key={label.id}
-              className="flex items-center gap-3 p-3 rounded-lg border border-gris-ligne hover:bg-gris-fond/50 cursor-pointer"
-            >
-              <input
-                type="checkbox"
-                checked={isAttached}
-                onChange={(e) => handleToggleLabel(label.id, e.target.checked)}
-              />
-              <span
-                className="w-3 h-3 rounded-full flex-shrink-0"
-                style={{ backgroundColor: label.color }}
-              />
-              <div className="flex-1">
-                <div className="font-bold text-sm text-marine">
-                  {label.icon} {label.name}
-                </div>
-                {label.description && (
-                  <div className="text-xs text-gris-texte">{label.description}</div>
-                )}
-              </div>
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-gris-fond text-gris-texte">
-                {label.category}
-              </span>
-            </label>
-          );
-        })}
-      </div>
-    </div>
-  </div>
-)}
+            <div className="space-y-2">
+              {labelCatalog.map((label) => {
+                const isAttached = tenantLabels.some((tl) => tl.label_id === label.id);
+                return (
+                  <label
+                    key={label.id}
+                    className="flex items-center gap-3 p-3 rounded-lg border border-gris-ligne hover:bg-gris-fond/50 cursor-pointer"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={isAttached}
+                      onChange={(e) => handleToggleLabel(label.id, e.target.checked)}
+                    />
+                    <span
+                      className="w-3 h-3 rounded-full flex-shrink-0"
+                      style={{ backgroundColor: label.color }}
+                    />
+                    <div className="flex-1">
+                      <div className="font-bold text-sm text-marine">
+                        {label.icon} {label.name}
+                      </div>
+                      {label.description && (
+                        <div className="text-xs text-gris-texte">{label.description}</div>
+                      )}
+                    </div>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-gris-fond text-gris-texte">
+                      {label.category}
+                    </span>
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* MODALE CHANGEMENT EMAIL */}
       {showEmailModal && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
