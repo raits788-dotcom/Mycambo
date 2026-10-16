@@ -59,6 +59,7 @@ export default function GererEtablissementPage() {
   }
 
   const statusConfig = getStatusConfig(establishment.status as EstablishmentStatus);
+  const isPublished = establishment.status === 'approved';
 
   return (
     <>
@@ -150,9 +151,12 @@ export default function GererEtablissementPage() {
 
       {showDeleteModal && (
         <DeleteEstablishmentModal
-          establishment={establishment}
+          establishmentSlug={establishment.slug}
+          establishmentName={establishment.name}
+          establishmentStatus={establishment.status}
+          isPublished={isPublished}
           onClose={() => setShowDeleteModal(false)}
-          onDeleted={() => {
+          onConfirmed={() => {
             window.location.href = '/espace-partenaire/etablissements';
           }}
         />

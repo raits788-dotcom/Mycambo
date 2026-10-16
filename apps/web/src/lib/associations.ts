@@ -26,6 +26,65 @@ export interface AssociationAction {
   status: 'actif' | 'termine' | 'prevu';
 }
 
+export interface AssociationTeamMember {
+  id: string;
+  name: string;
+  role: 'bureau' | 'terrain' | 'benevole' | string;
+  position?: string;
+  photo?: string;
+  bio?: string;
+}
+
+export interface AssociationPhoto {
+  id: string;
+  url: string;
+  caption?: string;
+}
+
+export interface AssociationValue {
+  id: string;
+  icon: string;
+  title: string;
+  description: string;
+}
+
+export interface Review {
+  id: string;
+  business_id?: string;
+  author_name: string;
+  author_initial: string;
+  author_email?: string | null;
+  rating: number;
+  title: string | null;
+  content: string;
+  visit_type: string | null;
+  org_response: string | null;
+  org_response_at?: string | null;
+  status: 'pending' | 'published' | 'rejected';
+  created_at: string;
+  updated_at?: string;
+}
+
+export interface AssociationEnriched {
+  founded_year?: number;
+  stats?: {
+    views: number;
+    supports: number;
+  };
+  donation_link?: DonationLink;
+  values?: AssociationValue[];
+  actions?: AssociationAction[];
+  team?: AssociationTeamMember[];
+  photos?: string[];
+  photos_limit?: number;
+}
+
+export interface RatingStats {
+  average: number;
+  total: number;
+  distribution: { stars: number; count: number }[];
+}
+
 // ═══════════════════════════════════════════════════════════
 // SOUMISSION DE MESSAGES (contact, don, bénévolat, contribution)
 // ═══════════════════════════════════════════════════════════
@@ -173,86 +232,22 @@ export async function submitVolunteer(payload: {
 // STUB — incrementSupports (à brancher sur stats plus tard)
 // ═══════════════════════════════════════════════════════════
 export function incrementSupports(_slug: string): number {
-  // TODO: brancher sur la table stats
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new Event('stats-updated'));
   }
   return 0;
 }
+
 // ═══════════════════════════════════════════════════════════
-// TYPES COMPLÉMENTAIRES
+// AVIS
 // ═══════════════════════════════════════════════════════════
-
-export interface AssociationTeamMember {
-  id: string;
-  name: string;
-  role: 'bureau' | 'terrain' | 'benevole' | string;
-  position?: string;
-  photo?: string;
-  bio?: string;
-}
-
-export interface AssociationPhoto {
-  id: string;
-  url: string;
-  caption?: string;
-}
-
-export interface AssociationValue {
-  id: string;
-  icon: string;
-  title: string;
-  description: string;
-}
-
-export interface Review {
-  id: string;
-  business_id?: string;
-  author_name: string;
-  author_initial: string;
-  author_email?: string | null;
-  rating: number;
-  title: string | null;
-  content: string;
-  visit_type: string | null;
-  org_response: string | null;
-  org_response_at?: string | null;
-  status: 'pending' | 'published' | 'rejected';
-  created_at: string;
-  updated_at?: string;
-}
-// ═══════════════════════════════════════════════════════════
-// ENRICHISSEMENT ASSOCIATION
-// ═══════════════════════════════════════════════════════════
-
-export interface AssociationEnriched {
-  founded_year?: number;
-  stats?: {
-    views: number;
-    supports: number;
-  };
-  donation_link?: DonationLink;
-  values?: AssociationValue[];
-  actions?: AssociationAction[];
-  team?: AssociationTeamMember[];
-  photos?: string[];
-  photos_limit?: number;
-}
-
-export interface RatingStats {
-  average: number;
-  total: number;
-  distribution: { stars: number; count: number }[];
-}
 
 export async function getReviewsForAssociation(businessIdOrSlug: string): Promise<Review[]> {
   const supabaseClient = supabase();
 
-  // Récupère l'ID du business à partir du slug (ou utilise directement l'ID)
   let businessId = businessIdOrSlug;
 
   if (businessIdOrSlug.includes('-') && businessIdOrSlug.length < 40) {
-    // C'est probablement un slug
     const { data: business } = await supabaseClient
       .from('businesses')
       .select('id')
@@ -275,10 +270,19 @@ export async function getReviewsForAssociation(businessIdOrSlug: string): Promis
 
   return (data || []).map((r: any) => ({
     id: r.id,
-    author: r.author_name,
+    business_id: r.business_id,
+    author_name: r.author_name || 'Anonyme',
+    author_initial: r.author_initial || (r.author_name || 'A').charAt(0).toUpperCase(),
+    author_email: r.author_email || null,
     rating: r.rating,
-    text: r.text || '',
-    date: new Date(r.created_at).toLocaleDateString('fr-FR'),
+    title: r.title || null,
+    content: r.content || r.text || '',
+    visit_type: r.visit_type || null,
+    org_response: r.org_response || null,
+    org_response_at: r.org_response_at || null,
+    status: r.status || 'published',
+    created_at: r.created_at,
+    updated_at: r.updated_at,
   }));
 }
 

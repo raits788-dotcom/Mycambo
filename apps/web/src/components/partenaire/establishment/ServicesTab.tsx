@@ -146,11 +146,24 @@ const SERVICES_BY_TYPE: Record<string, Service[]> = {
   ],
 };
 
+// Mapping du nom de catégorie vers la clé de SERVICES_BY_TYPE
+function getServiceTypeFromCategory(categoryName?: string | null): string {
+  if (!categoryName) return '';
+  const lower = categoryName.toLowerCase();
+  if (lower.includes('association')) return 'association';
+  if (lower.includes('hôtel') || lower.includes('hotel')) return 'hotel';
+  if (lower.includes('restaurant')) return 'restaurant';
+  if (lower.includes('activité') || lower.includes('activite')) return 'activite';
+  if (lower.includes('boutique') || lower.includes('shop')) return 'boutique';
+  return '';
+}
+
 export default function ServicesTab({
   establishment,
   onUpdate,
 }: ServicesTabProps) {
-  const services = SERVICES_BY_TYPE[establishment.type] || [];
+  const serviceType = getServiceTypeFromCategory(establishment.categories?.name);
+  const services = SERVICES_BY_TYPE[serviceType] || [];
 
   const [active, setActive] = useState<Record<string, boolean>>(() => {
     const initial: Record<string, boolean> = {};
@@ -167,7 +180,7 @@ export default function ServicesTab({
   };
 
   const handleSave = () => {
-    updateEstablishment(establishment.slug, {
+    updateEstablishment(establishment.id, {
       // @ts-ignore
       services: active,
     });

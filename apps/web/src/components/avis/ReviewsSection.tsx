@@ -67,10 +67,10 @@ export default function ReviewsSection({
 
             {/* Distribution */}
             <div className="space-y-1.5">
-              {stats.distribution.map((count, i) => {
+              {stats.distribution.map((item, i) => {
                 const star = 5 - i;
                 const percent =
-                  stats.total > 0 ? (count / stats.total) * 100 : 0;
+                  stats.total > 0 ? (item.count / stats.total) * 100 : 0;
                 return (
                   <div key={star} className="flex items-center gap-3">
                     <span className="text-xs font-bold text-marine w-6">
@@ -83,7 +83,7 @@ export default function ReviewsSection({
                       />
                     </div>
                     <span className="text-xs text-gris-doux w-8 text-right">
-                      {count}
+                      {item.count}
                     </span>
                   </div>
                 );
