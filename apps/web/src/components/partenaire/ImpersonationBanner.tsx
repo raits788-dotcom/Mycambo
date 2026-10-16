@@ -4,6 +4,28 @@ import { useEffect, useState } from 'react';
 import { Shield, X } from 'lucide-react';
 import { clearImpersonation } from '@/lib/impersonation';
 
+function getAdminBaseUrl(): string {
+  if (process.env.NEXT_PUBLIC_ADMIN_URL) {
+    return process.env.NEXT_PUBLIC_ADMIN_URL;
+  }
+
+  if (typeof window !== 'undefined') {
+    const host = window.location.hostname;
+
+    // Production : dev.mycambo.net → admin.mycambo.net
+    if (host === 'dev.mycambo.net' || host === 'mycambo.net') {
+      return 'https://admin.mycambo.net';
+    }
+
+    // GitHub Codespaces : -3000 → -3001
+    if (host.includes('github.dev')) {
+      return window.location.origin.replace('-3000.', '-3001.');
+    }
+  }
+
+  return 'http://localhost:3001';
+}
+
 export default function ImpersonationBanner() {
   const [visible, setVisible] = useState(false);
   const [tenantName, setTenantName] = useState('');
@@ -12,7 +34,6 @@ export default function ImpersonationBanner() {
     const token = sessionStorage.getItem('mycambo_impersonate_token');
     if (!token) return;
 
-    // Récupère le nom du tenant pour l'afficher
     (async () => {
       const { createBrowserClient } = await import('@supabase/ssr');
       const supabase = createBrowserClient(
@@ -35,10 +56,7 @@ export default function ImpersonationBanner() {
 
   const handleQuit = () => {
     clearImpersonation();
-    const adminUrl = process.env.NEXT_PUBLIC_ADMIN_URL
-      || (typeof window !== 'undefined' && window.location.hostname.includes('github.dev')
-        ? window.location.origin.replace('-3000.', '-3001.')
-        : 'http://localhost:3001');
+    const adminUrl = getAdminBaseUrl();
     window.location.href = `${adminUrl}/tenants`;
   };
 
