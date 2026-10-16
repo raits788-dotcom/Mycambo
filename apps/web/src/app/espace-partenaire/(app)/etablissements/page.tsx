@@ -2,9 +2,18 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Plus, Store, Eye, Heart, Star, Loader2, MapPin } from 'lucide-react';
+import { Plus, Store, Eye, Heart, Star, Loader2, MapPin, CreditCard } from 'lucide-react';
 import { createBrowserClient } from '@supabase/ssr';
 import { useCurrentTenant } from '@/lib/use-current-tenant';
+
+const PLAN_COLORS: Record<string, string> = {
+  Découverte: 'bg-gris-fond text-gris-texte',
+  Essentiel: 'bg-blue-100 text-blue-700',
+  Pro: 'bg-purple-100 text-purple-700',
+  Business: 'bg-orange-100 text-orange-700',
+  Entreprise: 'bg-red-100 text-red-700',
+  Association: 'bg-green-100 text-green-700',
+};
 
 export default function EstablishmentsPage() {
   const { tenant, loading: tenantLoading } = useCurrentTenant();
@@ -22,7 +31,7 @@ export default function EstablishmentsPage() {
 
       const { data, error } = await supabase
         .from('businesses')
-        .select('*, categories(name, icon)')
+        .select('*, categories(name, icon), plans(name, slug, price_monthly)')
         .eq('tenant_id', tenant.id)
         .order('created_at', { ascending: false });
 
@@ -82,76 +91,94 @@ export default function EstablishmentsPage() {
         </div>
       ) : (
         <div className="space-y-4">
-          {businesses.map((b) => (
-            <div
-              key={b.id}
-              className="bg-white rounded-xl border border-gris-ligne p-5 flex flex-wrap items-center gap-4 shadow-cb-sm"
-            >
-              <div className="w-14 h-14 rounded-xl bg-marine/10 text-marine flex items-center justify-center flex-shrink-0">
-                <Store size={22} />
-              </div>
+          {businesses.map((b) => {
+            const planName = b.plans?.name || 'Découverte';
+            const planColor = PLAN_COLORS[planName] || 'bg-gris-fond text-gris-texte';
+            const planPrice = b.plans?.price_monthly || 0;
 
-              <div className="flex-1 min-w-[200px]">
-                <div className="flex items-center gap-2 flex-wrap mb-1">
-                  <h3 className="font-bold text-marine">{b.name}</h3>
-                  <span
-                    className={
-                      'inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold ' +
-                      (b.status === 'approved'
-                        ? 'bg-green-100 text-green-700'
+            return (
+              <div
+                key={b.id}
+                className="bg-white rounded-xl border border-gris-ligne p-5 flex flex-wrap items-center gap-4 shadow-cb-sm"
+              >
+                <div className="w-14 h-14 rounded-xl bg-marine/10 text-marine flex items-center justify-center flex-shrink-0">
+                  <Store size={22} />
+                </div>
+
+                <div className="flex-1 min-w-[200px]">
+                  <div className="flex items-center gap-2 flex-wrap mb-1">
+                    <h3 className="font-bold text-marine">{b.name}</h3>
+                    <span
+                      className={
+                        'inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold ' +
+                        (b.status === 'approved'
+                          ? 'bg-green-100 text-green-700'
+                          : b.status === 'pending'
+                          ? 'bg-orange-100 text-orange-700'
+                          : 'bg-red-100 text-red-700')
+                      }
+                    >
+                      {b.status === 'approved'
+                        ? 'Publié'
                         : b.status === 'pending'
-                        ? 'bg-orange-100 text-orange-700'
-                        : 'bg-red-100 text-red-700')
-                    }
-                  >
-                    {b.status === 'approved'
-                      ? 'Publié'
-                      : b.status === 'pending'
-                      ? 'En attente'
-                      : 'Suspendu'}
+                        ? 'En attente'
+                        : 'Suspendu'}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-3 flex-wrap text-xs text-gris-texte">
+                    {b.categories?.name && <span>{b.categories.name}</span>}
+                    {b.city && (
+                      <span className="flex items-center gap-1">
+                        <MapPin size={11} />
+                        {b.city}
+                      </span>
+                    )}
+                    {/* ▼▼▼ FORMULE DE L'ÉTABLISSEMENT ▼▼▼ */}
+                    <span className="flex items-center gap-1.5">
+                      <CreditCard size={11} />
+                      <span className={'inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold ' + planColor}>
+                        {planName}
+                      </span>
+                      {planPrice > 0 && (
+                        <span className="text-gris-doux">{planPrice} $/mois</span>
+                      )}
+                    </span>
+                    {/* ▲▲▲ FIN FORMULE ▲▲▲ */}
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-4 text-xs text-gris-texte">
+                  <span className="flex items-center gap-1">
+                    <Eye size={12} /> 0
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <Heart size={12} /> 0
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <Star size={12} /> —
                   </span>
                 </div>
-                <div className="flex items-center gap-3 flex-wrap text-xs text-gris-texte">
-                  {b.categories?.name && <span>{b.categories.name}</span>}
-                  {b.city && (
-                    <span className="flex items-center gap-1">
-                      <MapPin size={11} />
-                      {b.city}
-                    </span>
-                  )}
+
+                <div className="flex items-center gap-2">
+                  <Link
+                    href={`/espace-partenaire/etablissements/${b.slug}`}
+                    className="text-xs font-bold bg-marine text-white px-4 py-2 rounded-full hover:bg-marine-dark"
+                  >
+                    Gérer
+                  </Link>
+                  <a
+                    href={`/commerce/${b.slug}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs font-bold border border-gris-ligne text-marine px-4 py-2 rounded-full hover:border-marine"
+                  >
+                    Voir public ↗
+                  </a>
                 </div>
               </div>
-
-              <div className="flex items-center gap-4 text-xs text-gris-texte">
-                <span className="flex items-center gap-1">
-                  <Eye size={12} /> 0
-                </span>
-                <span className="flex items-center gap-1">
-                  <Heart size={12} /> 0
-                </span>
-                <span className="flex items-center gap-1">
-                  <Star size={12} /> —
-                </span>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <Link
-                  href={`/espace-partenaire/etablissements/${b.slug}`}
-                  className="text-xs font-bold bg-marine text-white px-4 py-2 rounded-full hover:bg-marine-dark"
-                >
-                  Gérer
-                </Link>
-                <a
-                  href={`/commerce/${b.slug}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-xs font-bold border border-gris-ligne text-marine px-4 py-2 rounded-full hover:border-marine"
-                >
-                  Voir public ↗
-                </a>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </>

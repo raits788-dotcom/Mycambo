@@ -28,34 +28,28 @@ const STATUS_LABELS: Record<string, string> = {
   suspended: 'Suspendu',
 };
 
-/**
- * Détection intelligente de l'URL du site web public
- * - Priorité 1 : variable d'env NEXT_PUBLIC_WEB_URL (définie sur Cloudflare)
- * - Priorité 2 : détection auto par hostname (admin.mycambo.net → dev.mycambo.net)
- * - Priorité 3 : GitHub Codespaces (-3001 → -3000)
- * - Fallback : localhost
- */
+const PLAN_COLORS: Record<string, string> = {
+  Découverte: 'bg-gris-fond text-gris-texte',
+  Essentiel: 'bg-blue-100 text-blue-700',
+  Pro: 'bg-purple-100 text-purple-700',
+  Business: 'bg-orange-100 text-orange-700',
+  Entreprise: 'bg-red-100 text-red-700',
+  Association: 'bg-green-100 text-green-700',
+};
+
 function getWebBaseUrl(): string {
-  // 1. Variable d'env prioritaire
   if (process.env.NEXT_PUBLIC_WEB_URL) {
     return process.env.NEXT_PUBLIC_WEB_URL;
   }
-
   if (typeof window !== 'undefined') {
     const host = window.location.hostname;
-
-    // 2. Production : admin.mycambo.net → dev.mycambo.net
     if (host === 'admin.mycambo.net') {
       return 'https://dev.mycambo.net';
     }
-
-    // 3. GitHub Codespaces : -3001 → -3000
     if (host.includes('github.dev')) {
       return window.location.origin.replace('-3001.', '-3000.');
     }
   }
-
-  // 4. Fallback local
   return 'http://localhost:3000';
 }
 
@@ -125,6 +119,11 @@ export default function TenantDetailPage({
   const totalPaid = payments
     .filter((p) => p.status === 'paid')
     .reduce((s, p) => s + Number(p.amount), 0);
+
+  // Calcule le total des abonnements des établissements
+  const totalMonthly = businesses
+    .filter((b) => b.status === 'approved')
+    .reduce((sum, b) => sum + Number(b.plans?.price_monthly || 0), 0);
 
   const handleImpersonate = async () => {
     setImpersonating(true);
@@ -401,38 +400,29 @@ export default function TenantDetailPage({
         </div>
       </div>
 
+      {/* ─── CARTES D'INFOS ─── */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 mb-6">
         <div className="bg-white rounded-xl border border-gris-ligne p-6 shadow-cb-sm">
           <div className="flex items-center gap-2 mb-4">
             <CreditCard size={16} className="text-marine" />
-            <h2 className="font-bold text-marine">Abonnement en cours</h2>
+            <h2 className="font-bold text-marine">Revenu mensuel</h2>
           </div>
-          {subscription ? (
-            <div className="space-y-3 text-sm">
-              <div className="flex justify-between">
-                <span className="text-gris-texte">Formule</span>
-                <span className="font-bold text-marine">{subscription.plans?.name || '—'}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gris-texte">Prix mensuel</span>
-                <span className="font-bold text-marine">{subscription.plans?.price_monthly || 0} $</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gris-texte">Prochaine échéance</span>
-                <span className="font-bold text-marine">
-                  {new Date(subscription.current_period_end).toLocaleDateString('fr-FR')}
-                </span>
-              </div>
-              <div className="pt-3 mt-3 border-t border-gris-ligne">
-                <div className="text-xs text-gris-texte mb-2">
-                  Total encaissé ({payments.filter((p) => p.status === 'paid').length} paiements)
-                </div>
-                <div className="text-2xl font-extrabold text-marine">{totalPaid} $</div>
-              </div>
+          <div className="space-y-3 text-sm">
+            <div className="flex justify-between">
+              <span className="text-gris-texte">Établissements actifs</span>
+              <span className="font-bold text-marine">{businesses.filter((b) => b.status === 'approved').length}</span>
             </div>
-          ) : (
-            <p className="text-sm text-gris-texte">Aucun abonnement.</p>
-          )}
+            <div className="flex justify-between">
+              <span className="text-gris-texte">Total mensuel</span>
+              <span className="font-bold text-marine">{totalMonthly} $</span>
+            </div>
+            <div className="pt-3 mt-3 border-t border-gris-ligne">
+              <div className="text-xs text-gris-texte mb-2">
+                Total encaissé ({payments.filter((p) => p.status === 'paid').length} paiements)
+              </div>
+              <div className="text-2xl font-extrabold text-marine">{totalPaid} $</div>
+            </div>
+          </div>
         </div>
 
         <div className="bg-white rounded-xl border border-gris-ligne p-6 shadow-cb-sm">
@@ -473,25 +463,39 @@ export default function TenantDetailPage({
         </div>
       </div>
 
+      {/* ─── TABLEAU ÉTABLISSEMENTS + FORMULES ─── */}
       <div className="bg-white rounded-xl border border-gris-ligne mb-6 overflow-hidden shadow-cb-sm">
-        <div className="px-6 py-4 border-b border-gris-ligne">
-          <h2 className="font-bold text-marine">Établissements liés</h2>
+        <div className="px-6 py-4 border-b border-gris-ligne flex items-center justify-between flex-wrap gap-2">
+          <h2 className="font-bold text-marine">Établissements et formules</h2>
+          <span className="text-xs text-gris-texte">
+            {businesses.length} établissement{businesses.length > 1 ? 's' : ''} · {totalMonthly} $/mois
+          </span>
         </div>
         <table className="w-full text-sm">
           <thead className="bg-gris-fond text-gris-texte text-xs uppercase tracking-wider">
             <tr>
               <th className="text-left px-6 py-3 font-bold">Nom</th>
               <th className="text-left px-3 py-3 font-bold">Catégorie</th>
+              <th className="text-left px-3 py-3 font-bold">Formule</th>
+              <th className="text-left px-3 py-3 font-bold">Prix / mois</th>
               <th className="text-left px-3 py-3 font-bold">Statut</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gris-ligne">
             {businesses.length === 0 ? (
-              <tr><td colSpan={3} className="text-center py-8 text-gris-texte">Aucun établissement.</td></tr>
+              <tr><td colSpan={5} className="text-center py-8 text-gris-texte">Aucun établissement.</td></tr>
             ) : businesses.map((b) => (
               <tr key={b.id} className="hover:bg-gris-fond/50">
                 <td className="px-6 py-4 font-medium text-marine">{b.name}</td>
                 <td className="px-3 py-4 text-gris-texte">{b.categories?.name || '—'}</td>
+                <td className="px-3 py-4">
+                  <span className={'inline-flex px-2 py-0.5 rounded-full text-[11px] font-bold ' + (PLAN_COLORS[b.plans?.name || ''] || 'bg-gris-fond text-gris-texte')}>
+                    {b.plans?.name || 'Découverte'}
+                  </span>
+                </td>
+                <td className="px-3 py-4 text-marine font-bold">
+                  {b.plans?.price_monthly ? `${b.plans.price_monthly} $` : 'Gratuit'}
+                </td>
                 <td className="px-3 py-4">
                   <span className={'inline-flex px-2 py-0.5 rounded-full text-[11px] font-bold ' + (STATUS_STYLES[b.status] || '')}>
                     {b.status === 'approved' ? 'Publié' : b.status === 'pending' ? 'En attente' : 'Suspendu'}
@@ -503,6 +507,7 @@ export default function TenantDetailPage({
         </table>
       </div>
 
+      {/* ─── HISTORIQUE DES PAIEMENTS ─── */}
       <div className="bg-white rounded-xl border border-gris-ligne overflow-hidden shadow-cb-sm">
         <div className="px-6 py-4 border-b border-gris-ligne">
           <h2 className="font-bold text-marine">Historique des paiements</h2>

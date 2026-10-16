@@ -29,7 +29,7 @@ export async function getTenantBusinesses(tenantId: string) {
   const supabase = getSupabase();
   const { data, error } = await supabase
     .from('businesses')
-    .select('*, categories(name, color)')
+    .select('*, categories(name, color), plans(name, slug, price_monthly)')
     .eq('tenant_id', tenantId)
     .order('created_at', { ascending: false });
   if (error) { console.error('getTenantBusinesses error:', error); return []; }
@@ -67,7 +67,7 @@ export async function getBusinesses() {
   const supabase = getSupabase();
   const { data, error } = await supabase
     .from('businesses')
-    .select('*, categories(name, color), tenants(name)')
+    .select('*, categories(name, color), tenants(name), plans(name)')
     .order('created_at', { ascending: false });
   if (error) { console.error('getBusinesses error:', error); return []; }
   return data || [];
@@ -128,8 +128,14 @@ export async function getPayments() {
 export async function getCategories() {
   const supabase = getSupabase();
   const { data, error } = await supabase
-    .from('categories').select('*').order('position', { ascending: true });
-  if (error) { console.error('getCategories error:', error); return []; }
+    .from('categories')
+    .select('*')
+    .eq('is_active', true)
+    .order('position', { ascending: true });
+  if (error) {
+    console.error('getCategories error:', error);
+    return [];
+  }
   return data || [];
 }
 
@@ -314,8 +320,14 @@ export async function resetTenantAdminPassword(tenantId: string) {
 // TENANTS CRUD
 // ============================================================================
 export async function createTenant(payload: {
-  name: string; email: string; phone?: string;
-  city?: string; address?: string; plan_id?: string;
+  name: string;
+  email: string;
+  phone?: string;
+  city?: string;
+  address?: string;
+  description?: string;
+  structure_type?: string;
+  plan_id?: string;
 }) {
   const supabase = getSupabase();
   const { data, error } = await supabase.rpc('admin_create_tenant', {
@@ -324,6 +336,8 @@ export async function createTenant(payload: {
     p_phone: payload.phone || null,
     p_city: payload.city || null,
     p_address: payload.address || null,
+    p_description: payload.description || null,
+    p_structure_type: payload.structure_type || 'commerce',
     p_plan_id: payload.plan_id || null,
   });
   if (error) throw error;

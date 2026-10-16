@@ -12,11 +12,23 @@ import {
   Shield,
   Loader2,
   KeyRound,
+  Store,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { createBrowserClient } from '@supabase/ssr';
+import { useCurrentTenant } from '@/lib/use-current-tenant';
+
+const PLAN_COLORS: Record<string, string> = {
+  Découverte: 'bg-gris-fond text-gris-texte',
+  Essentiel: 'bg-blue-100 text-blue-700',
+  Pro: 'bg-purple-100 text-purple-700',
+  Business: 'bg-orange-100 text-orange-700',
+  Entreprise: 'bg-red-100 text-red-700',
+  Association: 'bg-green-100 text-green-700',
+};
 
 export default function ParametresPage() {
+  const { tenant, loading: tenantLoading } = useCurrentTenant();
   const [notifications, setNotifications] = useState({
     emailReviews: true,
     emailRequests: true,
@@ -28,6 +40,10 @@ export default function ParametresPage() {
   // ═══ MFA ═══
   const [mfaEnabled, setMfaEnabled] = useState<boolean | null>(null);
   const [mfaLoading, setMfaLoading] = useState(true);
+
+  // ═══ ABONNEMENTS PAR ÉTABLISSEMENT ═══
+  const [businesses, setBusinesses] = useState<any[]>([]);
+  const [businessesLoading, setBusinessesLoading] = useState(true);
 
   useEffect(() => {
     (async () => {
@@ -57,6 +73,34 @@ export default function ParametresPage() {
     })();
   }, []);
 
+  useEffect(() => {
+    if (tenantLoading || !tenant) return;
+
+    (async () => {
+      try {
+        const supabase = createBrowserClient(
+          process.env.NEXT_PUBLIC_SUPABASE_URL!,
+          process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+        );
+        const { data } = await supabase
+          .from('businesses')
+          .select('id, name, slug, status, plans(name, price_monthly)')
+          .eq('tenant_id', tenant.id)
+          .order('created_at', { ascending: false });
+
+        setBusinesses(data || []);
+      } catch (err) {
+        console.error('Businesses fetch error:', err);
+      } finally {
+        setBusinessesLoading(false);
+      }
+    })();
+  }, [tenant, tenantLoading]);
+
+  const totalMonthly = businesses
+    .filter((b) => b.status === 'approved')
+    .reduce((sum, b) => sum + Number(b.plans?.price_monthly || 0), 0);
+
   return (
     <>
       <div className="mb-6">
@@ -64,7 +108,7 @@ export default function ParametresPage() {
           Paramètres
         </h1>
         <p className="text-sm text-gris-texte">
-          Gérez votre compte, vos notifications et votre abonnement.
+          Gérez votre compte, vos notifications et vos abonnements.
         </p>
       </div>
 
@@ -92,7 +136,7 @@ export default function ParametresPage() {
               est requis à chaque connexion.
             </p>
             <a
-href="/setup-mfa"
+              href="/setup-mfa"
               className="text-sm font-bold border border-gris-ligne text-marine rounded-full px-5 py-2.5 hover:border-marine transition-colors inline-block"
             >
               Gérer la MFA
@@ -174,22 +218,81 @@ href="/setup-mfa"
         </div>
       </div>
 
-      {/* ═══ Abonnement ═══ */}
+      {/* ═══ Abonnements (par établissement) ═══ */}
       <div className="bg-white rounded-lg border border-gris-ligne p-6 mb-6">
-        <div className="flex items-center gap-2 mb-4">
-          <CreditCard size={16} className="text-marine" />
-          <h2 className="font-bold text-marine">Abonnement</h2>
+        <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+          <div className="flex items-center gap-2">
+            <CreditCard size={16} className="text-marine" />
+            <h2 className="font-bold text-marine">Mes abonnements</h2>
+          </div>
+          {!businessesLoading && businesses.length > 0 && (
+            <span className="text-xs text-gris-texte">
+              {businesses.filter((b) => b.status === 'approved').length} actif{businesses.filter((b) => b.status === 'approved').length > 1 ? 's' : ''} · {totalMonthly} $/mois
+            </span>
+          )}
         </div>
-        <p className="text-xs text-gris-texte mb-4">
-          Votre formule actuelle : <b className="text-marine">Pro</b> — 39 $/mois
-        </p>
-        <a
-          href="/espace-partenaire/parametres"
-          className="text-sm font-bold border border-gris-ligne text-marine rounded-full px-5 py-2.5 hover:border-marine transition-colors inline-flex items-center gap-2"
-        >
-          Voir mon abonnement
-          <ExternalLink size={12} />
-        </a>
+
+        {businessesLoading || tenantLoading ? (
+          <div className="flex items-center gap-2 text-xs text-gris-texte">
+            <Loader2 size={12} className="animate-spin" />
+            Chargement...
+          </div>
+        ) : businesses.length === 0 ? (
+          <div className="text-center py-6 bg-gris-fond rounded-lg">
+            <Store size={28} className="text-gris-doux mx-auto mb-2" />
+            <p className="text-xs text-gris-texte mb-3">
+              Aucun établissement pour le moment.
+            </p>
+            <a
+              href="/espace-partenaire/etablissements/nouveau"
+              className="inline-flex items-center gap-2 text-xs font-bold bg-marine text-white rounded-full px-4 py-2 hover:bg-marine-dark transition-colors"
+            >
+              Créer un établissement
+            </a>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {businesses.map((b) => {
+              const planName = b.plans?.name || 'Découverte';
+              const planPrice = b.plans?.price_monthly || 0;
+              const planColor = PLAN_COLORS[planName] || 'bg-gris-fond text-gris-texte';
+
+              return (
+                <div
+                  key={b.id}
+                  className="flex items-center justify-between gap-3 p-3 rounded-lg border border-gris-ligne hover:bg-gris-fond/50 transition-colors"
+                >
+                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                    <div className="w-9 h-9 rounded-lg bg-marine/10 text-marine flex items-center justify-center flex-shrink-0">
+                      <Store size={16} />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="font-bold text-marine text-sm truncate">
+                        {b.name}
+                      </div>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <span className={'inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold ' + planColor}>
+                          {planName}
+                        </span>
+                        <span className="text-xs text-gris-texte">
+                          {planPrice > 0 ? `${planPrice} $/mois` : 'Gratuit'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <a
+                    href={`/espace-partenaire/etablissements/${b.slug}`}
+                    className="flex items-center gap-1 text-xs font-bold border border-gris-ligne text-marine rounded-full px-3 py-1.5 hover:border-marine transition-colors flex-shrink-0"
+                  >
+                    Gérer
+                    <ExternalLink size={10} />
+                  </a>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* ═══ Suppression compte ═══ */}

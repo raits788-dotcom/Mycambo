@@ -85,36 +85,90 @@ export async function getPlanById(planId: string): Promise<SubscriptionPlan | nu
 // ABONNEMENT D'UN ÉTABLISSEMENT
 // ═══════════════════════════════════════════════════════════
 
+/**
+ * Récupère l'abonnement d'un établissement.
+ *
+ * Logique de priorité :
+ * 1. Cherche une souscription active liée au business (`business_id`)
+ * 2. Sinon, cherche une souscription active liée au tenant (`tenant_id`)
+ * 3. Sinon, utilise le plan par défaut du business (`businesses.plan_id`)
+ * 4. Sinon, utilise le plan par défaut du tenant (`tenants.plan_id`)
+ * 5. Sinon, retourne null (formule Découverte implicite)
+ */
 export async function getSubscription(businessSlug: string): Promise<Subscription | null> {
-  // 1. Récupère le business
-  const { data: business } = await supabase()
+  const client = supabase();
+
+  // 1. Récupère le business avec son plan_id
+  const { data: business } = await client
     .from('businesses')
-    .select('id, tenant_id')
+    .select('id, tenant_id, plan_id')
     .eq('slug', businessSlug)
     .maybeSingle();
 
   if (!business) return null;
 
-  // 2. Récupère son abonnement actif
-  const { data: sub } = await supabase()
+  // 2. Cherche une souscription active liée au BUSINESS
+  const { data: subByBusiness } = await client
     .from('subscriptions')
     .select('*, plans(name, slug)')
-    .eq('tenant_id', business.tenant_id)
+    .eq('business_id', business.id)
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle();
 
-  if (!sub) return null;
+  if (subByBusiness) {
+    return {
+      planId: subByBusiness.plan_id,
+      status: subByBusiness.status || 'active',
+      startedAt: subByBusiness.current_period_start,
+      endsAt: subByBusiness.current_period_end,
+      autoRenew: true,
+      nextBillingDate: subByBusiness.current_period_end,
+      paymentMethod: null,
+    };
+  }
 
-  return {
-    planId: sub.plan_id,
-    status: sub.status || 'active',
-    startedAt: sub.current_period_start,
-    endsAt: sub.current_period_end,
-    autoRenew: true,
-    nextBillingDate: sub.current_period_end,
-    paymentMethod: null,
-  };
+  // 3. Cherche une souscription active liée au TENANT
+  const { data: subByTenant } = await client
+    .from('subscriptions')
+    .select('*, plans(name, slug)')
+    .eq('tenant_id', business.tenant_id)
+    .is('business_id', null)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (subByTenant) {
+    return {
+      planId: subByTenant.plan_id,
+      status: subByTenant.status || 'active',
+      startedAt: subByTenant.current_period_start,
+      endsAt: subByTenant.current_period_end,
+      autoRenew: true,
+      nextBillingDate: subByTenant.current_period_end,
+      paymentMethod: null,
+    };
+  }
+
+  // 4. Fallback : utiliser le plan par défaut du business
+  if (business.plan_id) {
+    const now = new Date();
+    const inOneMonth = new Date(now);
+    inOneMonth.setMonth(inOneMonth.getMonth() + 1);
+
+    return {
+      planId: business.plan_id,
+      status: 'active',
+      startedAt: now.toISOString(),
+      endsAt: inOneMonth.toISOString(),
+      autoRenew: true,
+      nextBillingDate: inOneMonth.toISOString(),
+      paymentMethod: null,
+    };
+  }
+
+  // 5. Aucun abonnement trouvé → formule Découverte implicite
+  return null;
 }
 
 export function getDaysRemaining(endDate: string): number {

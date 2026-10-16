@@ -15,6 +15,15 @@ const STATUS_LABELS: Record<string, string> = {
   suspended: 'Suspendu',
 };
 
+const PLAN_COLORS: Record<string, string> = {
+  Découverte: 'bg-gris-fond text-gris-texte',
+  Essentiel: 'bg-blue-100 text-blue-700',
+  Pro: 'bg-purple-100 text-purple-700',
+  Business: 'bg-orange-100 text-orange-700',
+  Entreprise: 'bg-red-100 text-red-700',
+  Association: 'bg-green-100 text-green-700',
+};
+
 export default function EstablishmentsPage() {
   const [businesses, setBusinesses] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -102,6 +111,7 @@ export default function EstablishmentsPage() {
               <tr>
                 <th className="text-left px-5 py-3 font-bold">Établissement</th>
                 <th className="text-left px-3 py-3 font-bold">Catégorie</th>
+                <th className="text-left px-3 py-3 font-bold">Formule</th>
                 <th className="text-left px-3 py-3 font-bold">Tenant</th>
                 <th className="text-left px-3 py-3 font-bold">Ville</th>
                 <th className="text-left px-3 py-3 font-bold">Statut</th>
@@ -119,6 +129,11 @@ export default function EstablishmentsPage() {
                     </div>
                   </td>
                   <td className="px-3 py-4 text-gris-texte">{est.categories?.name || '—'}</td>
+                  <td className="px-3 py-4">
+                    <span className={'inline-flex px-2 py-0.5 rounded-full text-[11px] font-bold ' + (PLAN_COLORS[est.plans?.name || ''] || 'bg-gris-fond text-gris-texte')}>
+                      {est.plans?.name || 'Découverte'}
+                    </span>
+                  </td>
                   <td className="px-3 py-4 text-gris-texte text-xs">{est.tenants?.name || '—'}</td>
                   <td className="px-3 py-4 text-gris-texte text-xs">{est.city || '—'}</td>
                   <td className="px-3 py-4">
