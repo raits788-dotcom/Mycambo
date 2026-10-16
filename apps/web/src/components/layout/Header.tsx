@@ -30,8 +30,17 @@ export default function Header() {
   const pathname = usePathname();
   const router = useRouter();
 
-  // ▼▼▼ DÉTECTION PAGE PUBLIQUE COMMERCE ▼▼▼
+  // ▼▼▼ DÉTECTION PAGES ANONYMES ▼▼▼
+  const isAuthPage =
+    pathname === '/connexion' ||
+    pathname === '/inscription' ||
+    pathname === '/partenaire/connexion' ||
+    pathname === '/espace-partenaire/connexion' ||
+    pathname === '/confirmer-email' ||
+    pathname === '/setup-mfa';
+
   const isPublicCommercePage = pathname?.startsWith('/commerce/') || false;
+  const showAnonymousHeader = isAuthPage || isPublicCommercePage;
   // ▲▲▲ FIN DÉTECTION ▲▲▲
 
   const allItems = [
@@ -42,7 +51,6 @@ export default function Header() {
     ...FIXED_RIGHT,
   ];
 
-  // Charge l'utilisateur connecté
   useEffect(() => {
     (async () => {
       const supabase = createBrowserClient(
@@ -128,8 +136,7 @@ export default function Header() {
                 <Search size={20} />
               </button>
 
-              {/* ▼▼▼ SUR PAGE PUBLIQUE : boutons Connexion / Inscription ▼▼▼ */}
-              {isPublicCommercePage ? (
+              {showAnonymousHeader ? (
                 <div className="flex items-center gap-2">
                   <Link
                     href="/connexion"
@@ -146,7 +153,6 @@ export default function Header() {
                 </div>
               ) : (
                 <>
-                  {/* NOTIFICATION BELL (si connecté) */}
                   {user && mounted && (
                     <NotificationBell
                       recipientType="user"
@@ -188,7 +194,6 @@ export default function Header() {
                   </div>
                 </>
               )}
-              {/* ▲▲▲ FIN CONDITIONNEL ▲▲▲ */}
             </div>
           </div>
         </div>

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { Loader2, Shield, AlertTriangle, X } from 'lucide-react';
+import { Loader2, AlertTriangle, X } from 'lucide-react';
 import PartnerSidebar from '@/components/partenaire/PartnerSidebar';
 import PartnerTopBar from '@/components/partenaire/PartnerTopBar';
 import ImpersonationBanner from '@/components/partenaire/ImpersonationBanner';
@@ -21,8 +21,8 @@ export default function PartnerAppLayout({
   const [checking, setChecking] = useState(true);
   const [authorized, setAuthorized] = useState(false);
   const [isImpersonating, setIsImpersonating] = useState(false);
-  const [isAdminSession, setIsAdminSession] = useState(false);
-  const [adminBannerDismissed, setAdminBannerDismissed] = useState(false);
+  const [isPartnerSession, setIsPartnerSession] = useState(false);
+  const [partnerBannerDismissed, setPartnerBannerDismissed] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -62,7 +62,7 @@ export default function PartnerAppLayout({
         clearImpersonation();
       }
 
-      // 2. Mode NORMAL (session Supabase)
+      // 2. Mode NORMAL (session partenaire)
       const supabase = createBrowserClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
         process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -78,10 +78,9 @@ export default function PartnerAppLayout({
         return;
       }
 
-      // ▼▼▼ DÉTECTION ADMIN (SuperAdmin connecté directement) ▼▼▼
-      const role = session.user.app_metadata?.role;
-      const isAdmin = role === 'superadmin' || role === 'admin';
-      setIsAdminSession(isAdmin);
+      // ▼▼▼ BANDEAU JAUNE : session partenaire normale ▼▼▼
+      // Toute session connectée sur /espace-partenaire est un partenaire admin de son espace
+      setIsPartnerSession(true);
       // ▲▲▲ FIN DÉTECTION ▲▲▲
 
       setAuthorized(true);
@@ -101,23 +100,23 @@ export default function PartnerAppLayout({
 
   if (!authorized) return null;
 
-  const showAdminBanner = isAdminSession && !isImpersonating && !adminBannerDismissed;
+  const showPartnerBanner = isPartnerSession && !isImpersonating && !partnerBannerDismissed;
   const showImpersonationBanner = isImpersonating;
 
   return (
     <div className="min-h-screen bg-gris-fond">
-      {/* Bandeau violet — Impersonation */}
+      {/* Bandeau violet — Impersonation SuperAdmin */}
       {showImpersonationBanner && <ImpersonationBanner />}
 
-      {/* Bandeau jaune — Admin connecté directement */}
-      {showAdminBanner && (
+      {/* Bandeau jaune — Partenaire admin de son espace */}
+      {showPartnerBanner && (
         <div className="fixed top-0 left-0 right-0 z-[100] bg-yellow-400 text-yellow-950 px-4 py-2 flex items-center justify-between shadow-lg">
           <div className="flex items-center gap-2 text-xs font-bold">
             <AlertTriangle size={14} />
-            MODE ADMIN — Vous êtes connecté en tant que SuperAdmin sur l&apos;espace partenaire
+            MODE ADMIN PARTENAIRE — Vous gérez votre espace myCAMBO
           </div>
           <button
-            onClick={() => setAdminBannerDismissed(true)}
+            onClick={() => setPartnerBannerDismissed(true)}
             aria-label="Fermer"
             className="flex items-center gap-1 text-xs font-bold bg-yellow-950/10 hover:bg-yellow-950/20 px-3 py-1 rounded-full"
           >
@@ -126,7 +125,7 @@ export default function PartnerAppLayout({
         </div>
       )}
 
-      <div className={`flex ${(showImpersonationBanner || showAdminBanner) ? 'pt-10' : ''}`}>
+      <div className={`flex ${(showImpersonationBanner || showPartnerBanner) ? 'pt-10' : ''}`}>
         <PartnerSidebar />
         <div className="flex-1 flex flex-col min-w-0">
           <PartnerTopBar />
