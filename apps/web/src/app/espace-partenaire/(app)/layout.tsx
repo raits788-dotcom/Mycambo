@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Shield, AlertTriangle, X } from 'lucide-react';
 import PartnerSidebar from '@/components/partenaire/PartnerSidebar';
 import PartnerTopBar from '@/components/partenaire/PartnerTopBar';
 import ImpersonationBanner from '@/components/partenaire/ImpersonationBanner';
@@ -21,40 +21,33 @@ export default function PartnerAppLayout({
   const [checking, setChecking] = useState(true);
   const [authorized, setAuthorized] = useState(false);
   const [isImpersonating, setIsImpersonating] = useState(false);
-
-  console.log('🟦 [LAYOUT] RENDER — pathname:', pathname);
+  const [isAdminSession, setIsAdminSession] = useState(false);
+  const [adminBannerDismissed, setAdminBannerDismissed] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
 
     (async () => {
-      console.log('🟦 [LAYOUT] useEffect START');
-
       let token: string | null = null;
 
       if (typeof window !== 'undefined') {
         const url = new URL(window.location.href);
         const urlToken = url.searchParams.get('impersonate');
-        console.log('🟦 [LAYOUT] Token depuis URL:', urlToken);
 
         if (urlToken) {
           sessionStorage.setItem(TOKEN_KEY, urlToken);
           token = urlToken;
         } else {
           token = sessionStorage.getItem(TOKEN_KEY);
-          console.log('🟦 [LAYOUT] Token depuis sessionStorage:', token);
         }
       }
 
+      // 1. Mode IMPERSONATION (SuperAdmin qui se fait passer pour un tenant)
       if (token) {
-        console.log('🟦 [LAYOUT] Token trouvé → validation...');
         const tenant = await getImpersonatedTenant();
-        console.log('🟦 [LAYOUT] Tenant retourné:', tenant?.name || 'NULL');
-
         if (cancelled) return;
 
         if (tenant) {
-          console.log('🟦 [LAYOUT] ✅ IMPERSONATION OK —', tenant.name);
           setIsImpersonating(true);
           setAuthorized(true);
           setChecking(false);
@@ -66,11 +59,10 @@ export default function PartnerAppLayout({
           }
           return;
         }
-        console.log('🟦 [LAYOUT] ❌ Token invalide → clear');
         clearImpersonation();
       }
 
-      console.log('🟦 [LAYOUT] Pas de token → vérif session normale');
+      // 2. Mode NORMAL (session Supabase)
       const supabase = createBrowserClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
         process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -80,14 +72,18 @@ export default function PartnerAppLayout({
       if (cancelled) return;
 
       if (!session) {
-        console.log('🟦 [LAYOUT] Pas de session → redirect /connexion');
         if (pathname !== '/espace-partenaire/connexion') {
           router.replace('/espace-partenaire/connexion');
         }
         return;
       }
 
-      console.log('🟦 [LAYOUT] ✅ Session normale —', session.user.email);
+      // ▼▼▼ DÉTECTION ADMIN (SuperAdmin connecté directement) ▼▼▼
+      const role = session.user.app_metadata?.role;
+      const isAdmin = role === 'superadmin' || role === 'admin';
+      setIsAdminSession(isAdmin);
+      // ▲▲▲ FIN DÉTECTION ▲▲▲
+
       setAuthorized(true);
       setChecking(false);
     })();
@@ -105,12 +101,32 @@ export default function PartnerAppLayout({
 
   if (!authorized) return null;
 
-  console.log('🟦 [LAYOUT] RENDER FINAL — isImpersonating:', isImpersonating);
+  const showAdminBanner = isAdminSession && !isImpersonating && !adminBannerDismissed;
+  const showImpersonationBanner = isImpersonating;
 
   return (
     <div className="min-h-screen bg-gris-fond">
-      {isImpersonating && <ImpersonationBanner />}
-      <div className={`flex ${isImpersonating ? 'pt-10' : ''}`}>
+      {/* Bandeau violet — Impersonation */}
+      {showImpersonationBanner && <ImpersonationBanner />}
+
+      {/* Bandeau jaune — Admin connecté directement */}
+      {showAdminBanner && (
+        <div className="fixed top-0 left-0 right-0 z-[100] bg-yellow-400 text-yellow-950 px-4 py-2 flex items-center justify-between shadow-lg">
+          <div className="flex items-center gap-2 text-xs font-bold">
+            <AlertTriangle size={14} />
+            MODE ADMIN — Vous êtes connecté en tant que SuperAdmin sur l&apos;espace partenaire
+          </div>
+          <button
+            onClick={() => setAdminBannerDismissed(true)}
+            aria-label="Fermer"
+            className="flex items-center gap-1 text-xs font-bold bg-yellow-950/10 hover:bg-yellow-950/20 px-3 py-1 rounded-full"
+          >
+            <X size={12} /> Fermer
+          </button>
+        </div>
+      )}
+
+      <div className={`flex ${(showImpersonationBanner || showAdminBanner) ? 'pt-10' : ''}`}>
         <PartnerSidebar />
         <div className="flex-1 flex flex-col min-w-0">
           <PartnerTopBar />

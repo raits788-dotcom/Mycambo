@@ -30,6 +30,10 @@ export default function Header() {
   const pathname = usePathname();
   const router = useRouter();
 
+  // ▼▼▼ DÉTECTION PAGE PUBLIQUE COMMERCE ▼▼▼
+  const isPublicCommercePage = pathname?.startsWith('/commerce/') || false;
+  // ▲▲▲ FIN DÉTECTION ▲▲▲
+
   const allItems = [
     ...FIXED_LEFT,
     ...SECTORS,
@@ -58,11 +62,9 @@ export default function Header() {
       const appMeta = u.app_metadata || {};
       let role: HeaderUser['role'] = 'user';
 
-      // Détermine le rôle
       if (appMeta.role === 'superadmin' || appMeta.role === 'admin') {
         role = 'admin';
       } else {
-        // Vérifie si membre d'un tenant
         const { data: tenantUser } = await supabase
           .from('tenant_users')
           .select('tenant_id')
@@ -126,47 +128,67 @@ export default function Header() {
                 <Search size={20} />
               </button>
 
-              {/* ▼▼▼ NOTIFICATION BELL (si connecté) ▼▼▼ */}
-              {user && mounted && (
-                <NotificationBell
-                  recipientType="user"
-                  recipientId={user.id}
-                />
+              {/* ▼▼▼ SUR PAGE PUBLIQUE : boutons Connexion / Inscription ▼▼▼ */}
+              {isPublicCommercePage ? (
+                <div className="flex items-center gap-2">
+                  <Link
+                    href="/connexion"
+                    className="text-xs font-bold text-marine hover:text-marine-light px-3 py-2"
+                  >
+                    Connexion
+                  </Link>
+                  <Link
+                    href="/inscription"
+                    className="text-xs font-bold bg-marine text-white px-4 py-2 rounded-full hover:bg-marine-dark transition-colors"
+                  >
+                    Inscription
+                  </Link>
+                </div>
+              ) : (
+                <>
+                  {/* NOTIFICATION BELL (si connecté) */}
+                  {user && mounted && (
+                    <NotificationBell
+                      recipientType="user"
+                      recipientId={user.id}
+                    />
+                  )}
+
+                  <div className="relative">
+                    <button
+                      onClick={() => setAccountOpen(!accountOpen)}
+                      aria-label="Mon compte"
+                      className={cn(
+                        'flex items-center gap-1.5 text-marine hover:text-marine-light transition-colors',
+                        user && 'bg-gris-fond hover:bg-gris-ligne rounded-full pl-1 pr-2.5 py-1'
+                      )}
+                    >
+                      {user && mounted ? (
+                        <>
+                          <span className="w-7 h-7 rounded-full bg-marine text-white flex items-center justify-center text-xs font-bold">
+                            {user.name.charAt(0).toUpperCase()}
+                          </span>
+                          <span className="hidden md:inline text-xs font-semibold max-w-[100px] truncate">
+                            {user.name.split(' ')[0]}
+                          </span>
+                        </>
+                      ) : (
+                        <User size={20} />
+                      )}
+                      <ChevronDown size={14} />
+                    </button>
+
+                    {accountOpen && mounted && (
+                      <AccountDropdown
+                        user={user}
+                        onClose={() => setAccountOpen(false)}
+                        onLogout={handleLogout}
+                      />
+                    )}
+                  </div>
+                </>
               )}
-              {/* ▲▲▲ FIN NOTIFICATION BELL ▲▲▲ */}
-
-              <div className="relative">
-                <button
-                  onClick={() => setAccountOpen(!accountOpen)}
-                  aria-label="Mon compte"
-                  className={cn(
-                    'flex items-center gap-1.5 text-marine hover:text-marine-light transition-colors',
-                    user && 'bg-gris-fond hover:bg-gris-ligne rounded-full pl-1 pr-2.5 py-1'
-                  )}
-                >
-                  {user && mounted ? (
-                    <>
-                      <span className="w-7 h-7 rounded-full bg-marine text-white flex items-center justify-center text-xs font-bold">
-                        {user.name.charAt(0).toUpperCase()}
-                      </span>
-                      <span className="hidden md:inline text-xs font-semibold max-w-[100px] truncate">
-                        {user.name.split(' ')[0]}
-                      </span>
-                    </>
-                  ) : (
-                    <User size={20} />
-                  )}
-                  <ChevronDown size={14} />
-                </button>
-
-                {accountOpen && mounted && (
-                  <AccountDropdown
-                    user={user}
-                    onClose={() => setAccountOpen(false)}
-                    onLogout={handleLogout}
-                  />
-                )}
-              </div>
+              {/* ▲▲▲ FIN CONDITIONNEL ▲▲▲ */}
             </div>
           </div>
         </div>
@@ -201,7 +223,6 @@ function AccountDropdown({
   onClose: () => void;
   onLogout: () => void;
 }) {
-  // Déconnecté
   if (!user) {
     return (
       <div className="absolute top-full right-0 mt-2 min-w-[240px] bg-white border border-gris-ligne rounded-md shadow-cb-md py-2 z-50">
@@ -228,7 +249,6 @@ function AccountDropdown({
     );
   }
 
-  // Partenaire
   if (user.role === 'partner') {
     return (
       <div className="absolute top-full right-0 mt-2 min-w-[240px] bg-white border border-gris-ligne rounded-md shadow-cb-md py-2 z-50">
@@ -265,7 +285,6 @@ function AccountDropdown({
     );
   }
 
-  // Admin
   if (user.role === 'admin') {
     return (
       <div className="absolute top-full right-0 mt-2 min-w-[240px] bg-white border border-gris-ligne rounded-md shadow-cb-md py-2 z-50">
@@ -290,7 +309,6 @@ function AccountDropdown({
     );
   }
 
-  // Utilisateur standard
   return (
     <div className="absolute top-full right-0 mt-2 min-w-[240px] bg-white border border-gris-ligne rounded-md shadow-cb-md py-2 z-50">
       <div className="px-4 py-2 border-b border-gris-ligne mb-1">
