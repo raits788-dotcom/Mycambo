@@ -7,9 +7,8 @@ import { useParams } from 'next/navigation';
 import {
   MapPin, Phone, Globe, Clock, Heart, Share2, Star, Lock,
 } from 'lucide-react';
-import CommerceTabs from '@/components/commerce/CommerceTabs';
+import CommerceTabsPublic from '@/components/commerce/CommerceTabsPublic';
 import AssociationActionsBar from '@/components/association/AssociationActionsBar';
-import StatsBlock from '@/components/commerce/StatsBlock';
 import { LevelBadge, SubLabels } from '@/components/ui/LevelBadge';
 import { createBrowserClient } from '@supabase/ssr';
 import { getPlanPermissions } from '@/lib/plan-permissions';
@@ -68,6 +67,8 @@ export default function CommercePage() {
         image: business.photos?.[0]
           || 'https://images.unsplash.com/photo-1497486751825-1233686d5d80?q=85&w=1600&auto=format&fit=crop',
         gallery: business.photos || [],
+        description: business.description,
+        longDescription: business.long_description,
         rating: 0,
         reviews: 0,
       });
@@ -116,7 +117,6 @@ export default function CommercePage() {
   const isAssociation = commerce.type === 'association';
   const permissions = getPlanPermissions(planSlug);
 
-  // Filtre les photos : affichées seulement si autorisées par la formule
   const visiblePhotos = permissions.canShowPhotos ? commerce.gallery : [];
   const heroImage = permissions.canShowPhotos && commerce.image
     ? commerce.image
@@ -166,7 +166,6 @@ export default function CommercePage() {
                 {commerce.name}
               </h1>
 
-              {/* NIVEAU + SOUS-LABELS */}
               <div className="flex items-center gap-2 flex-wrap mb-2">
                 <LevelBadge level={tenantLevel} size="md" />
                 {tenantLabels.length > 0 && (
@@ -175,15 +174,6 @@ export default function CommercePage() {
               </div>
 
               <div className="flex flex-wrap items-center gap-4 text-sm text-white/90">
-                {commerce.rating > 0 && (
-                  <span className="flex items-center gap-1.5">
-                    <Star size={15} className="fill-ic-or text-ic-or" />
-                    <b className="text-base">{commerce.rating}</b>
-                    <span className="text-white/70">
-                      ({commerce.reviews} avis)
-                    </span>
-                  </span>
-                )}
                 {commerce.city && (
                   <span className="flex items-center gap-1.5">
                     <MapPin size={15} />
@@ -213,14 +203,13 @@ export default function CommercePage() {
       <section className="max-w-wrap mx-auto px-4 md:px-8 lg:px-12 xl:px-20 py-6">
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-10">
           <div>
-            <CommerceTabs
+            <CommerceTabsPublic
               commerce={{
                 ...commerce,
                 gallery: visiblePhotos,
               }}
               isAssociation={isAssociation}
               stats={null}
-              enriched={null}
               permissions={permissions}
             />
           </div>
@@ -248,11 +237,11 @@ export default function CommercePage() {
                   {commerce.city && (
                     <a
                       href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-                        [commerce.address, commerce.city].filter(Boolean).join(', ')
+                        commerce.address || commerce.city
                       )}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="block w-full text-center border-[1.5px] border-gris-ligne text-marine font-bold py-3 rounded-full hover:border-marine transition-colors text-sm"
+                      className="block w-full border-[1.5px] border-gris-ligne text-marine font-bold py-3 rounded-full hover:border-marine transition-colors text-sm text-center"
                     >
                       Voir sur la carte
                     </a>
@@ -263,55 +252,33 @@ export default function CommercePage() {
               <div className="pt-4 border-t border-gris-ligne space-y-3 text-sm text-gris-texte">
                 {commerce.address && (
                   <div className="flex items-start gap-2.5">
-                    <MapPin size={15} className="text-gris-doux mt-0.5 flex-shrink-0" />
+                    <MapPin size={15} className="text-gris-doux mt-0.5" />
                     <span>{commerce.address}</span>
                   </div>
                 )}
                 {commerce.phone && (
                   <div className="flex items-center gap-2.5">
-                    <Phone size={15} className="text-gris-doux flex-shrink-0" />
-                    <a href={`tel:${commerce.phone}`} className="hover:text-marine">
-                      {commerce.phone}
-                    </a>
+                    <Phone size={15} className="text-gris-doux" />
+                    <span>{commerce.phone}</span>
                   </div>
                 )}
-
-                {/* Site web / Horaires : seulement si autorisé */}
-                {permissions.canShowSocialLinks && commerce.website && (
+                {commerce.website && (
                   <div className="flex items-center gap-2.5">
-                    <Globe size={15} className="text-gris-doux flex-shrink-0" />
-                    <a
-                      href={commerce.website.startsWith('http') ? commerce.website : `https://${commerce.website}`}
-                      target="_blank"
-                      rel="noopener"
-                      className="hover:text-marine truncate"
-                    >
-                      {commerce.website}
-                    </a>
+                    <Globe size={15} className="text-gris-doux" />
+                    <span>{commerce.website}</span>
                   </div>
                 )}
-                {permissions.canShowHours && commerce.hours && typeof commerce.hours === 'object' && (
+                {commerce.hours && (
                   <div className="flex items-center gap-2.5">
-                    <Clock size={15} className="text-gris-doux flex-shrink-0" />
-                    <span>Horaires disponibles</span>
-                  </div>
-                )}
-
-                {!permissions.canShowSocialLinks && (
-                  <div className="flex items-center gap-2.5 text-gris-doux italic text-xs">
-                    <Lock size={12} />
-                    Site web et horaires masqués (formule Découverte)
+                    <Clock size={15} className="text-gris-doux" />
+                    <span>
+                      {typeof commerce.hours === 'string'
+                        ? commerce.hours
+                        : JSON.stringify(commerce.hours)}
+                    </span>
                   </div>
                 )}
               </div>
-
-              {isAssociation && permissions.canShowStats && (
-                <StatsBlock
-                  slug={slug}
-                  initialViews={0}
-                  initialSupports={0}
-                />
-              )}
             </div>
 
             <div className="text-[11px] text-gris-doux text-center">
