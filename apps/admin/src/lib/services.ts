@@ -1183,11 +1183,11 @@ export async function getSubmittedVerifications() {
 export async function getPendingVerifications() {
   const supabase = getSupabase();
 
-  // Récupère les BUSINESS (pas les tenants)
   const { data: businesses, error } = await supabase
     .from('businesses')
     .select(`
       id, name, email, city, phone, status, tenant_id, plan_id, created_at,
+      tenants!businesses_tenant_id_fkey(id, name, email),
       tenant_verifications(status, last_submitted_at, business_id)
     `)
     .eq('status', 'approved')
@@ -1195,7 +1195,6 @@ export async function getPendingVerifications() {
 
   if (error) { console.error('getPendingVerifications:', error); return []; }
 
-  // Filtre : garde ceux sans dossier lié à ce business
   return (businesses || []).filter((b: any) => {
     const verif = Array.isArray(b.tenant_verifications)
       ? b.tenant_verifications.find((v: any) => v.business_id === b.id)
@@ -1225,9 +1224,13 @@ export async function getVerificationHistoryList(limit = 100) {
 }
 
 /**
- * Relance par email un établissement sans dossier
+ * Relance par email un établissement sans dossier (tenant + établissement)
  */
-export async function remindTenantToSubmitVerification(tenantId: string) {
+export async function remindTenantToSubmitVerification(
+  tenantId: string,
+  businessId?: string,
+  businessEmail?: string
+) {
   const supabase = getSupabase();
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) throw new Error('NOT_AUTHENTICATED');
@@ -1240,6 +1243,27 @@ export async function remindTenantToSubmitVerification(tenantId: string) {
 
   if (!tenant) throw new Error('TENANT_NOT_FOUND');
 
+  const emailSubject = `[MyCambo] Complétez votre dossier de vérification`;
+  const emailHtml = `
+    <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto">
+      <div style="background:#1B3A6B;color:white;padding:24px;border-radius:8px 8px 0 0">
+        <h1 style="margin:0;font-size:20px">📋 Dossier à compléter</h1>
+      </div>
+      <div style="background:#f9fafb;padding:24px;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 8px 8px">
+        <p>Bonjour <strong>${tenant.name}</strong>,</p>
+        <p>Votre établissement n'a pas encore soumis son dossier de vérification.</p>
+        <p>Pour apparaître dans l'annuaire et bénéficier de toutes les fonctionnalités, complétez votre dossier :</p>
+        <p style="text-align:center;margin:24px 0">
+          <a href="https://dev.mycambo.net/espace-partenaire/verification" style="display:inline-block;background:#1B3A6B;color:white;padding:12px 24px;text-decoration:none;border-radius:6px;font-weight:bold">
+            Compléter mon dossier →
+          </a>
+        </p>
+        <p style="font-size:12px;color:#9ca3af">Pour toute question : contact@mycambo.net</p>
+      </div>
+    </div>
+  `;
+
+  // 1. Email au tenant (contact principal)
   await fetch(
     `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/send-email`,
     {
@@ -1250,35 +1274,39 @@ export async function remindTenantToSubmitVerification(tenantId: string) {
       },
       body: JSON.stringify({
         to: tenant.email,
-        subject: `[MyCambo] Complétez votre dossier de vérification`,
-        html: `
-          <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto">
-            <div style="background:#1B3A6B;color:white;padding:24px;border-radius:8px 8px 0 0">
-              <h1 style="margin:0;font-size:20px">📋 Dossier à compléter</h1>
-            </div>
-            <div style="background:#f9fafb;padding:24px;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 8px 8px">
-              <p>Bonjour <strong>${tenant.name}</strong>,</p>
-              <p>Votre compte partenaire est actif, mais nous n'avons pas encore reçu votre dossier de vérification.</p>
-              <p>Pour apparaître dans l'annuaire et bénéficier de toutes les fonctionnalités, complétez votre dossier :</p>
-              <p style="text-align:center;margin:24px 0">
-                <a href="https://dev.mycambo.net/espace-partenaire/verification" style="display:inline-block;background:#1B3A6B;color:white;padding:12px 24px;text-decoration:none;border-radius:6px;font-weight:bold">
-                  Compléter mon dossier →
-                </a>
-              </p>
-              <p style="font-size:12px;color:#9ca3af">Pour toute question : contact@mycambo.net</p>
-            </div>
-          </div>
-        `,
+        subject: emailSubject,
+        html: emailHtml,
       }),
     }
   );
 
+  // 2. Email à l'établissement (si différent)
+  if (businessEmail && businessEmail !== tenant.email) {
+    await fetch(
+      `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/send-email`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          to: businessEmail,
+          subject: emailSubject,
+          html: emailHtml,
+        }),
+      }
+    );
+  }
+
+  // 3. Log audit
   await supabase.from('audit_logs').insert({
     actor_id: session.user.id,
     actor_type: 'superadmin',
     action: 'verification.reminder_sent',
     entity_type: 'tenant',
     entity_id: tenantId,
+    changes: { business_id: businessId, business_email: businessEmail },
   });
 
   return { success: true };
@@ -1299,13 +1327,11 @@ export async function approveVerification(verifId: string, businessId: string, n
     })
     .eq('id', verifId);
 
-  // Change le niveau de vérification du business
   await supabase
     .from('businesses')
     .update({ verified_at: new Date().toISOString() })
     .eq('id', businessId);
 
-  // Log audit
   await supabase.from('audit_logs').insert({
     actor_type: 'superadmin',
     action: 'business.verify',

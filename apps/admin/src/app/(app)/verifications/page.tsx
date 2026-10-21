@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import {
   ShieldCheck, Loader2, Eye, Mail, MapPin, Clock, CheckCircle2, XCircle,
-  X, Award, Inbox, History, Bell, Send, FileText, Store,
+  X, Award, Inbox, History, Bell, Send, FileText, Store, Building2, ExternalLink,
 } from 'lucide-react';
 import {
   getSubmittedVerifications,
@@ -16,13 +16,6 @@ import {
 } from '@/lib/services';
 
 type TabId = 'submitted' | 'pending' | 'history';
-
-const STATUS_LABELS: Record<string, string> = {
-  submitted: 'Dossier soumis',
-  approved: 'Approuvé',
-  rejected: 'Refusé',
-  incomplete: 'Incomplet',
-};
 
 export default function VerificationsPage() {
   const [tab, setTab] = useState<TabId>('submitted');
@@ -52,8 +45,8 @@ export default function VerificationsPage() {
   useEffect(() => { reload(); }, []);
 
   const handleApprove = async (v: any) => {
-    const businessName = v.business?.name || v.tenant?.name;
-    if (!confirm(`Approuver le dossier de "${businessName}" ?\n\nCela le passera au niveau Vérifié (Bronze).`)) return;
+    const name = v.business?.name || v.tenant?.name;
+    if (!confirm(`Approuver le dossier de "${name}" ?\n\nCela le passera au niveau Vérifié (Bronze).`)) return;
     setProcessing(v.id);
     try {
       await approveVerification(v.id, v.business_id || v.tenant_id);
@@ -82,11 +75,11 @@ export default function VerificationsPage() {
     }
   };
 
-  const handleReminder = async (tenantId: string) => {
-    setSendingReminder(tenantId);
+  const handleReminder = async (b: any) => {
+    setSendingReminder(b.id);
     try {
-      await remindTenantToSubmitVerification(tenantId);
-      alert('✅ Email de relance envoyé');
+      await remindTenantToSubmitVerification(b.tenant_id, b.id, b.email);
+      alert(`✅ Email de relance envoyé au tenant et à l'établissement`);
     } catch (err) {
       alert('Erreur : ' + (err as Error).message);
     } finally {
@@ -256,13 +249,27 @@ export default function VerificationsPage() {
                           Inscrit le {new Date(b.created_at).toLocaleDateString('fr-FR')}
                         </span>
                       </div>
+                      {/* ▼▼▼ LIEN VERS LE TENANT ▼▼▼ */}
+                      {b.tenants && (
+                        <div className="mt-2 flex items-center gap-2">
+                          <Building2 size={11} className="text-gris-doux" />
+                          <Link
+                            href={`/tenants/${b.tenant_id}`}
+                            className="text-xs font-bold text-marine hover:underline inline-flex items-center gap-1"
+                          >
+                            {b.tenants.name}
+                            <ExternalLink size={10} />
+                          </Link>
+                        </div>
+                      )}
+                      {/* ▲▲▲ FIN LIEN ▲▲▲ */}
                     </div>
                     <button
-                      onClick={() => handleReminder(b.tenant_id)}
-                      disabled={sendingReminder === b.tenant_id}
+                      onClick={() => handleReminder(b)}
+                      disabled={sendingReminder === b.id}
                       className="flex items-center gap-2 bg-amber-600 text-white font-bold text-xs px-4 py-2 rounded-full hover:bg-amber-700 disabled:opacity-50"
                     >
-                      {sendingReminder === b.tenant_id ? (
+                      {sendingReminder === b.id ? (
                         <><Loader2 size={12} className="animate-spin" /> Envoi...</>
                       ) : (
                         <><Send size={12} /> Relancer</>
@@ -303,10 +310,18 @@ export default function VerificationsPage() {
                   {history.map((h) => {
                     const businessName = h.business?.name || '—';
                     const tenantName = h.tenant?.name || '—';
+                    const tenantId = h.tenant?.id;
                     return (
                       <tr key={h.id} className="hover:bg-gris-fond/50">
                         <td className="px-5 py-3 font-bold text-marine">{businessName}</td>
-                        <td className="px-3 py-3 text-xs text-gris-texte">{tenantName}</td>
+                        <td className="px-3 py-3 text-xs text-gris-texte">
+                          {tenantId ? (
+                            <Link href={`/tenants/${tenantId}`} className="hover:underline inline-flex items-center gap-1">
+                              {tenantName}
+                              <ExternalLink size={10} />
+                            </Link>
+                          ) : tenantName}
+                        </td>
                         <td className="px-3 py-3">
                           <span className={
                             'inline-flex px-2 py-0.5 rounded-full text-[11px] font-bold ' +
