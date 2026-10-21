@@ -64,6 +64,8 @@ export default function SubscriptionTab({ establishment }: SubscriptionTabProps)
           <ChangePlanModal
             currentPlanId=""
             establishmentName={establishment.name}
+            establishmentId={establishment.id}
+            tenantId={establishment.tenant_id}
             onClose={() => setShowChangeModal(false)}
             onConfirm={() => setShowChangeModal(false)}
           />
@@ -211,6 +213,8 @@ export default function SubscriptionTab({ establishment }: SubscriptionTabProps)
         <ChangePlanModal
           currentPlanId={subscription.planId}
           establishmentName={establishment.name}
+          establishmentId={establishment.id}
+          tenantId={establishment.tenant_id}
           onClose={() => setShowChangeModal(false)}
           onConfirm={() => setShowChangeModal(false)}
         />

@@ -4,10 +4,13 @@ import { useState, useEffect } from 'react';
 import { X, Check, Info, Sparkles, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getSubscriptionPlans, type SubscriptionPlan } from '@/lib/subscription';
+import { createOrUpdateSubscription } from '@/lib/services';
 
 interface ChangePlanModalProps {
   currentPlanId: string;
   establishmentName: string;
+  establishmentId: string;
+  tenantId: string;
   onClose: () => void;
   onConfirm: (newPlanId: string) => void;
 }
@@ -15,12 +18,15 @@ interface ChangePlanModalProps {
 export default function ChangePlanModal({
   currentPlanId,
   establishmentName,
+  establishmentId,
+  tenantId,
   onClose,
   onConfirm,
 }: ChangePlanModalProps) {
   const [plans, setPlans] = useState<SubscriptionPlan[]>([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<string | null>(null);
+  const [confirming, setConfirming] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
 
   useEffect(() => {
@@ -31,10 +37,28 @@ export default function ChangePlanModal({
     })();
   }, []);
 
-  const handleConfirm = () => {
+  const handleConfirm = async () => {
     if (!selected) return;
-    setConfirmed(true);
-    setTimeout(() => onConfirm(selected), 800);
+    setConfirming(true);
+
+    try {
+      const plan = plans.find((p) => p.id === selected);
+      await createOrUpdateSubscription({
+        businessId: establishmentId,
+        tenantId: tenantId,
+        planId: selected,
+        amount: plan?.price || 0,
+      });
+      setConfirmed(true);
+      setTimeout(() => {
+        onConfirm(selected);
+        onClose();
+      }, 1500);
+    } catch (err) {
+      alert('Erreur : ' + (err as Error).message);
+    } finally {
+      setConfirming(false);
+    }
   };
 
   return (
@@ -59,16 +83,12 @@ export default function ChangePlanModal({
             <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4">
               <Check size={32} className="text-green-600" />
             </div>
-            <h3 className="text-2xl font-extrabold text-marine mb-3">Demande envoyée !</h3>
+            <h3 className="text-2xl font-extrabold text-marine mb-3">Formule changée !</h3>
             <p className="text-sm text-gris-texte leading-relaxed mb-6 max-w-md mx-auto">
-              Votre demande de changement de formule pour <b className="text-marine">{establishmentName}</b> a bien été transmise.
+              Votre nouvelle formule pour <b className="text-marine">{establishmentName}</b> est active.
+              <br />
+              Un paiement en attente de validation a été créé. L&apos;administrateur confirmera sous 48h.
             </p>
-            <button
-              onClick={onClose}
-              className="bg-marine text-white font-bold px-8 py-3 rounded-full hover:bg-marine-dark transition-colors text-sm"
-            >
-              Fermer
-            </button>
           </div>
         ) : (
           <div className="p-8">
@@ -151,11 +171,15 @@ export default function ChangePlanModal({
               <button
                 type="button"
                 onClick={handleConfirm}
-                disabled={!selected}
+                disabled={!selected || confirming}
                 className="inline-flex items-center gap-2 bg-marine text-white font-bold rounded-full px-6 py-3 hover:bg-marine-dark transition-colors text-sm disabled:opacity-50"
               >
-                <Sparkles size={14} />
-                Confirmer le changement
+                {confirming ? (
+                  <Loader2 size={14} className="animate-spin" />
+                ) : (
+                  <Sparkles size={14} />
+                )}
+                {confirming ? 'Enregistrement...' : 'Confirmer le changement'}
               </button>
             </div>
           </div>

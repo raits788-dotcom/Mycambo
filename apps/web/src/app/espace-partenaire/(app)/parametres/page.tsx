@@ -2,21 +2,13 @@
 
 import { useState, useEffect } from 'react';
 import {
-  Lock,
-  Bell,
-  CreditCard,
-  Trash2,
-  AlertCircle,
-  Check,
-  ExternalLink,
-  Shield,
-  Loader2,
-  KeyRound,
-  Store,
+  Lock, Bell, CreditCard, Trash2, AlertCircle, Check, ExternalLink,
+  Shield, Loader2, KeyRound, Store,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { createBrowserClient } from '@supabase/ssr';
 import { useCurrentTenant } from '@/lib/use-current-tenant';
+import { sendPasswordResetEmail, requestAccountDeletion } from '@/lib/services';
 
 const PLAN_COLORS: Record<string, string> = {
   Découverte: 'bg-gris-fond text-gris-texte',
@@ -36,12 +28,15 @@ export default function ParametresPage() {
     emailBilling: true,
   });
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deletionReason, setDeletionReason] = useState('');
+  const [submittingDeletion, setSubmittingDeletion] = useState(false);
+  const [sendingPasswordReset, setSendingPasswordReset] = useState(false);
 
-  // ═══ MFA ═══
+  // MFA
   const [mfaEnabled, setMfaEnabled] = useState<boolean | null>(null);
   const [mfaLoading, setMfaLoading] = useState(true);
 
-  // ═══ ABONNEMENTS PAR ÉTABLISSEMENT ═══
+  // Abonnements
   const [businesses, setBusinesses] = useState<any[]>([]);
   const [businessesLoading, setBusinessesLoading] = useState(true);
 
@@ -101,6 +96,37 @@ export default function ParametresPage() {
     .filter((b) => b.status === 'approved')
     .reduce((sum, b) => sum + Number(b.plans?.price_monthly || 0), 0);
 
+  const handlePasswordReset = async () => {
+    if (!tenant?.email) return;
+    setSendingPasswordReset(true);
+    try {
+      await sendPasswordResetEmail(tenant.email);
+      alert('✅ Email de réinitialisation envoyé à ' + tenant.email);
+    } catch (err) {
+      alert('Erreur : ' + (err as Error).message);
+    } finally {
+      setSendingPasswordReset(false);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    if (!tenant?.id || !deletionReason.trim()) return;
+    setSubmittingDeletion(true);
+    try {
+      await requestAccountDeletion({
+        tenantId: tenant.id,
+        reason: deletionReason,
+      });
+      alert('✅ Demande de suppression envoyée. Un administrateur vous contactera sous 48h.');
+      setShowDeleteConfirm(false);
+      setDeletionReason('');
+    } catch (err) {
+      alert('Erreur : ' + (err as Error).message);
+    } finally {
+      setSubmittingDeletion(false);
+    }
+  };
+
   return (
     <>
       <div className="mb-6">
@@ -112,7 +138,7 @@ export default function ParametresPage() {
         </p>
       </div>
 
-      {/* ═══ Sécurité MFA ═══ */}
+      {/* Sécurité MFA */}
       <div className="bg-white rounded-lg border border-gris-ligne p-6 mb-6">
         <div className="flex items-center gap-2 mb-4">
           <KeyRound size={16} className="text-marine" />
@@ -132,8 +158,7 @@ export default function ParametresPage() {
               </span>
             </div>
             <p className="text-xs text-gris-texte mb-4">
-              Votre compte est protégé par une double authentification. Un code à 6 chiffres
-              est requis à chaque connexion.
+              Votre compte est protégé par une double authentification.
             </p>
             <a
               href="/setup-mfa"
@@ -150,8 +175,7 @@ export default function ParametresPage() {
               </span>
             </div>
             <p className="text-xs text-gris-texte mb-4">
-              Sécurisez votre compte en activant la double authentification. Un code à 6 chiffres
-              sera demandé à chaque connexion.
+              Sécurisez votre compte en activant la double authentification.
             </p>
             <a
               href="/setup-mfa"
@@ -164,22 +188,26 @@ export default function ParametresPage() {
         )}
       </div>
 
-      {/* ═══ Mot de passe ═══ */}
+      {/* Mot de passe */}
       <div className="bg-white rounded-lg border border-gris-ligne p-6 mb-6">
         <div className="flex items-center gap-2 mb-4">
           <Lock size={16} className="text-marine" />
           <h2 className="font-bold text-marine">Mot de passe</h2>
         </div>
         <p className="text-xs text-gris-texte mb-4">
-          Pour modifier votre mot de passe, un lien de réinitialisation vous
-          sera envoyé par email.
+          Pour modifier votre mot de passe, un lien de réinitialisation vous sera envoyé par email.
         </p>
-        <button className="text-sm font-bold border border-gris-ligne text-marine rounded-full px-5 py-2.5 hover:border-marine transition-colors">
-          Changer mon mot de passe
+        <button
+          onClick={handlePasswordReset}
+          disabled={sendingPasswordReset}
+          className="inline-flex items-center gap-2 text-sm font-bold border border-gris-ligne text-marine rounded-full px-5 py-2.5 hover:border-marine transition-colors disabled:opacity-50"
+        >
+          {sendingPasswordReset && <Loader2 size={12} className="animate-spin" />}
+          {sendingPasswordReset ? 'Envoi...' : 'Changer mon mot de passe'}
         </button>
       </div>
 
-      {/* ═══ Notifications ═══ */}
+      {/* Notifications */}
       <div className="bg-white rounded-lg border border-gris-ligne p-6 mb-6">
         <div className="flex items-center gap-2 mb-4">
           <Bell size={16} className="text-marine" />
@@ -190,35 +218,27 @@ export default function ParametresPage() {
           <ToggleRow
             label="M'alerter par email lors de nouveaux avis"
             checked={notifications.emailReviews}
-            onChange={(v) =>
-              setNotifications({ ...notifications, emailReviews: v })
-            }
+            onChange={(v) => setNotifications({ ...notifications, emailReviews: v })}
           />
           <ToggleRow
             label="M'alerter par email lors de nouvelles demandes"
             checked={notifications.emailRequests}
-            onChange={(v) =>
-              setNotifications({ ...notifications, emailRequests: v })
-            }
+            onChange={(v) => setNotifications({ ...notifications, emailRequests: v })}
           />
           <ToggleRow
             label="Recevoir la newsletter MyCambo"
             checked={notifications.emailNewsletter}
-            onChange={(v) =>
-              setNotifications({ ...notifications, emailNewsletter: v })
-            }
+            onChange={(v) => setNotifications({ ...notifications, emailNewsletter: v })}
           />
           <ToggleRow
             label="M'alerter par email pour la facturation"
             checked={notifications.emailBilling}
-            onChange={(v) =>
-              setNotifications({ ...notifications, emailBilling: v })
-            }
+            onChange={(v) => setNotifications({ ...notifications, emailBilling: v })}
           />
         </div>
       </div>
 
-      {/* ═══ Abonnements (par établissement) ═══ */}
+      {/* Mes abonnements */}
       <div className="bg-white rounded-lg border border-gris-ligne p-6 mb-6">
         <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
           <div className="flex items-center gap-2">
@@ -295,7 +315,7 @@ export default function ParametresPage() {
         )}
       </div>
 
-      {/* ═══ Suppression compte ═══ */}
+      {/* Suppression compte */}
       <div className="bg-white rounded-lg border border-red-200 p-6">
         <div className="flex items-center gap-2 mb-4">
           <Trash2 size={16} className="text-red-600" />
@@ -312,7 +332,7 @@ export default function ParametresPage() {
         </button>
       </div>
 
-      {/* ═══ Modal confirmation ═══ */}
+      {/* Modal confirmation suppression */}
       {showDeleteConfirm && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl max-w-md w-full p-6">
@@ -320,9 +340,19 @@ export default function ParametresPage() {
               <AlertCircle size={24} className="text-red-600" />
               <h2 className="text-lg font-bold text-marine">Confirmer la suppression</h2>
             </div>
-            <p className="text-sm text-gris-texte mb-6">
-              Êtes-vous sûr ? Cette action est irréversible.
+            <p className="text-sm text-gris-texte mb-4">
+              Êtes-vous sûr ? Cette action est irréversible. Un administrateur vous contactera sous 48h.
             </p>
+            <label className="block text-xs font-bold text-gris-texte uppercase mb-2">
+              Motif de la suppression *
+            </label>
+            <textarea
+              rows={3}
+              value={deletionReason}
+              onChange={(e) => setDeletionReason(e.target.value)}
+              placeholder="Expliquez pourquoi vous souhaitez supprimer votre compte..."
+              className="w-full px-3 py-2 text-sm rounded-lg border border-gris-ligne focus:border-marine focus:outline-none resize-none mb-4"
+            />
             <div className="flex gap-3">
               <button
                 onClick={() => setShowDeleteConfirm(false)}
@@ -330,7 +360,12 @@ export default function ParametresPage() {
               >
                 Annuler
               </button>
-              <button className="flex-1 text-sm font-bold bg-red-600 text-white rounded-full py-2.5 hover:bg-red-700">
+              <button
+                onClick={handleDeleteAccount}
+                disabled={!deletionReason.trim() || submittingDeletion}
+                className="flex-1 text-sm font-bold bg-red-600 text-white rounded-full py-2.5 hover:bg-red-700 disabled:opacity-50 inline-flex items-center justify-center gap-2"
+              >
+                {submittingDeletion && <Loader2 size={12} className="animate-spin" />}
                 Confirmer
               </button>
             </div>
@@ -341,13 +376,8 @@ export default function ParametresPage() {
   );
 }
 
-// ═══════════════════════════════════════════════════════════
-// Composant Toggle Row
-// ═══════════════════════════════════════════════════════════
 function ToggleRow({
-  label,
-  checked,
-  onChange,
+  label, checked, onChange,
 }: {
   label: string;
   checked: boolean;
