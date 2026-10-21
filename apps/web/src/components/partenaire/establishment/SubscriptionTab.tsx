@@ -74,7 +74,9 @@ export default function SubscriptionTab({ establishment }: SubscriptionTabProps)
 
   const statusConfig = SUBSCRIPTION_STATUS_CONFIG[subscription.status as keyof typeof SUBSCRIPTION_STATUS_CONFIG] || SUBSCRIPTION_STATUS_CONFIG.active;
   const daysRemaining = getDaysRemaining(subscription.endsAt);
-  const isFree = plan?.period === 'free';
+  const isFree = !plan || plan.price === 0;
+  const planLabel = plan?.label || 'Découverte';
+  const planPrice = plan?.price || 0;
 
   return (
     <>
@@ -85,10 +87,10 @@ export default function SubscriptionTab({ establishment }: SubscriptionTabProps)
               Formule actuelle
             </div>
             <div className="text-3xl font-extrabold mb-2">
-              {plan?.label || 'Formule'}
+              {planLabel}
             </div>
             <div className="text-2xl font-bold text-ic-or">
-              {isFree ? 'Gratuit' : `${plan?.price} $ / mois`}
+              {isFree ? 'Gratuit' : `${planPrice} $ / mois`}
             </div>
           </div>
           <span className={cn('text-[10px] font-bold px-3 py-1.5 rounded-full inline-flex items-center gap-1.5', statusConfig.color)}>
@@ -141,7 +143,7 @@ export default function SubscriptionTab({ establishment }: SubscriptionTabProps)
           <div className="space-y-2 text-sm">
             <div className="flex justify-between">
               <span className="text-gris-texte">Montant</span>
-              <b className="text-marine">{isFree ? '0 $ (gratuit)' : `${plan?.price} $`}</b>
+              <b className="text-marine">{isFree ? 'Gratuit' : `${planPrice} $`}</b>
             </div>
             <div className="flex justify-between">
               <span className="text-gris-texte">Date</span>
@@ -178,7 +180,7 @@ export default function SubscriptionTab({ establishment }: SubscriptionTabProps)
         </div>
       )}
 
-      {isFree && (
+      {isFree && plan?.audience === 'association' && (
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6 flex items-start gap-3">
           <AlertCircle size={16} className="text-blue-600 flex-shrink-0 mt-0.5" />
           <div className="text-xs text-blue-800 leading-relaxed">
@@ -196,7 +198,10 @@ export default function SubscriptionTab({ establishment }: SubscriptionTabProps)
           {isFree ? 'Choisir une formule' : 'Changer de formule'}
         </button>
 
-        <button className="inline-flex items-center gap-2 text-xs font-bold border border-gris-ligne text-marine px-5 py-3 rounded-full hover:border-marine transition-colors">
+        <button
+          onClick={() => alert('Fonctionnalité à venir : historique des factures')}
+          className="inline-flex items-center gap-2 text-xs font-bold border border-gris-ligne text-marine px-5 py-3 rounded-full hover:border-marine transition-colors"
+        >
           <FileText size={14} />
           Voir les factures
         </button>

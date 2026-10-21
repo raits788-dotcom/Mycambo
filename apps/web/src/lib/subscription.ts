@@ -6,10 +6,6 @@ const supabase = () =>
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   );
 
-// ═══════════════════════════════════════════════════════════
-// TYPES
-// ═══════════════════════════════════════════════════════════
-
 export type PlanId = string;
 
 export interface SubscriptionPlan {
@@ -22,6 +18,7 @@ export interface SubscriptionPlan {
   popular?: boolean;
   period: 'free' | 'monthly' | 'yearly';
   maxBusinesses: number;
+  audience: 'business' | 'association';
 }
 
 export interface Subscription {
@@ -43,12 +40,22 @@ export const SUBSCRIPTION_STATUS_CONFIG = {
 } as const;
 
 // ═══════════════════════════════════════════════════════════
-// FORMULES (lecture BDD)
+// FORMULES (lecture BDD) — TOUS AUDIENCES CONFONDUES
 // ═══════════════════════════════════════════════════════════
 
-export async function getSubscriptionPlans(): Promise<SubscriptionPlan[]> {
+export async function getSubscriptionPlans(audience?: 'business' | 'association'): Promise<SubscriptionPlan[]> {
+  let query = supabase()
+    .from('plans')
+    .select('*')
+    .eq('is_active', true)
+    .order('position');
+
+  if (audience) {
+    query = query.eq('audience', audience);
+  }
+
   const [plansRes, versionsRes, featuresRes] = await Promise.all([
-    supabase().from('plans').select('*').eq('is_active', true).eq('audience', 'business').order('position'),
+    query,
     supabase().from('plan_versions').select('*').eq('status', 'current'),
     supabase().from('plan_features').select('*').eq('is_active', true),
   ]);
@@ -72,11 +79,13 @@ export async function getSubscriptionPlans(): Promise<SubscriptionPlan[]> {
       popular: p.slug === 'pro',
       period: price === 0 ? 'free' : 'monthly',
       maxBusinesses: v?.max_businesses ?? p.max_businesses ?? 1,
+      audience: p.audience || 'business',
     };
   });
 }
 
 export async function getPlanById(planId: string): Promise<SubscriptionPlan | null> {
+  // Cherche dans TOUS les plans (business + association)
   const plans = await getSubscriptionPlans();
   return plans.find((p) => p.id === planId || p.slug === planId) || null;
 }
@@ -85,20 +94,9 @@ export async function getPlanById(planId: string): Promise<SubscriptionPlan | nu
 // ABONNEMENT D'UN ÉTABLISSEMENT
 // ═══════════════════════════════════════════════════════════
 
-/**
- * Récupère l'abonnement d'un établissement.
- *
- * Logique de priorité :
- * 1. Cherche une souscription active liée au business (`business_id`)
- * 2. Sinon, cherche une souscription active liée au tenant (`tenant_id`)
- * 3. Sinon, utilise le plan par défaut du business (`businesses.plan_id`)
- * 4. Sinon, utilise le plan par défaut du tenant (`tenants.plan_id`)
- * 5. Sinon, retourne null (formule Découverte implicite)
- */
 export async function getSubscription(businessSlug: string): Promise<Subscription | null> {
   const client = supabase();
 
-  // 1. Récupère le business avec son plan_id
   const { data: business } = await client
     .from('businesses')
     .select('id, tenant_id, plan_id')
@@ -107,7 +105,7 @@ export async function getSubscription(businessSlug: string): Promise<Subscriptio
 
   if (!business) return null;
 
-  // 2. Cherche une souscription active liée au BUSINESS
+  // 1. Cherche une souscription active liée au BUSINESS
   const { data: subByBusiness } = await client
     .from('subscriptions')
     .select('*, plans(name, slug)')
@@ -128,29 +126,7 @@ export async function getSubscription(businessSlug: string): Promise<Subscriptio
     };
   }
 
-  // 3. Cherche une souscription active liée au TENANT
-  const { data: subByTenant } = await client
-    .from('subscriptions')
-    .select('*, plans(name, slug)')
-    .eq('tenant_id', business.tenant_id)
-    .is('business_id', null)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (subByTenant) {
-    return {
-      planId: subByTenant.plan_id,
-      status: subByTenant.status || 'active',
-      startedAt: subByTenant.current_period_start,
-      endsAt: subByTenant.current_period_end,
-      autoRenew: true,
-      nextBillingDate: subByTenant.current_period_end,
-      paymentMethod: null,
-    };
-  }
-
-  // 4. Fallback : utiliser le plan par défaut du business
+  // 2. Fallback : utiliser le plan par défaut du business
   if (business.plan_id) {
     const now = new Date();
     const inOneMonth = new Date(now);
@@ -167,7 +143,6 @@ export async function getSubscription(businessSlug: string): Promise<Subscriptio
     };
   }
 
-  // 5. Aucun abonnement trouvé → formule Découverte implicite
   return null;
 }
 

@@ -12,12 +12,10 @@ function getAdminBaseUrl(): string {
   if (typeof window !== 'undefined') {
     const host = window.location.hostname;
 
-    // Production : dev.mycambo.net → admin.mycambo.net
     if (host === 'dev.mycambo.net' || host === 'mycambo.net') {
       return 'https://admin.mycambo.net';
     }
 
-    // GitHub Codespaces : -3000 → -3001
     if (host.includes('github.dev')) {
       return window.location.origin.replace('-3000.', '-3001.');
     }
@@ -56,8 +54,20 @@ export default function ImpersonationBanner() {
 
   const handleQuit = () => {
     clearImpersonation();
-    const adminUrl = getAdminBaseUrl();
-    window.location.href = `${adminUrl}/tenants`;
+
+    // Tente de fermer l'onglet (fonctionne si ouvert via window.open)
+    try {
+      window.close();
+
+      // Si window.close() échoue (onglet ouvert directement), redirection
+      setTimeout(() => {
+        const adminUrl = getAdminBaseUrl();
+        window.location.href = `${adminUrl}/tenants`;
+      }, 100);
+    } catch {
+      const adminUrl = getAdminBaseUrl();
+      window.location.href = `${adminUrl}/tenants`;
+    }
   };
 
   return (
