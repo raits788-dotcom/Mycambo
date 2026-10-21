@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import {
   ShieldCheck, Loader2, Eye, Mail, MapPin, Clock, CheckCircle2, XCircle,
-  X, Award, Inbox, History, Bell, Send, FileText,
+  X, Award, Inbox, History, Bell, Send, FileText, Store,
 } from 'lucide-react';
 import {
   getSubmittedVerifications,
@@ -52,10 +52,11 @@ export default function VerificationsPage() {
   useEffect(() => { reload(); }, []);
 
   const handleApprove = async (v: any) => {
-    if (!confirm(`Approuver le dossier de "${v.tenant?.name}" ?\n\nCela le passera au niveau Vérifié (Bronze).`)) return;
+    const businessName = v.business?.name || v.tenant?.name;
+    if (!confirm(`Approuver le dossier de "${businessName}" ?\n\nCela le passera au niveau Vérifié (Bronze).`)) return;
     setProcessing(v.id);
     try {
-      await approveVerification(v.id, v.tenant_id);
+      await approveVerification(v.id, v.business_id || v.tenant_id);
       setSelected(null);
       await reload();
     } catch (err) {
@@ -100,7 +101,7 @@ export default function VerificationsPage() {
           Vérifications
         </h1>
         <p className="text-sm text-gris-texte">
-          Contrôle qualité des fiches partenaires.
+          Contrôle qualité des fiches établissements.
         </p>
       </div>
 
@@ -154,7 +155,7 @@ export default function VerificationsPage() {
             <ShieldCheck size={18} className="text-blue-600 flex-shrink-0 mt-0.5" />
             <div className="text-xs text-blue-800">
               <strong className="block mb-1">Dossiers en révision</strong>
-              Ces partenaires ont complété leur dossier. Vérifiez les informations,
+              Ces établissements ont complété leur dossier. Vérifiez les informations,
               les photos et appelez pour confirmer avant d&apos;approuver.
             </div>
           </div>
@@ -170,36 +171,41 @@ export default function VerificationsPage() {
             </div>
           ) : (
             <div className="space-y-3">
-              {submitted.map((v) => (
-                <div key={v.id} className="bg-white rounded-xl border border-gris-ligne p-5 shadow-cb-sm">
-                  <div className="flex items-start gap-4 flex-wrap">
-                    <div className="w-12 h-12 rounded-xl bg-orange-100 text-orange-700 flex items-center justify-center flex-shrink-0">
-                      <Clock size={20} />
-                    </div>
-                    <div className="flex-1 min-w-[200px]">
-                      <div className="flex items-center gap-2 flex-wrap mb-1">
-                        <h3 className="font-bold text-marine">{v.tenant?.name}</h3>
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-orange-100 text-orange-700">
-                          <Award size={10} /> Dossier soumis
-                        </span>
+              {submitted.map((v) => {
+                const businessName = v.business?.name || v.tenant?.name;
+                const businessEmail = v.business?.email || v.tenant?.email;
+                const businessCity = v.business?.city || v.tenant?.city;
+                return (
+                  <div key={v.id} className="bg-white rounded-xl border border-gris-ligne p-5 shadow-cb-sm">
+                    <div className="flex items-start gap-4 flex-wrap">
+                      <div className="w-12 h-12 rounded-xl bg-orange-100 text-orange-700 flex items-center justify-center flex-shrink-0">
+                        <Store size={20} />
                       </div>
-                      <div className="flex items-center gap-3 flex-wrap text-xs text-gris-texte">
-                        <span className="flex items-center gap-1"><Mail size={11} /> {v.tenant?.email}</span>
-                        {v.tenant?.city && <span className="flex items-center gap-1"><MapPin size={11} /> {v.tenant.city}</span>}
-                        <span className="text-gris-doux">
-                          Soumis {v.last_submitted_at ? new Date(v.last_submitted_at).toLocaleDateString('fr-FR') : '—'}
-                        </span>
+                      <div className="flex-1 min-w-[200px]">
+                        <div className="flex items-center gap-2 flex-wrap mb-1">
+                          <h3 className="font-bold text-marine">{businessName}</h3>
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-orange-100 text-orange-700">
+                            <Award size={10} /> Dossier soumis
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-3 flex-wrap text-xs text-gris-texte">
+                          {businessEmail && <span className="flex items-center gap-1"><Mail size={11} /> {businessEmail}</span>}
+                          {businessCity && <span className="flex items-center gap-1"><MapPin size={11} /> {businessCity}</span>}
+                          <span className="text-gris-doux">
+                            Soumis {v.last_submitted_at ? new Date(v.last_submitted_at).toLocaleDateString('fr-FR') : '—'}
+                          </span>
+                        </div>
                       </div>
+                      <button
+                        onClick={() => setSelected(v)}
+                        className="flex items-center gap-2 bg-marine text-white font-bold text-xs px-4 py-2 rounded-full hover:bg-marine-dark"
+                      >
+                        <Eye size={12} /> Examiner
+                      </button>
                     </div>
-                    <button
-                      onClick={() => setSelected(v)}
-                      className="flex items-center gap-2 bg-marine text-white font-bold text-xs px-4 py-2 rounded-full hover:bg-marine-dark"
-                    >
-                      <Eye size={12} /> Examiner
-                    </button>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </>
@@ -214,7 +220,7 @@ export default function VerificationsPage() {
             <Bell size={18} className="text-amber-600 flex-shrink-0 mt-0.5" />
             <div className="text-xs text-amber-800">
               <strong className="block mb-1">En attente de dossier</strong>
-              Ces partenaires ont un compte actif mais n&apos;ont pas encore soumis
+              Ces établissements sont actifs mais n&apos;ont pas encore soumis
               leur dossier de vérification. Relancez-les pour qu&apos;ils complètent.
             </div>
           </div>
@@ -226,37 +232,37 @@ export default function VerificationsPage() {
           ) : pending.length === 0 ? (
             <div className="bg-white rounded-xl border border-gris-ligne p-12 text-center">
               <CheckCircle2 size={32} className="text-green-500 mx-auto mb-3" />
-              <p className="text-sm text-gris-texte">Tous les partenaires ont soumis leur dossier.</p>
+              <p className="text-sm text-gris-texte">Tous les établissements ont soumis leur dossier.</p>
             </div>
           ) : (
             <div className="space-y-3">
-              {pending.map((t) => (
-                <div key={t.id} className="bg-white rounded-xl border border-gris-ligne p-5 shadow-cb-sm">
+              {pending.map((b) => (
+                <div key={b.id} className="bg-white rounded-xl border border-gris-ligne p-5 shadow-cb-sm">
                   <div className="flex items-start gap-4 flex-wrap">
                     <div className="w-12 h-12 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center flex-shrink-0">
-                      <Clock size={20} />
+                      <Store size={20} />
                     </div>
                     <div className="flex-1 min-w-[200px]">
                       <div className="flex items-center gap-2 flex-wrap mb-1">
-                        <h3 className="font-bold text-marine">{t.name}</h3>
+                        <h3 className="font-bold text-marine">{b.name}</h3>
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-700">
                           En attente
                         </span>
                       </div>
                       <div className="flex items-center gap-3 flex-wrap text-xs text-gris-texte">
-                        <span className="flex items-center gap-1"><Mail size={11} /> {t.email}</span>
-                        {t.city && <span className="flex items-center gap-1"><MapPin size={11} /> {t.city}</span>}
+                        {b.email && <span className="flex items-center gap-1"><Mail size={11} /> {b.email}</span>}
+                        {b.city && <span className="flex items-center gap-1"><MapPin size={11} /> {b.city}</span>}
                         <span className="text-gris-doux">
-                          Inscrit le {new Date(t.created_at).toLocaleDateString('fr-FR')}
+                          Inscrit le {new Date(b.created_at).toLocaleDateString('fr-FR')}
                         </span>
                       </div>
                     </div>
                     <button
-                      onClick={() => handleReminder(t.id)}
-                      disabled={sendingReminder === t.id}
+                      onClick={() => handleReminder(b.tenant_id)}
+                      disabled={sendingReminder === b.tenant_id}
                       className="flex items-center gap-2 bg-amber-600 text-white font-bold text-xs px-4 py-2 rounded-full hover:bg-amber-700 disabled:opacity-50"
                     >
-                      {sendingReminder === t.id ? (
+                      {sendingReminder === b.tenant_id ? (
                         <><Loader2 size={12} className="animate-spin" /> Envoi...</>
                       ) : (
                         <><Send size={12} /> Relancer</>
@@ -286,32 +292,38 @@ export default function VerificationsPage() {
               <table className="w-full text-sm">
                 <thead className="bg-gris-fond text-gris-texte text-xs uppercase tracking-wider">
                   <tr>
-                    <th className="text-left px-5 py-3 font-bold">Tenant</th>
+                    <th className="text-left px-5 py-3 font-bold">Établissement</th>
+                    <th className="text-left px-3 py-3 font-bold">Tenant</th>
                     <th className="text-left px-3 py-3 font-bold">Statut</th>
                     <th className="text-left px-3 py-3 font-bold">Date</th>
                     <th className="text-left px-3 py-3 font-bold">Motif</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gris-ligne">
-                  {history.map((h) => (
-                    <tr key={h.id} className="hover:bg-gris-fond/50">
-                      <td className="px-5 py-3 font-bold text-marine">{h.tenant?.name || '—'}</td>
-                      <td className="px-3 py-3">
-                        <span className={
-                          'inline-flex px-2 py-0.5 rounded-full text-[11px] font-bold ' +
-                          (h.status === 'approved' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700')
-                        }>
-                          {h.status === 'approved' ? '✓ Approuvé' : '✗ Refusé'}
-                        </span>
-                      </td>
-                      <td className="px-3 py-3 text-xs text-gris-texte">
-                        {h.reviewed_at ? new Date(h.reviewed_at).toLocaleDateString('fr-FR') : '—'}
-                      </td>
-                      <td className="px-3 py-3 text-xs text-gris-texte">
-                        {h.rejection_reason || h.reviewer_notes || '—'}
-                      </td>
-                    </tr>
-                  ))}
+                  {history.map((h) => {
+                    const businessName = h.business?.name || '—';
+                    const tenantName = h.tenant?.name || '—';
+                    return (
+                      <tr key={h.id} className="hover:bg-gris-fond/50">
+                        <td className="px-5 py-3 font-bold text-marine">{businessName}</td>
+                        <td className="px-3 py-3 text-xs text-gris-texte">{tenantName}</td>
+                        <td className="px-3 py-3">
+                          <span className={
+                            'inline-flex px-2 py-0.5 rounded-full text-[11px] font-bold ' +
+                            (h.status === 'approved' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700')
+                          }>
+                            {h.status === 'approved' ? '✓ Approuvé' : '✗ Refusé'}
+                          </span>
+                        </td>
+                        <td className="px-3 py-3 text-xs text-gris-texte">
+                          {h.reviewed_at ? new Date(h.reviewed_at).toLocaleDateString('fr-FR') : '—'}
+                        </td>
+                        <td className="px-3 py-3 text-xs text-gris-texte">
+                          {h.rejection_reason || h.reviewer_notes || '—'}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             )}
@@ -319,14 +331,18 @@ export default function VerificationsPage() {
         </>
       )}
 
-      {/* Modale détail (pour l'onglet "soumis") */}
+      {/* Modale détail */}
       {selected && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-start justify-center p-4 overflow-y-auto">
           <div className="bg-white rounded-2xl max-w-4xl w-full my-8 max-h-[calc(100vh-4rem)] flex flex-col">
             <div className="flex items-center justify-between p-6 border-b border-gris-ligne bg-white rounded-t-2xl shrink-0">
               <div>
-                <h2 className="text-xl font-extrabold text-marine">{selected.tenant?.name}</h2>
-                <p className="text-xs text-gris-texte mt-1">{selected.tenant?.email}</p>
+                <h2 className="text-xl font-extrabold text-marine">
+                  {selected.business?.name || selected.tenant?.name}
+                </h2>
+                <p className="text-xs text-gris-texte mt-1">
+                  {selected.business?.email || selected.tenant?.email}
+                </p>
               </div>
               <button
                 onClick={() => setSelected(null)}

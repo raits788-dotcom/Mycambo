@@ -103,7 +103,7 @@ export async function getSubscriptions() {
   const supabase = getSupabase();
   const { data, error } = await supabase
     .from('subscriptions')
-    .select('*, plans(name, price_monthly), tenants(name, id)')
+    .select('*, plans(name, price_monthly), tenants(name, id), businesses(name, id)')
     .order('current_period_end', { ascending: false });
   if (error) { console.error('getSubscriptions error:', error); return []; }
   return data || [];
@@ -116,7 +116,7 @@ export async function getPayments() {
   const supabase = getSupabase();
   const { data, error } = await supabase
     .from('payments')
-    .select('*, tenants(name, id)')
+    .select('*, tenants(name, id), businesses(name, id)')
     .order('created_at', { ascending: false });
   if (error) { console.error('getPayments error:', error); return []; }
   return data || [];
@@ -337,7 +337,7 @@ export async function createTenant(payload: {
     p_city: payload.city || null,
     p_address: payload.address || null,
     p_description: payload.description || null,
-    p_structure_type: payload.structure_type || 'commerce',
+    p_structure_type: payload.structure_type || 'commercial',
     p_plan_id: payload.plan_id || null,
   });
   if (error) throw error;
@@ -1150,7 +1150,7 @@ export async function deletePartnerRequest(requestId: string) {
 }
 
 // ============================================================================
-// VÉRIFICATIONS — 3 VUES
+// VÉRIFICATIONS — 3 VUES (par ÉTABLISSEMENT)
 // ============================================================================
 
 /**
@@ -1162,11 +1162,15 @@ export async function getSubmittedVerifications() {
     .from('tenant_verifications')
     .select(`
       *,
+      business:businesses!tenant_verifications_business_id_fkey(
+        id, name, email, city, phone, status, tenant_id
+      ),
       tenant:tenants!tenant_verifications_tenant_id_fkey(
-        id, name, email, city, phone, status, verification_level, created_at
+        id, name, email
       )
     `)
     .eq('status', 'submitted')
+    .not('business_id', 'is', null)
     .order('last_submitted_at', { ascending: false });
 
   if (error) { console.error('getSubmittedVerifications:', error); return []; }
@@ -1174,24 +1178,28 @@ export async function getSubmittedVerifications() {
 }
 
 /**
- * Onglet 2 : Tenants sans dossier soumis (en attente)
+ * Onglet 2 : Établissements sans dossier soumis (en attente)
  */
 export async function getPendingVerifications() {
   const supabase = getSupabase();
 
-  const { data: tenants, error } = await supabase
-    .from('tenants')
+  // Récupère les BUSINESS (pas les tenants)
+  const { data: businesses, error } = await supabase
+    .from('businesses')
     .select(`
-      id, name, email, city, phone, status, verification_level, created_at,
-      tenant_verifications(status, last_submitted_at)
+      id, name, email, city, phone, status, tenant_id, plan_id, created_at,
+      tenant_verifications(status, last_submitted_at, business_id)
     `)
-    .eq('status', 'active')
+    .eq('status', 'approved')
     .order('created_at', { ascending: false });
 
   if (error) { console.error('getPendingVerifications:', error); return []; }
 
-  return (tenants || []).filter((t: any) => {
-    const verif = Array.isArray(t.tenant_verifications) ? t.tenant_verifications[0] : t.tenant_verifications;
+  // Filtre : garde ceux sans dossier lié à ce business
+  return (businesses || []).filter((b: any) => {
+    const verif = Array.isArray(b.tenant_verifications)
+      ? b.tenant_verifications.find((v: any) => v.business_id === b.id)
+      : (b.tenant_verifications?.business_id === b.id ? b.tenant_verifications : null);
     return !verif || verif.status === 'incomplete' || verif.status === 'rejected';
   });
 }
@@ -1205,6 +1213,7 @@ export async function getVerificationHistoryList(limit = 100) {
     .from('tenant_verifications')
     .select(`
       *,
+      business:businesses!tenant_verifications_business_id_fkey(id, name),
       tenant:tenants!tenant_verifications_tenant_id_fkey(id, name, email)
     `)
     .in('status', ['approved', 'rejected'])
@@ -1216,7 +1225,7 @@ export async function getVerificationHistoryList(limit = 100) {
 }
 
 /**
- * Relance par email un tenant sans dossier
+ * Relance par email un établissement sans dossier
  */
 export async function remindTenantToSubmitVerification(tenantId: string) {
   const supabase = getSupabase();
@@ -1278,7 +1287,7 @@ export async function remindTenantToSubmitVerification(tenantId: string) {
 /**
  * Approuver une vérification (passe au niveau supérieur)
  */
-export async function approveVerification(verifId: string, tenantId: string, notes?: string) {
+export async function approveVerification(verifId: string, businessId: string, notes?: string) {
   const supabase = getSupabase();
 
   await supabase
@@ -1290,7 +1299,19 @@ export async function approveVerification(verifId: string, tenantId: string, not
     })
     .eq('id', verifId);
 
-  await changeVerificationLevel(tenantId, 'verifie', notes || 'Approuvé via vérification');
+  // Change le niveau de vérification du business
+  await supabase
+    .from('businesses')
+    .update({ verified_at: new Date().toISOString() })
+    .eq('id', businessId);
+
+  // Log audit
+  await supabase.from('audit_logs').insert({
+    actor_type: 'superadmin',
+    action: 'business.verify',
+    entity_type: 'business',
+    entity_id: businessId,
+  });
 }
 
 /**
@@ -1307,6 +1328,7 @@ export async function rejectVerification(verifId: string, reason: string) {
     })
     .eq('id', verifId);
 }
+
 // ============================================================================
 // NOTIFICATIONS ADMIN
 // ============================================================================
