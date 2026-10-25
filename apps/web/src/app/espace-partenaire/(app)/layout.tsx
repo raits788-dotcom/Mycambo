@@ -78,10 +78,15 @@ export default function PartnerAppLayout({
         return;
       }
 
-      // ▼▼▼ BANDEAU JAUNE : session partenaire normale ▼▼▼
-      // Toute session connectée sur /espace-partenaire est un partenaire admin de son espace
-      setIsPartnerSession(true);
+      // ▼▼▼ FORCER LE CHANGEMENT DE MDP ▼▼▼
+      const mustChange = session.user.user_metadata?.must_change_password === true;
+      if (mustChange && pathname !== '/espace-partenaire/changer-mot-de-passe') {
+        router.replace('/espace-partenaire/changer-mot-de-passe');
+        return;
+      }
       // ▲▲▲ FIN DÉTECTION ▲▲▲
+
+      setIsPartnerSession(true);
 
       setAuthorized(true);
       setChecking(false);

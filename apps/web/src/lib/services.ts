@@ -118,3 +118,46 @@ export async function requestAccountDeletion(payload: {
 
   if (error) throw error;
 }
+// ============================================================================
+// AVIS — par établissement (business)
+// ============================================================================
+export async function getReviewsForBusiness(businessId: string) {
+  const supabase = createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
+
+  const { data, error } = await supabase
+    .from('reviews')
+    .select('*')
+    .eq('business_id', businessId)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('getReviewsForBusiness:', error);
+    return [];
+  }
+  return data || [];
+}
+
+// ============================================================================
+// DEMANDES — par établissement (business)
+// ============================================================================
+export async function getContactMessagesForBusiness(businessId: string) {
+  const supabase = createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
+
+  const { data, error } = await supabase
+    .from('contact_messages')
+    .select('*')
+    .eq('business_id', businessId)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('getContactMessagesForBusiness:', error);
+    return [];
+  }
+  return data || [];
+}

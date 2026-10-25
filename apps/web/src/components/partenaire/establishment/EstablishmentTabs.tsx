@@ -8,8 +8,10 @@ import PhotosTab from './PhotosTab';
 import ServicesTab from './ServicesTab';
 import StatsTab from './StatsTab';
 import SubscriptionTab from './SubscriptionTab';
+import ReviewsTab from './ReviewsTab';
+import RequestsTab from './RequestsTab';
 
-type TabId = 'info' | 'photos' | 'services' | 'stats' | 'subscription';
+type TabId = 'info' | 'photos' | 'services' | 'stats' | 'reviews' | 'requests' | 'subscription';
 
 interface EstablishmentTabsProps {
   establishment: StoredEstablishment;
@@ -27,6 +29,8 @@ export default function EstablishmentTabs({
     { id: 'photos' as TabId, label: 'Photos', icon: 'fa-images' },
     { id: 'services' as TabId, label: 'Services', icon: 'fa-gift' },
     { id: 'stats' as TabId, label: 'Statistiques', icon: 'fa-chart-line' },
+    { id: 'reviews' as TabId, label: 'Avis', icon: 'fa-star' },
+    { id: 'requests' as TabId, label: 'Demandes', icon: 'fa-inbox' },
     {
       id: 'subscription' as TabId,
       label: 'Abonnement',
@@ -65,6 +69,8 @@ export default function EstablishmentTabs({
           <ServicesTab establishment={establishment} onUpdate={onUpdate} />
         )}
         {tab === 'stats' && <StatsTab establishment={establishment} />}
+        {tab === 'reviews' && <ReviewsTab establishment={establishment} />}
+        {tab === 'requests' && <RequestsTab establishment={establishment} />}
         {tab === 'subscription' && (
           <SubscriptionTab establishment={establishment} />
         )}
