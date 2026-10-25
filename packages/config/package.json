@@ -5,12 +5,12 @@
   "main": "index.js",
   "types": "index.d.ts",
   "files": [
-    "tailwind.config.ts",
+    "tailwind.js",
     "tsconfig.json",
     "eslint.config.js"
   ],
   "exports": {
-    "./tailwind": "./tailwind.config.ts",
+    "./tailwind": "./tailwind.js",
     "./tsconfig": "./tsconfig.json",
     "./eslint": "./eslint.config.js"
   },
