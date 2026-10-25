@@ -4,21 +4,23 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import {
   Search, Filter, CheckCircle2, XCircle, Clock, Download,
-  Building2, RefreshCw, Loader2,
+  Building2, Loader2, Check, Ban, Store,
 } from 'lucide-react';
-import { getPayments } from '@/lib/services';
+import { getPayments, validatePaymentManually, cancelPaymentManually } from '@/lib/services';
 
 const STATUS_STYLES: Record<string, string> = {
   paid: 'bg-green-100 text-green-700',
   pending: 'bg-orange-100 text-orange-700',
   failed: 'bg-red-100 text-red-700',
   refunded: 'bg-gris-fond text-gris-texte',
+  cancelled: 'bg-gris-fond text-gris-texte',
 };
 const STATUS_LABELS: Record<string, string> = {
   paid: 'Payé',
   pending: 'En attente',
   failed: 'Échoué',
   refunded: 'Remboursé',
+  cancelled: 'Annulé',
 };
 const METHOD_LABELS: Record<string, string> = {
   aba: 'ABA PayWay',
@@ -41,17 +43,52 @@ export default function PaymentsPage() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [methodFilter, setMethodFilter] = useState<string>('all');
+  const [validating, setValidating] = useState<string | null>(null);
+  const [canceling, setCanceling] = useState<string | null>(null);
 
-  useEffect(() => {
-    (async () => {
-      const data = await getPayments();
-      setPayments(data);
-      setLoading(false);
-    })();
-  }, []);
+  const reload = async () => {
+    setLoading(true);
+    const data = await getPayments();
+    setPayments(data);
+    setLoading(false);
+  };
+
+  useEffect(() => { reload(); }, []);
+
+  const handleValidate = async (paymentId: string) => {
+    if (!confirm('Confirmer la validation de ce paiement ?\n\nCela marquera le paiement comme payé et publiera l\'établissement.')) return;
+    setValidating(paymentId);
+    try {
+      await validatePaymentManually(paymentId);
+      alert('✅ Paiement validé et établissement publié');
+      await reload();
+    } catch (err) {
+      alert('Erreur : ' + (err as Error).message);
+    } finally {
+      setValidating(null);
+    }
+  };
+
+  const handleCancel = async (paymentId: string) => {
+    const reason = prompt('Motif de l\'annulation (obligatoire) :');
+    if (!reason || !reason.trim()) return;
+    setCanceling(paymentId);
+    try {
+      await cancelPaymentManually(paymentId, reason);
+      alert('✅ Paiement annulé et établissement dépublié');
+      await reload();
+    } catch (err) {
+      alert('Erreur : ' + (err as Error).message);
+    } finally {
+      setCanceling(null);
+    }
+  };
 
   const filtered = payments.filter((p) => {
-    const matchSearch = (p.tenants?.name || '').toLowerCase().includes(search.toLowerCase()) || (p.gateway_ref || '').toLowerCase().includes(search.toLowerCase());
+    const matchSearch =
+      (p.businesses?.name || '').toLowerCase().includes(search.toLowerCase()) ||
+      (p.tenants?.name || '').toLowerCase().includes(search.toLowerCase()) ||
+      (p.gateway_ref || '').toLowerCase().includes(search.toLowerCase());
     const matchStatus = statusFilter === 'all' || p.status === statusFilter;
     const matchMethod = methodFilter === 'all' || p.method === methodFilter;
     return matchSearch && matchStatus && matchMethod;
@@ -93,7 +130,7 @@ export default function PaymentsPage() {
       <div className="bg-white rounded-xl border border-gris-ligne p-4 mb-5 flex flex-wrap gap-3 items-center shadow-cb-sm">
         <div className="flex-1 min-w-[200px] relative">
           <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gris-doux" />
-          <input type="text" placeholder="Rechercher par tenant, référence..." value={search} onChange={(e) => setSearch(e.target.value)} className="w-full pl-9 pr-4 py-2.5 text-sm rounded-lg border border-gris-ligne focus:border-marine focus:outline-none" />
+          <input type="text" placeholder="Rechercher par établissement, tenant, référence..." value={search} onChange={(e) => setSearch(e.target.value)} className="w-full pl-9 pr-4 py-2.5 text-sm rounded-lg border border-gris-ligne focus:border-marine focus:outline-none" />
         </div>
         <div className="flex items-center gap-2">
           <Filter size={14} className="text-gris-doux" />
@@ -103,6 +140,7 @@ export default function PaymentsPage() {
             <option value="pending">En attente</option>
             <option value="failed">Échoué</option>
             <option value="refunded">Remboursé</option>
+            <option value="cancelled">Annulé</option>
           </select>
           <select value={methodFilter} onChange={(e) => setMethodFilter(e.target.value)} className="text-sm rounded-lg border border-gris-ligne px-3 py-2.5">
             <option value="all">Toutes méthodes</option>
@@ -110,6 +148,7 @@ export default function PaymentsPage() {
             <option value="wing">Wing</option>
             <option value="bakong">Bakong</option>
             <option value="stripe">Stripe</option>
+            <option value="manual">Manuel</option>
           </select>
         </div>
       </div>
@@ -122,11 +161,11 @@ export default function PaymentsPage() {
             <thead className="bg-gris-fond text-gris-texte text-xs uppercase tracking-wider">
               <tr>
                 <th className="text-left px-5 py-3 font-bold">Date</th>
-                <th className="text-left px-3 py-3 font-bold">Tenant</th>
-                <th className="text-left px-3 py-3 font-bold">Référence</th>
+                <th className="text-left px-3 py-3 font-bold">Établissement</th>
                 <th className="text-left px-3 py-3 font-bold">Méthode</th>
                 <th className="text-right px-3 py-3 font-bold">Montant</th>
                 <th className="text-left px-3 py-3 font-bold">Statut</th>
+                <th className="text-right px-5 py-3 font-bold">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gris-ligne">
@@ -135,13 +174,29 @@ export default function PaymentsPage() {
               ) : filtered.map((p) => (
                 <tr key={p.id} className="hover:bg-gris-fond/50">
                   <td className="px-5 py-4 text-xs text-gris-texte">{new Date(p.paid_at || p.created_at).toLocaleDateString('fr-FR')}</td>
+                  
+                  {/* ▼▼▼ COLONNE ÉTABLISSEMENT (avec tenant en sous-ligne) ▼▼▼ */}
                   <td className="px-3 py-4">
-                    <Link href={'/tenants/' + p.tenants?.id} className="flex items-center gap-2 font-bold text-marine hover:underline">
-                      <Building2 size={12} />
-                      <span className="truncate max-w-[140px]">{p.tenants?.name || '—'}</span>
-                    </Link>
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-marine/10 text-marine flex items-center justify-center flex-shrink-0">
+                        <Store size={14} />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="font-bold text-marine truncate max-w-[200px]">
+                          {p.businesses?.name || '—'}
+                        </div>
+                        <Link
+                          href={'/tenants/' + p.tenants?.id}
+                          className="text-[10px] text-gris-doux hover:text-marine hover:underline flex items-center gap-1"
+                        >
+                          <Building2 size={10} />
+                          {p.tenants?.name || '—'}
+                        </Link>
+                      </div>
+                    </div>
                   </td>
-                  <td className="px-3 py-4 text-xs font-mono text-gris-texte">{p.gateway_ref || '—'}</td>
+                  {/* ▲▲▲ FIN COLONNE ÉTABLISSEMENT ▲▲▲ */}
+
                   <td className="px-3 py-4">
                     <span className={'inline-flex px-2 py-0.5 rounded-full text-[11px] font-bold ' + (METHOD_COLORS[p.method] || '')}>
                       {METHOD_LABELS[p.method] || p.method}
@@ -152,6 +207,30 @@ export default function PaymentsPage() {
                     <span className={'inline-flex px-2 py-0.5 rounded-full text-[11px] font-bold ' + (STATUS_STYLES[p.status] || '')}>
                       {STATUS_LABELS[p.status] || p.status}
                     </span>
+                  </td>
+                  <td className="px-5 py-4">
+                    <div className="flex items-center justify-end gap-1.5">
+                      {p.status === 'pending' && p.amount > 0 && (
+                        <button
+                          onClick={() => handleValidate(p.id)}
+                          disabled={validating === p.id}
+                          className="flex items-center gap-1 text-xs font-bold bg-green-600 text-white px-3 py-1.5 rounded-full hover:bg-green-700 disabled:opacity-50"
+                        >
+                          {validating === p.id ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
+                          Valider
+                        </button>
+                      )}
+                      {p.status === 'paid' && (
+                        <button
+                          onClick={() => handleCancel(p.id)}
+                          disabled={canceling === p.id}
+                          className="flex items-center gap-1 text-xs font-bold border border-red-200 text-red-600 px-3 py-1.5 rounded-full hover:bg-red-50 disabled:opacity-50"
+                        >
+                          {canceling === p.id ? <Loader2 size={12} className="animate-spin" /> : <Ban size={12} />}
+                          Annuler
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}

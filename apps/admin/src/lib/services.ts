@@ -1524,3 +1524,231 @@ export async function requestAccountDeletion(payload: {
 
   if (error) throw error;
 }
+// ============================================================================
+// VALIDATION MANUELLE D'UN PAIEMENT
+// ============================================================================
+export async function validatePaymentManually(paymentId: string) {
+  const supabase = getSupabase();
+
+  // 1. Récupérer le paiement
+  const { data: payment, error: payErr } = await supabase
+    .from('payments')
+    .select('*, subscriptions(id, business_id)')
+    .eq('id', paymentId)
+    .single();
+
+  if (payErr || !payment) throw new Error('PAYMENT_NOT_FOUND');
+  if (payment.status === 'paid') throw new Error('ALREADY_PAID');
+
+  // 2. Mettre à jour le paiement
+  const now = new Date().toISOString();
+  await supabase
+    .from('payments')
+    .update({ status: 'paid', paid_at: now })
+    .eq('id', paymentId);
+
+  // 3. Mettre à jour la souscription
+  if (payment.subscription_id) {
+    const nextMonth = new Date();
+    nextMonth.setMonth(nextMonth.getMonth() + 1);
+    await supabase
+      .from('subscriptions')
+      .update({
+        status: 'active',
+        current_period_end: nextMonth.toISOString(),
+      })
+      .eq('id', payment.subscription_id);
+  }
+
+  // 4. Publier l'établissement
+  if (payment.business_id) {
+    await supabase
+      .from('businesses')
+      .update({ status: 'approved' })
+      .eq('id', payment.business_id);
+  }
+
+  // 5. Log audit
+  await supabase.from('audit_logs').insert({
+    actor_type: 'superadmin',
+    action: 'payment.validate_manual',
+    entity_type: 'payment',
+    entity_id: paymentId,
+    changes: { amount: payment.amount, method: payment.method },
+  });
+
+  return { success: true };
+}
+// ============================================================================
+// ANNULATION D'UN PAIEMENT
+// ============================================================================
+export async function cancelPaymentManually(paymentId: string, reason: string) {
+  const supabase = getSupabase();
+
+  // 1. Récupérer le paiement
+  const { data: payment, error: payErr } = await supabase
+    .from('payments')
+    .select('*, subscriptions(id, business_id)')
+    .eq('id', paymentId)
+    .single();
+
+  if (payErr || !payment) throw new Error('PAYMENT_NOT_FOUND');
+  if (payment.status !== 'paid') throw new Error('NOT_PAID_YET');
+
+  // 2. Mettre à jour le paiement
+  const now = new Date().toISOString();
+  await supabase
+    .from('payments')
+    .update({ 
+      status: 'refunded',
+      failure_reason: reason,
+      updated_at: now,
+    })
+    .eq('id', paymentId);
+
+  // 3. Mettre à jour la souscription (repasse en 'cancelled')
+  if (payment.subscription_id) {
+    await supabase
+      .from('subscriptions')
+      .update({
+        status: 'cancelled',
+        canceled_at: now,
+      })
+      .eq('id', payment.subscription_id);
+  }
+
+  // 4. Dépublier l'établissement
+  if (payment.business_id) {
+    await supabase
+      .from('businesses')
+      .update({ status: 'pending' })
+      .eq('id', payment.business_id);
+  }
+
+  // 5. Log audit
+  await supabase.from('audit_logs').insert({
+    actor_type: 'superadmin',
+    action: 'payment.cancel_manual',
+    entity_type: 'payment',
+    entity_id: paymentId,
+    changes: { reason, amount: payment.amount },
+  });
+
+  return { success: true };
+}
+// ============================================================================
+// ÉTABLISSEMENTS — Actions admin
+// ============================================================================
+export async function updateBusinessStatus(businessId: string, status: 'approved' | 'pending' | 'suspended') {
+  const supabase = getSupabase();
+  const { error } = await supabase
+    .from('businesses')
+    .update({ status })
+    .eq('id', businessId);
+  
+  if (error) throw error;
+
+  await supabase.from('audit_logs').insert({
+    actor_type: 'superadmin',
+    action: `business.${status}`,
+    entity_type: 'business',
+    entity_id: businessId,
+  });
+}
+
+export async function toggleFeatured(businessId: string) {
+  const supabase = getSupabase();
+  const { data: business } = await supabase
+    .from('businesses')
+    .select('is_featured')
+    .eq('id', businessId)
+    .single();
+
+  if (!business) throw new Error('BUSINESS_NOT_FOUND');
+
+  const { error } = await supabase
+    .from('businesses')
+    .update({ is_featured: !business.is_featured })
+    .eq('id', businessId);
+
+  if (error) throw error;
+}
+// ============================================================================
+// CATÉGORIES — CRUD
+// ============================================================================
+export async function createCategory(payload: {
+  name: string;
+  icon: string;
+  color: string;
+  position?: number;
+  parent_id?: string | null;
+}) {
+  const supabase = getSupabase();
+
+  // Génère le slug à partir du nom
+  const slug = payload.name
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+
+  const { data, error } = await supabase
+    .from('categories')
+    .insert({
+      name: payload.name,
+      slug,
+      icon: payload.icon,
+      color: payload.color,
+      position: payload.position || 99,
+      is_active: true,
+      parent_id: payload.parent_id || null,
+    })
+    .select()
+    .single();
+
+  if (error) throw error;
+
+  await supabase.from('audit_logs').insert({
+    actor_type: 'superadmin',
+    action: 'category.create',
+    entity_type: 'category',
+    entity_id: data.id,
+    changes: { name: payload.name },
+  });
+
+  return data;
+}
+
+export async function updateCategory(id: string, payload: Partial<{
+  name: string;
+  icon: string;
+  color: string;
+  position: number;
+  is_active: boolean;
+  parent_id: string | null;
+}>) {
+  const supabase = getSupabase();
+  const { error } = await supabase
+    .from('categories')
+    .update(payload)
+    .eq('id', id);
+  if (error) throw error;
+}
+
+export async function deleteCategory(id: string) {
+  const supabase = getSupabase();
+
+  // Vérifier qu'aucun business n'utilise cette catégorie
+  const { count } = await supabase
+    .from('businesses')
+    .select('*', { count: 'exact', head: true })
+    .eq('category_id', id);
+
+  if (count && count > 0) {
+    throw new Error(`Impossible de supprimer : ${count} établissement(s) utilisent cette catégorie.`);
+  }
+
+  const { error } = await supabase.from('categories').delete().eq('id', id);
+  if (error) throw error;
+}

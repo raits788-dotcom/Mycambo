@@ -26,6 +26,7 @@ import {
   Bell,
   HardDrive,
   Loader2,
+  Tag, // ← Ajouté pour les catégories
 } from 'lucide-react';
 import { cn } from '@my-cambo/utils';
 import { getCurrentAdmin, getInitials } from '@/lib/auth';
@@ -77,6 +78,7 @@ const NAV_SECTIONS: NavSection[] = [
     items: [
       { id: 'cms-pages', label: 'Pages', icon: FileText, href: '/cms' },
       { id: 'cms-carrousel', label: 'Carrousel', icon: ImageIcon, href: '/cms?tab=carrousel' },
+      { id: 'categories', label: 'Catégories', icon: Tag, href: '/categories' }, // ← Nouvelle entrée
     ],
   },
   {
