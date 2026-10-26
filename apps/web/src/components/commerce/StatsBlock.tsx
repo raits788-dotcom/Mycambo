@@ -2,14 +2,10 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { Eye, Heart } from 'lucide-react';
-import {
-  incrementViews,
-  getViews,
-  getSupports,
-  initStatsIfEmpty,
-} from '@/lib/stats-tracker';
+import { incrementViews, getViews, getSupports } from '@/lib/stats-tracker';
 
 interface StatsBlockProps {
+  // Identifiant de l'établissement (business_id). Nommé "slug" pour compat.
   slug: string;
   initialViews: number;
   initialSupports: number;
@@ -24,35 +20,32 @@ export default function StatsBlock({
   const [supports, setSupports] = useState(initialSupports);
   const [mounted, setMounted] = useState(false);
 
-  // ===== Fonction de lecture des stats =====
-  const refreshStats = useCallback(() => {
-    setViews(getViews(slug));
-    setSupports(getSupports(slug));
+  // ===== Lecture des stats depuis Supabase =====
+  const refreshStats = useCallback(async () => {
+    const [v, s] = await Promise.all([getViews(slug), getSupports(slug)]);
+    setViews(v);
+    setSupports(s);
   }, [slug]);
 
   useEffect(() => {
-    // 1. Initialise les compteurs
-    initStatsIfEmpty(slug, initialViews, initialSupports);
-
-    // 2. Incrémente les vues (une fois par session)
-    incrementViews(slug);
-
-    // 3. Lit les valeurs actuelles
-    refreshStats();
+    let active = true;
+    (async () => {
+      // Incrémente les vues (une fois par session) puis lit les valeurs
+      await incrementViews(slug);
+      if (active) await refreshStats();
+    })();
     setMounted(true);
 
-    // ===== Écoute les mises à jour =====
     const handleUpdate = () => refreshStats();
     window.addEventListener('stats-updated', handleUpdate);
-
-    // ===== Polling léger (toutes les 2s) pour rattraper les changements =====
-    const interval = setInterval(refreshStats, 2000);
+    const interval = setInterval(refreshStats, 5000);
 
     return () => {
+      active = false;
       window.removeEventListener('stats-updated', handleUpdate);
       clearInterval(interval);
     };
-  }, [slug, initialViews, initialSupports, refreshStats]);
+  }, [slug, refreshStats]);
 
   if (!mounted) {
     return (

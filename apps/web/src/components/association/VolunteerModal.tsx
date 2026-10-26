@@ -32,7 +32,7 @@ export default function VolunteerModal({
     setLoading(true);
     try {
       await submitVolunteer({ association_slug: associationSlug, ...form });
-      incrementSupports(associationSlug);
+      void incrementSupports(associationSlug);
       setSent(true);
     } catch (err) {
       console.error('Erreur candidature:', err);

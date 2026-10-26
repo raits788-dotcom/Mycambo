@@ -1,6 +1,14 @@
 // ============================================================================
-// DEMANDES DE MODIFICATION (mock — localStorage)
+// DEMANDES DE MODIFICATION (Supabase)
 // ============================================================================
+
+import { createBrowserClient } from '@supabase/ssr';
+
+const sb = () =>
+  createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
 
 export type ModificationField =
   | 'name'
@@ -26,8 +34,6 @@ export type ModificationRequest = {
   reviewedAt?: string;
 };
 
-const STORAGE_KEY = 'mycambo_modification_requests';
-
 export const MODIFICATION_FIELD_LABELS: Record<ModificationField, string> = {
   name: "Nom de l'établissement",
   category: 'Catégorie',
@@ -37,48 +43,98 @@ export const MODIFICATION_FIELD_LABELS: Record<ModificationField, string> = {
   registration_number: "Numéro d'enregistrement",
 };
 
-export function getModificationRequests(): ModificationRequest[] {
-  if (typeof window === 'undefined') return [];
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch {
-    return [];
-  }
-}
+// ----------------------------------------------------------------------------
+// Mapping colonnes Supabase (snake_case) -> type de retour (camelCase).
+// Table `modification_requests` : id, business_id, tenant_id, requested_by,
+// field, current_value, new_value, reason, status, reviewed_by, reviewed_at,
+// created_at. Les champs historiques fieldLabel et rejectionReason ne sont pas
+// stockés : fieldLabel est reconstruit depuis MODIFICATION_FIELD_LABELS, et
+// rejectionReason laissé vide, pour conserver la MÊME forme de retour.
+// ----------------------------------------------------------------------------
+type ModificationRequestRow = {
+  id: string;
+  business_id: string | null;
+  tenant_id: string | null;
+  requested_by: string | null;
+  field: ModificationField;
+  current_value: string | null;
+  new_value: string | null;
+  reason: string | null;
+  status: ModificationStatus;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  created_at: string;
+};
 
-export function getRequestsByEstablishment(
-  slug: string
-): ModificationRequest[] {
-  return getModificationRequests()
-    .filter((r) => r.establishmentSlug === slug)
-    .sort(
-      (a, b) =>
-        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-    );
-}
-
-export function addModificationRequest(
-  data: Omit<ModificationRequest, 'id' | 'createdAt' | 'status'>
-): ModificationRequest {
-  const all = getModificationRequests();
-  const request: ModificationRequest = {
-    ...data,
-    id: 'mod_' + Date.now(),
-    status: 'pending',
-    createdAt: new Date().toISOString(),
+function mapRow(row: ModificationRequestRow): ModificationRequest {
+  return {
+    id: row.id,
+    establishmentSlug: row.business_id ?? '',
+    field: row.field,
+    fieldLabel: MODIFICATION_FIELD_LABELS[row.field] ?? '',
+    oldValue: row.current_value ?? '',
+    newValue: row.new_value ?? '',
+    reason: row.reason ?? '',
+    status: row.status,
+    rejectionReason: undefined,
+    createdAt: row.created_at,
+    reviewedAt: row.reviewed_at ?? undefined,
   };
-  all.push(request);
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(all));
-  return request;
 }
 
-export function getPendingRequestsCountForEstablishment(
-  slug: string
-): number {
-  return getModificationRequests().filter(
-    (r) => r.establishmentSlug === slug && r.status === 'pending'
-  ).length;
+export async function getModificationRequests(): Promise<ModificationRequest[]> {
+  const { data, error } = await sb()
+    .from('modification_requests')
+    .select('*')
+    .order('created_at', { ascending: false });
+  if (error || !data) return [];
+  return (data as ModificationRequestRow[]).map(mapRow);
+}
+
+// NOTE: filtre désormais par business_id (passez un businessId).
+export async function getRequestsByEstablishment(
+  businessId: string
+): Promise<ModificationRequest[]> {
+  const { data, error } = await sb()
+    .from('modification_requests')
+    .select('*')
+    .eq('business_id', businessId)
+    .order('created_at', { ascending: false });
+  if (error || !data) return [];
+  return (data as ModificationRequestRow[]).map(mapRow);
+}
+
+export async function addModificationRequest(
+  data: Omit<ModificationRequest, 'id' | 'createdAt' | 'status'>
+): Promise<ModificationRequest> {
+  const { data: inserted, error } = await sb()
+    .from('modification_requests')
+    .insert({
+      business_id: data.establishmentSlug,
+      field: data.field,
+      current_value: data.oldValue,
+      new_value: data.newValue,
+      reason: data.reason,
+      status: 'pending',
+    })
+    .select('*')
+    .single();
+  if (error || !inserted) {
+    throw error ?? new Error('Insertion modification_request échouée');
+  }
+  return mapRow(inserted as ModificationRequestRow);
+}
+
+export async function getPendingRequestsCountForEstablishment(
+  businessId: string
+): Promise<number> {
+  const { count, error } = await sb()
+    .from('modification_requests')
+    .select('*', { count: 'exact', head: true })
+    .eq('business_id', businessId)
+    .eq('status', 'pending');
+  if (error || count === null) return 0;
+  return count;
 }
 
 export const MODIFICATION_STATUS_CONFIG: Record<

@@ -229,13 +229,15 @@ export async function submitVolunteer(payload: {
 }
 
 // ═══════════════════════════════════════════════════════════
-// STUB — incrementSupports (à brancher sur stats plus tard)
+// incrementSupports — branché sur le vrai tracker Supabase (business_events)
 // ═══════════════════════════════════════════════════════════
-export function incrementSupports(_slug: string): number {
+export async function incrementSupports(businessId: string): Promise<number> {
+  const { incrementSupports: track } = await import('@/lib/stats-tracker');
+  const n = await track(businessId);
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new Event('stats-updated'));
   }
-  return 0;
+  return n;
 }
 
 // ═══════════════════════════════════════════════════════════

@@ -1,13 +1,18 @@
 import Button from '@/components/ui/Button';
+import { getPlans, formatPlanPrice } from '@/lib/services';
 
-const plans = [
-  { name: 'Découverte', price: 'Gratuit', detail: '1 commerce' },
-  { name: 'Essentiel', price: '15 $', detail: '/ mois · 1 commerce' },
-  { name: 'Pro', price: '39 $', detail: '/ mois · 3 commerces' },
-  { name: 'Business', price: '79 $', detail: '/ mois · 10 commerces' },
-];
+// Source unique : la table `plans` (Supabase). Plus aucun prix en dur.
+export default async function PartnerCTA() {
+  const rows = await getPlans();
+  const plans = rows.map((p) => ({
+    name: p.name,
+    price: formatPlanPrice(p.price_monthly),
+    detail:
+      p.price_monthly > 0
+        ? `/ mois · ${p.max_businesses} commerce${p.max_businesses > 1 ? 's' : ''}`
+        : `${p.max_businesses} commerce${p.max_businesses > 1 ? 's' : ''}`,
+  }));
 
-export default function PartnerCTA() {
   return (
     <section className="py-24 bg-terra relative overflow-hidden">
       <div className="absolute inset-0 bg-kbach-pattern opacity-20" />

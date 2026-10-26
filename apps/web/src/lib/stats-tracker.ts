@@ -1,73 +1,61 @@
 // ============================================================================
-// STATS TRACKER (mock — localStorage)
+// STATS TRACKER — Supabase (table business_events)
 // ----------------------------------------------------------------------------
 // Comptabilise les vues et soutiens par établissement.
-// À migrer vers Supabase plus tard.
+// Chaque interaction = une ligne dans business_events ; les totaux sont des count.
+// sessionStorage ne sert QU'À éviter de compter deux vues dans la même session
+// (anti-doublon côté client) — ce n'est pas du stockage de données métier.
 // ============================================================================
 
-const VIEW_PREFIX = 'mycambo_viewed_';      // Empêche de compter plusieurs fois par session
-const VIEWS_KEY = 'mycambo_views_';         // Compteur de vues
-const SUPPORTS_KEY = 'mycambo_supports_';   // Compteur de soutiens
+import { createBrowserClient } from '@supabase/ssr';
 
-// ===== Vues =====
-// Incrémente UNE SEULE FOIS par session (grâce à sessionStorage)
-export function incrementViews(slug: string): number {
-  if (typeof window === 'undefined') return 0;
+const sb = () =>
+  createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
 
-  const viewedKey = VIEW_PREFIX + slug;
-  const alreadyViewed = sessionStorage.getItem(viewedKey);
+const SEEN_PREFIX = 'mycambo_viewed_'; // anti-doublon de vue par session
 
-  if (alreadyViewed) {
-    // Déjà vu dans cette session → retourne la valeur actuelle sans incrémenter
-    return getViews(slug);
-  }
-
-  // Nouvelle vue dans cette session
-  sessionStorage.setItem(viewedKey, '1');
-  const viewsKey = VIEWS_KEY + slug;
-  const current = Number(localStorage.getItem(viewsKey) || 0);
-  const next = current + 1;
-  localStorage.setItem(viewsKey, String(next));
-  return next;
+// Compte les événements d'un type pour un établissement (par id).
+async function countEvents(businessId: string, type: string): Promise<number> {
+  const { count } = await sb()
+    .from('business_events')
+    .select('id', { count: 'exact', head: true })
+    .eq('business_id', businessId)
+    .eq('event_type', type);
+  return count || 0;
 }
 
-export function getViews(slug: string): number {
-  if (typeof window === 'undefined') return 0;
-  return Number(localStorage.getItem(VIEWS_KEY + slug) || 0);
+// Enregistre un événement.
+async function logEvent(businessId: string, type: string): Promise<void> {
+  await sb().from('business_events').insert({ business_id: businessId, event_type: type });
+}
+
+// ===== Vues =====
+// Incrémente UNE SEULE FOIS par session (anti-doublon via sessionStorage).
+export async function incrementViews(businessId: string): Promise<number> {
+  if (typeof window !== 'undefined') {
+    const seenKey = SEEN_PREFIX + businessId;
+    if (sessionStorage.getItem(seenKey)) {
+      return getViews(businessId); // déjà vu cette session
+    }
+    sessionStorage.setItem(seenKey, '1');
+  }
+  await logEvent(businessId, 'view');
+  return getViews(businessId);
+}
+
+export async function getViews(businessId: string): Promise<number> {
+  return countEvents(businessId, 'view');
 }
 
 // ===== Soutiens =====
-export function incrementSupports(slug: string): number {
-  if (typeof window === 'undefined') return 0;
-
-  const key = SUPPORTS_KEY + slug;
-  const current = Number(localStorage.getItem(key) || 0);
-  const next = current + 1;
-  localStorage.setItem(key, String(next));
-  return next;
+export async function incrementSupports(businessId: string): Promise<number> {
+  await logEvent(businessId, 'support');
+  return getSupports(businessId);
 }
 
-export function getSupports(slug: string): number {
-  if (typeof window === 'undefined') return 0;
-  return Number(localStorage.getItem(SUPPORTS_KEY + slug) || 0);
-}
-
-// ===== Initialisation (si jamais vu) =====
-// Permet de partir de valeurs de départ (mock) au premier chargement
-export function initStatsIfEmpty(
-  slug: string,
-  initialViews: number,
-  initialSupports: number
-): void {
-  if (typeof window === 'undefined') return;
-
-  const viewsKey = VIEWS_KEY + slug;
-  const supportsKey = SUPPORTS_KEY + slug;
-
-  if (!localStorage.getItem(viewsKey)) {
-    localStorage.setItem(viewsKey, String(initialViews));
-  }
-  if (!localStorage.getItem(supportsKey)) {
-    localStorage.setItem(supportsKey, String(initialSupports));
-  }
+export async function getSupports(businessId: string): Promise<number> {
+  return countEvents(businessId, 'support');
 }

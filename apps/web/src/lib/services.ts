@@ -161,3 +161,43 @@ export async function getContactMessagesForBusiness(businessId: string) {
   }
   return data || [];
 }
+
+// ============================================================================
+// FORMULES — Source unique : la table `plans` (remplace PARTNER_PLANS en dur)
+// ============================================================================
+
+export type PlanRow = {
+  id: string;
+  slug: string;
+  name: string;
+  price_monthly: number;
+  price_yearly: number | null;
+  max_businesses: number;
+  features: string[];
+  position: number;
+  is_active: boolean;
+  popular?: boolean;
+};
+
+// Lit les formules actives depuis Supabase, triées par position.
+export async function getPlans(): Promise<PlanRow[]> {
+  const client = supabase();
+  const { data, error } = await client
+    .from('plans')
+    .select('*')
+    .eq('is_active', true)
+    .order('position', { ascending: true });
+  if (error) {
+    console.error('getPlans:', error);
+    return [];
+  }
+  return (data || []).map((p: Record<string, unknown>) => ({
+    ...(p as unknown as PlanRow),
+    features: Array.isArray(p.features) ? (p.features as string[]) : [],
+  }));
+}
+
+// Formate un prix mensuel pour l'affichage ("Gratuit" ou "15 $").
+export function formatPlanPrice(priceMonthly: number): string {
+  return priceMonthly > 0 ? `${priceMonthly} $` : 'Gratuit';
+}
