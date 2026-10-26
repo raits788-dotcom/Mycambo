@@ -14,6 +14,7 @@ interface AssociationActionsBarProps {
   associationName: string;
   donationLink?: DonationLink | null;
   variant?: 'sidebar' | 'inline';
+  services?: Record<string, boolean> | null; // ← AJOUT
 }
 
 export default function AssociationActionsBar({
@@ -21,32 +22,44 @@ export default function AssociationActionsBar({
   associationName,
   donationLink,
   variant = 'sidebar',
+  services,
 }: AssociationActionsBarProps) {
   const [modal, setModal] = useState<ModalType>(null);
 
-  // ===== Variante SIDEBAR (3 boutons empilés) =====
+  // Services activés (si non fourni, on affiche tout par défaut)
+  const canDonate = services?.donations === true;
+  const canVolunteer = services?.volunteers === true;
+  const canContact = true; // Le contact est toujours disponible
+
+  // ===== Variante SIDEBAR (boutons empilés) =====
   if (variant === 'sidebar') {
     return (
       <>
         <div className="space-y-2">
-          <button
-            onClick={() => setModal('donate')}
-            className="w-full bg-khmer text-white font-bold py-3 rounded-full hover:bg-khmer/90 transition-colors text-sm"
-          >
-            ❤️ Faire un don
-          </button>
-          <button
-            onClick={() => setModal('volunteer')}
-            className="w-full border-[1.5px] border-gris-ligne text-marine font-bold py-3 rounded-full hover:border-marine transition-colors text-sm"
-          >
-            🙋 Devenir bénévole
-          </button>
-          <button
-            onClick={() => setModal('contact')}
-            className="w-full border-[1.5px] border-gris-ligne text-marine font-bold py-3 rounded-full hover:border-marine transition-colors text-sm"
-          >
-            ✉️ Nous contacter
-          </button>
+          {canDonate && (
+            <button
+              onClick={() => setModal('donate')}
+              className="w-full bg-khmer text-white font-bold py-3 rounded-full hover:bg-khmer/90 transition-colors text-sm"
+            >
+              ❤️ Faire un don
+            </button>
+          )}
+          {canVolunteer && (
+            <button
+              onClick={() => setModal('volunteer')}
+              className="w-full border-[1.5px] border-gris-ligne text-marine font-bold py-3 rounded-full hover:border-marine transition-colors text-sm"
+            >
+              🙋 Devenir bénévole
+            </button>
+          )}
+          {canContact && (
+            <button
+              onClick={() => setModal('contact')}
+              className="w-full border-[1.5px] border-gris-ligne text-marine font-bold py-3 rounded-full hover:border-marine transition-colors text-sm"
+            >
+              ✉️ Nous contacter
+            </button>
+          )}
         </div>
 
         {/* Modales */}
@@ -79,14 +92,16 @@ export default function AssociationActionsBar({
   // ===== Variante INLINE (bouton seul, pour "Contribuer") =====
   return (
     <>
-      <button
-        onClick={() => setModal('donate')}
-        className={cn(
-          'w-full bg-marine text-white font-bold py-3 rounded-full hover:bg-marine-dark transition-colors text-sm'
-        )}
-      >
-        Contribuer
-      </button>
+      {canDonate && (
+        <button
+          onClick={() => setModal('donate')}
+          className={cn(
+            'w-full bg-marine text-white font-bold py-3 rounded-full hover:bg-marine-dark transition-colors text-sm'
+          )}
+        >
+          Contribuer
+        </button>
+      )}
 
       {modal === 'donate' && (
         <DonateModal
@@ -105,22 +120,28 @@ export function ContributeProjectButton({
   associationSlug,
   associationName,
   projectTitle,
+  services,
 }: {
   associationSlug: string;
   associationName: string;
   projectTitle: string;
+  services?: Record<string, boolean> | null;
 }) {
   const [open, setOpen] = useState(false);
-  // Import dynamique pour éviter les erreurs SSR
   const [ContributeModal, setContributeModal] = useState<any>(null);
 
+  const canContribute = services?.projects === true;
+
   const handleClick = async () => {
+    if (!canContribute) return;
     if (!ContributeModal) {
       const mod = await import('./ProjectContributionModal');
       setContributeModal(() => mod.default);
     }
     setOpen(true);
   };
+
+  if (!canContribute) return null;
 
   return (
     <>

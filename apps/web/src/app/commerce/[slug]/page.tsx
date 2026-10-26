@@ -9,10 +9,10 @@ import {
 } from 'lucide-react';
 import CommerceTabsPublic from '@/components/commerce/CommerceTabsPublic';
 import AssociationActionsBar from '@/components/association/AssociationActionsBar';
+import ContactModal from '@/components/commerce/ContactModal';
 import { LevelBadge, SubLabels } from '@/components/ui/LevelBadge';
 import { createBrowserClient } from '@supabase/ssr';
 import { getPlanPermissions } from '@/lib/plan-permissions';
-import ContactModal from '@/components/commerce/ContactModal'; // ← AJOUT
 
 export default function CommercePage() {
   const params = useParams();
@@ -23,7 +23,7 @@ export default function CommercePage() {
   const [tenantLabels, setTenantLabels] = useState<any[]>([]);
   const [planSlug, setPlanSlug] = useState<string>('decouverte');
   const [mounted, setMounted] = useState(false);
-  const [showContactModal, setShowContactModal] = useState(false); // ← AJOUT
+  const [showContactModal, setShowContactModal] = useState(false);
 
   useEffect(() => {
     if (!slug) return;
@@ -59,12 +59,15 @@ export default function CommercePage() {
       const tenantPlan = (business.tenants as any)?.plans?.slug || 'decouverte';
       setPlanSlug(tenantPlan);
 
-      // 3. Formate l'objet commerce
+      // 3. Formate l'objet commerce (avec détection association robuste)
+      const categoryName = business.categories?.name || '';
+      const isAssoc = categoryName.toLowerCase().includes('association');
+
       setCommerce({
         ...business,
-        type: business.categories?.name?.toLowerCase() || 'commerce',
-        typeLabel: business.categories?.name || 'Établissement',
-        category: business.categories?.name,
+        type: isAssoc ? 'association' : 'commerce',
+        typeLabel: categoryName || 'Établissement',
+        category: categoryName,
         city: business.city || (business.tenants as any)?.city,
         image: business.photos?.[0]
           || 'https://images.unsplash.com/photo-1497486751825-1233686d5d80?q=85&w=1600&auto=format&fit=crop',
@@ -229,18 +232,17 @@ export default function CommercePage() {
                     associationName={commerce.name}
                     donationLink={undefined}
                     variant="sidebar"
+                    services={commerce.services}
                   />
                 </div>
               ) : (
                 <div className="space-y-2 mb-5">
-                  {/* ▼▼▼ BOUTON CONTACTER AVEC ONCLICK ▼▼▼ */}
                   <button
                     onClick={() => setShowContactModal(true)}
                     className="w-full bg-marine text-white font-bold py-3 rounded-full hover:bg-marine-dark transition-colors text-sm"
                   >
                     Contacter
                   </button>
-                  {/* ▲▲▲ FIN BOUTON ▲▲▲ */}
                   {commerce.city && (
                     <a
                       href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
@@ -295,15 +297,14 @@ export default function CommercePage() {
         </div>
       </section>
 
-      {/* ▼▼▼ MODALE DE CONTACT ▼▼▼ */}
-      {showContactModal && (
+      {/* Modale de contact (commerces uniquement) */}
+      {showContactModal && !isAssociation && (
         <ContactModal
           businessId={commerce.id}
           businessName={commerce.name}
           onClose={() => setShowContactModal(false)}
         />
       )}
-      {/* ▲▲▲ FIN MODALE ▲▲▲ */}
     </>
   );
 }
