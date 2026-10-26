@@ -1,12 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { CheckCircle2, XCircle, Loader2 } from 'lucide-react';
 import { createBrowserClient } from '@supabase/ssr';
 
-export default function VerifyEmailContactPage() {
+function VerifyEmailContactContent() {
   const searchParams = useSearchParams();
   const token = searchParams.get('token');
 
@@ -82,7 +82,7 @@ export default function VerifyEmailContactPage() {
       }
 
       setStatus('success');
-      setMessage('Votre email est vérifié ! Votre demande a été transmise à l\'établissement.');
+      setMessage("Votre email est vérifié ! Votre demande a été transmise à l'établissement.");
     })();
   }, [token]);
 
@@ -126,5 +126,22 @@ export default function VerifyEmailContactPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function VerifyEmailContactPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-gris-fond flex items-center justify-center px-4 py-12">
+          <div className="max-w-md w-full bg-white rounded-2xl shadow-lg p-8 text-center">
+            <Loader2 size={40} className="text-marine animate-spin mx-auto mb-4" />
+            <p className="text-sm text-gris-texte">Chargement...</p>
+          </div>
+        </div>
+      }
+    >
+      <VerifyEmailContactContent />
+    </Suspense>
   );
 }
