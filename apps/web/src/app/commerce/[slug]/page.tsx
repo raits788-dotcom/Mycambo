@@ -12,7 +12,7 @@ import AssociationActionsBar from '@/components/association/AssociationActionsBa
 import ContactModal from '@/components/commerce/ContactModal';
 import { LevelBadge, SubLabels } from '@/components/ui/LevelBadge';
 import { createBrowserClient } from '@supabase/ssr';
-import { getPlanPermissions } from '@/lib/plan-permissions';
+import { getPlanPermissions, getPlanPermissionsFromDB, type PlanPermissions } from '@/lib/plan-permissions';
 
 export default function CommercePage() {
   const params = useParams();
@@ -22,6 +22,7 @@ export default function CommercePage() {
   const [tenantLevel, setTenantLevel] = useState<string | null>(null);
   const [tenantLabels, setTenantLabels] = useState<any[]>([]);
   const [planSlug, setPlanSlug] = useState<string>('decouverte');
+  const [permissions, setPermissions] = useState<PlanPermissions>(() => getPlanPermissions('decouverte'));
   const [mounted, setMounted] = useState(false);
   const [showContactModal, setShowContactModal] = useState(false);
 
@@ -55,9 +56,10 @@ export default function CommercePage() {
         return;
       }
 
-      // 2. Détermine le plan
+      // 2. Détermine le plan + charge ses permissions depuis la base
       const tenantPlan = (business.tenants as any)?.plans?.slug || 'decouverte';
       setPlanSlug(tenantPlan);
+      setPermissions(await getPlanPermissionsFromDB(tenantPlan));
 
       // 3. Formate l'objet commerce (avec détection association robuste)
       const categoryName = business.categories?.name || '';
@@ -120,7 +122,7 @@ export default function CommercePage() {
   }
 
   const isAssociation = commerce.type === 'association';
-  const permissions = getPlanPermissions(planSlug);
+  // `permissions` vient de la base (state), avec fallback en dur au premier rendu.
 
   const visiblePhotos = permissions.canShowPhotos ? commerce.gallery : [];
   const heroImage = permissions.canShowPhotos && commerce.image

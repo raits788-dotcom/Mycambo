@@ -96,3 +96,46 @@ export function getPlanPermissions(planSlug: string | null | undefined): PlanPer
   const slug = (planSlug || 'decouverte') as PlanSlug;
   return PLAN_PERMISSIONS[slug] || PLAN_PERMISSIONS.decouverte;
 }
+// ============================================================================
+// Version pilotée par la base : lit la colonne `permissions` de `plans`.
+// Les valeurs en dur ci-dessus servent désormais UNIQUEMENT de filet de
+// sécurité (fallback) si la base ne renvoie rien. Pour changer ce qu'offre
+// une formule, on modifie la base — plus le code.
+// ============================================================================
+
+import { createBrowserClient } from '@supabase/ssr';
+
+// Cache mémoire léger pour éviter de requêter à chaque fiche.
+let _cache: Record<string, PlanPermissions> | null = null;
+
+export async function getPlanPermissionsFromDB(
+  planSlug: string | null | undefined
+): Promise<PlanPermissions> {
+  const slug = (planSlug || 'decouverte') as PlanSlug;
+
+  if (!_cache) {
+    try {
+      const sb = createBrowserClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      );
+      const { data } = await sb.from('plans').select('slug, permissions');
+      _cache = {};
+      for (const row of data || []) {
+        if (row.permissions && Object.keys(row.permissions).length > 0) {
+          _cache[row.slug] = row.permissions as PlanPermissions;
+        }
+      }
+    } catch {
+      _cache = {};
+    }
+  }
+
+  // base → sinon fallback sur les valeurs en dur → sinon Découverte
+  return _cache[slug] || PLAN_PERMISSIONS[slug] || PLAN_PERMISSIONS.decouverte;
+}
+
+// Vide le cache (utile après une modif des formules dans la console admin).
+export function clearPlanPermissionsCache(): void {
+  _cache = null;
+}
