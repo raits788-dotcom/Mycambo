@@ -13,8 +13,21 @@ import {
   Info,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { createBrowserClient } from '@supabase/ssr';
 import type { StoredEstablishment } from '@/lib/establishment-storage';
 import { updateEstablishment } from '@/lib/establishment-storage';
+
+// Mapping clé d'icône (base) -> composant lucide (ne peut pas vivre en base).
+const ICONS: Record<string, typeof Heart> = {
+  heart: Heart,
+  users: Users,
+  target: Target,
+  hotel: Hotel,
+  menu: UtensilsCrossed,
+  compass: Compass,
+  shopping: ShoppingBag,
+  bike: Bike,
+};
 
 interface ServicesTabProps {
   establishment: StoredEstablishment;
@@ -163,7 +176,45 @@ export default function ServicesTab({
   onUpdate,
 }: ServicesTabProps) {
   const serviceType = getServiceTypeFromCategory(establishment.categories?.name);
-  const services = SERVICES_BY_TYPE[serviceType] || [];
+
+  // Services chargés depuis la base (table category_services) ; fallback en dur.
+  const [services, setServices] = useState<Service[]>(
+    () => SERVICES_BY_TYPE[serviceType] || []
+  );
+
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        const sb = createBrowserClient(
+          process.env.NEXT_PUBLIC_SUPABASE_URL!,
+          process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+        );
+        const { data } = await sb
+          .from('category_services')
+          .select('service_key, label, description, icon_key, color')
+          .eq('category_slug', serviceType)
+          .eq('is_active', true)
+          .order('position');
+        if (active && data && data.length) {
+          setServices(
+            data.map((s: any) => ({
+              key: s.service_key as ServiceKey,
+              label: s.label,
+              description: s.description || '',
+              icon: ICONS[s.icon_key] || Info,
+              color: s.color || 'text-marine bg-blue-100',
+            }))
+          );
+        }
+      } catch {
+        // garde le fallback en dur
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [serviceType]);
 
   const [active, setActive] = useState<Record<string, boolean>>(() => {
     const initial: Record<string, boolean> = {};
