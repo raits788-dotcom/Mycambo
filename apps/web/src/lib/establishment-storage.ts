@@ -47,6 +47,7 @@ export interface StoredEstablishment {
   photos: string[] | null;
   photos_limit: number | null;
   hours: Record<string, unknown> | null;
+  services: Record<string, boolean> | null; // ← AJOUT
   status: 'pending' | 'approved' | 'suspended';
   is_featured: boolean;
   featured_position: number | null;

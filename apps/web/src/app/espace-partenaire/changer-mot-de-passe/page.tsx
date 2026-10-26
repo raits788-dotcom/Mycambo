@@ -11,29 +11,58 @@ export default function ChangePasswordPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+  const [isRecovery, setIsRecovery] = useState(false);
 
-  const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [showOld, setShowOld] = useState(false);
   const [showNew, setShowNew] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
 
-  // Vérifie que l'utilisateur est connecté
+  // Extraire le token de l'URL et créer la session
   useEffect(() => {
     (async () => {
       const supabase = createBrowserClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
         process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
       );
+
+      const hash = window.location.hash;
+
+      // Si on a un token de récupération dans l'URL
+      if (hash.includes('access_token=') && hash.includes('type=recovery')) {
+        setIsRecovery(true);
+
+        // Extraire le token
+        const params = new URLSearchParams(hash.substring(1)); // enlève le #
+        const accessToken = params.get('access_token');
+        const refreshToken = params.get('refresh_token');
+
+        if (accessToken && refreshToken) {
+          // Créer la session avec les tokens
+          const { error: sessionError } = await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken,
+          });
+
+          if (sessionError) {
+            setError('Session expirée. Veuillez refaire la demande.');
+            setLoading(false);
+            return;
+          }
+        }
+      }
+
+      // Vérifier la session (normale ou créée par le token)
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
+
+      if (!session && !isRecovery) {
         router.push('/espace-partenaire/connexion');
         return;
       }
+
       setLoading(false);
     })();
-  }, [router]);
+  }, [router, isRecovery]);
 
   const validatePassword = (pwd: string): string | null => {
     if (pwd.length < 8) return 'Le mot de passe doit contenir au moins 8 caractères.';
@@ -47,7 +76,6 @@ export default function ChangePasswordPage() {
     e.preventDefault();
     setError('');
 
-    // Validation
     const pwdError = validatePassword(newPassword);
     if (pwdError) {
       setError(pwdError);
@@ -67,7 +95,6 @@ export default function ChangePasswordPage() {
         process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
       );
 
-      // Mise à jour du mot de passe
       const { error: updateErr } = await supabase.auth.updateUser({
         password: newPassword,
         data: { must_change_password: false },
@@ -77,7 +104,6 @@ export default function ChangePasswordPage() {
 
       setSuccess(true);
 
-      // Redirection après 2 secondes
       setTimeout(() => {
         router.push('/espace-partenaire/dashboard');
       }, 2000);
@@ -122,41 +148,16 @@ export default function ChangePasswordPage() {
             <Shield size={28} />
           </div>
           <h1 className="text-2xl font-extrabold text-marine mb-2">
-            Changez votre mot de passe
+            {isRecovery ? 'Réinitialisez votre mot de passe' : 'Changez votre mot de passe'}
           </h1>
           <p className="text-sm text-gris-texte">
-            Pour des raisons de sécurité, vous devez changer le mot de passe temporaire avant d&apos;accéder à votre espace.
+            {isRecovery
+              ? 'Définissez un nouveau mot de passe pour sécuriser votre compte.'
+              : 'Pour des raisons de sécurité, vous devez changer le mot de passe temporaire avant d\'accéder à votre espace.'}
           </p>
         </div>
 
         <form onSubmit={handleSubmit} className="bg-white rounded-2xl shadow-lg p-6 space-y-4">
-
-          {/* Ancien mot de passe */}
-          <div>
-            <label className="block text-xs font-bold text-gris-texte uppercase mb-2">
-              Mot de passe actuel (temporaire) *
-            </label>
-            <div className="relative">
-              <Lock size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gris-doux" />
-              <input
-                type={showOld ? 'text' : 'password'}
-                required
-                value={oldPassword}
-                onChange={(e) => setOldPassword(e.target.value)}
-                placeholder="••••••••"
-                className="w-full pl-9 pr-10 py-2.5 text-sm rounded-lg border border-gris-ligne focus:border-marine focus:outline-none"
-                autoComplete="current-password"
-              />
-              <button
-                type="button"
-                onClick={() => setShowOld(!showOld)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gris-doux hover:text-marine"
-              >
-                {showOld ? <EyeOff size={14} /> : <Eye size={14} />}
-              </button>
-            </div>
-          </div>
-
           {/* Nouveau mot de passe */}
           <div>
             <label className="block text-xs font-bold text-gris-texte uppercase mb-2">

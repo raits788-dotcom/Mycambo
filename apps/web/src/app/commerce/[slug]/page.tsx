@@ -12,6 +12,7 @@ import AssociationActionsBar from '@/components/association/AssociationActionsBa
 import { LevelBadge, SubLabels } from '@/components/ui/LevelBadge';
 import { createBrowserClient } from '@supabase/ssr';
 import { getPlanPermissions } from '@/lib/plan-permissions';
+import ContactModal from '@/components/commerce/ContactModal'; // ← AJOUT
 
 export default function CommercePage() {
   const params = useParams();
@@ -22,6 +23,7 @@ export default function CommercePage() {
   const [tenantLabels, setTenantLabels] = useState<any[]>([]);
   const [planSlug, setPlanSlug] = useState<string>('decouverte');
   const [mounted, setMounted] = useState(false);
+  const [showContactModal, setShowContactModal] = useState(false); // ← AJOUT
 
   useEffect(() => {
     if (!slug) return;
@@ -231,9 +233,14 @@ export default function CommercePage() {
                 </div>
               ) : (
                 <div className="space-y-2 mb-5">
-                  <button className="w-full bg-marine text-white font-bold py-3 rounded-full hover:bg-marine-dark transition-colors text-sm">
+                  {/* ▼▼▼ BOUTON CONTACTER AVEC ONCLICK ▼▼▼ */}
+                  <button
+                    onClick={() => setShowContactModal(true)}
+                    className="w-full bg-marine text-white font-bold py-3 rounded-full hover:bg-marine-dark transition-colors text-sm"
+                  >
                     Contacter
                   </button>
+                  {/* ▲▲▲ FIN BOUTON ▲▲▲ */}
                   {commerce.city && (
                     <a
                       href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
@@ -287,6 +294,16 @@ export default function CommercePage() {
           </aside>
         </div>
       </section>
+
+      {/* ▼▼▼ MODALE DE CONTACT ▼▼▼ */}
+      {showContactModal && (
+        <ContactModal
+          businessId={commerce.id}
+          businessName={commerce.name}
+          onClose={() => setShowContactModal(false)}
+        />
+      )}
+      {/* ▲▲▲ FIN MODALE ▲▲▲ */}
     </>
   );
 }

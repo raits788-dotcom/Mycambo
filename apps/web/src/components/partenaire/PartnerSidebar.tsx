@@ -2,12 +2,14 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useState, useEffect } from 'react';
 import {
   LayoutDashboard, Store, Inbox, Star, BarChart3,
   Users, User, Settings, Loader2, Gift, ShieldCheck, Bell,
 } from 'lucide-react';
 import { cn } from '@my-cambo/utils';
 import { useCurrentTenant } from '@/lib/use-current-tenant';
+import { createBrowserClient } from '@supabase/ssr';
 
 const NAV_ITEMS = [
   { id: 'dashboard', label: "Vue d'ensemble", icon: LayoutDashboard, href: '/espace-partenaire/dashboard' },
@@ -34,8 +36,42 @@ function getInitials(name: string): string {
 export default function PartnerSidebar() {
   const pathname = usePathname();
   const { tenant, loading } = useCurrentTenant();
+  const [unreadCount, setUnreadCount] = useState(0);
 
   const initials = tenant ? getInitials(tenant.name) : '??';
+
+  useEffect(() => {
+    if (!tenant?.id) return;
+
+    (async () => {
+      const supabase = createBrowserClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      );
+
+      // Récupérer les business_ids du tenant
+      const { data: businesses } = await supabase
+        .from('businesses')
+        .select('id')
+        .eq('tenant_id', tenant.id);
+
+      const businessIds = (businesses || []).map((b) => b.id);
+
+      if (businessIds.length === 0) {
+        setUnreadCount(0);
+        return;
+      }
+
+      // Compter les messages non lus
+      const { count } = await supabase
+        .from('contact_messages')
+        .select('*', { count: 'exact', head: true })
+        .in('business_id', businessIds)
+        .eq('status', 'new');
+
+      setUnreadCount(count || 0);
+    })();
+  }, [tenant?.id]);
 
   return (
     <aside className="w-64 bg-white border-r border-gris-ligne flex flex-col shrink-0 min-h-screen">
@@ -72,6 +108,8 @@ export default function PartnerSidebar() {
           {NAV_ITEMS.map((item) => {
             const Icon = item.icon;
             const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
+            const showBadge = item.id === 'demandes' && unreadCount > 0;
+
             return (
               <Link
                 key={item.id}
@@ -85,6 +123,11 @@ export default function PartnerSidebar() {
               >
                 <Icon size={16} className="flex-shrink-0" />
                 <span className="truncate flex-1">{item.label}</span>
+                {showBadge && (
+                  <span className="bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
+                    {unreadCount}
+                  </span>
+                )}
               </Link>
             );
           })}

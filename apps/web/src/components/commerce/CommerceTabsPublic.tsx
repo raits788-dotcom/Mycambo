@@ -5,6 +5,18 @@ import Image from 'next/image';
 import { Info, Image as ImageIcon, Gift, Star, Lock, BarChart3, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import ReviewsSection from '@/components/avis/ReviewsSection';
+const SERVICE_LABELS: Record<string, string> = {
+  menu: 'Menu',
+  reservations: 'Réservations',
+  shipping: 'Livraison',
+  donations: 'Dons',
+  volunteers: 'Bénévolat',
+  projects: 'Projets',
+  rooms: 'Chambres',
+  offers: 'Offres promotionnelles',
+  tours: 'Tours / Activités',
+  products: 'Produits',
+};
 
 type TabId = 'info' | 'photos' | 'services' | 'stats' | 'reviews';
 
@@ -231,18 +243,20 @@ export default function CommerceTabsPublic({
         {/* Onglet Services / Équipements */}
         {tab === 'services' && (
           <>
-            {commerce.amenities && commerce.amenities.length > 0 ? (
+            {commerce.services && Object.keys(commerce.services).length > 0 ? (
               <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                {commerce.amenities.map((amenity: string, i: number) => (
-                  <div key={i} className="flex items-center gap-2 text-sm text-gris-texte">
-                    <div className="w-1.5 h-1.5 rounded-full bg-marine flex-shrink-0" />
-                    {amenity}
-                  </div>
-                ))}
+                {Object.entries(commerce.services)
+                  .filter(([_, active]) => active === true)
+                  .map(([key]) => (
+                    <div key={key} className="flex items-center gap-2 text-sm text-gris-texte">
+                      <div className="w-1.5 h-1.5 rounded-full bg-marine flex-shrink-0" />
+                      {SERVICE_LABELS[key] || key}
+                    </div>
+                  ))}
               </div>
             ) : (
               <div className="text-center py-8 text-sm text-gris-texte">
-                Aucun équipement renseigné pour le moment.
+                Aucun service activé pour le moment.
               </div>
             )}
           </>

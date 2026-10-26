@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Heart,
   Users,
@@ -168,10 +168,20 @@ export default function ServicesTab({
   const [active, setActive] = useState<Record<string, boolean>>(() => {
     const initial: Record<string, boolean> = {};
     services.forEach((s) => {
-      initial[s.key] = false;
+      initial[s.key] = establishment.services?.[s.key] === true;
     });
     return initial;
   });
+
+  // ▼▼▼ CORRECTION : Réinitialiser quand establishment.services change ▼▼▼
+  useEffect(() => {
+    const initial: Record<string, boolean> = {};
+    services.forEach((s) => {
+      initial[s.key] = establishment.services?.[s.key] === true;
+    });
+    setActive(initial);
+  }, [establishment.services, services]);
+  // ▲▲▲ FIN CORRECTION ▲▲▲
 
   const [saved, setSaved] = useState(false);
 
