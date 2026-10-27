@@ -10,8 +10,18 @@ import {
 import { cn } from '@/lib/utils';
 import Sidebar from './Sidebar';
 import {
-  SECTORS, DISCOVER, HUBS, FIXED_LEFT, FIXED_RIGHT,
+  SECTORS, DISCOVER, HUBS, FIXED_LEFT, FIXED_RIGHT, type NavItem,
 } from '@/lib/nav-config';
+
+// Icône lucide par défaut selon le slug de catégorie (le menu utilise des noms d'icônes).
+const SECTOR_ICON: Record<string, string> = {
+  hotel: 'Hotel',
+  restaurant: 'UtensilsCrossed',
+  association: 'HeartHandshake',
+  activite: 'Compass',
+  shopping: 'ShoppingBag',
+  boutique: 'ShoppingBag',
+};
 import { createBrowserClient } from '@supabase/ssr';
 import { NotificationBell } from '@my-cambo/ui';
 
@@ -43,9 +53,12 @@ export default function Header() {
   const showAnonymousHeader = isAuthPage || isPublicCommercePage;
   // ▲▲▲ FIN DÉTECTION ▲▲▲
 
+  // Les secteurs du menu viennent de la table `categories` (fallback : SECTORS en dur).
+  const [sectors, setSectors] = useState<NavItem[]>(SECTORS);
+
   const allItems = [
     ...FIXED_LEFT,
-    ...SECTORS,
+    ...sectors,
     ...DISCOVER,
     ...HUBS,
     ...FIXED_RIGHT,
@@ -57,6 +70,29 @@ export default function Header() {
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
         process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
       );
+
+      // Secteurs du menu depuis la table categories (seulement les catégories actives).
+      try {
+        const { data: cats } = await supabase
+          .from('categories')
+          .select('slug, name, icon, is_active, position')
+          .eq('is_active', true)
+          .is('parent_id', null)
+          .order('position');
+        if (cats && cats.length) {
+          setSectors(
+            cats.map((c: any) => ({
+              id: c.slug,
+              label: c.name,
+              icon: SECTOR_ICON[c.slug] || c.icon || 'Tag',
+              href: `/rubrique/${c.slug}`,
+              active: true,
+            }))
+          );
+        }
+      } catch {
+        // garde le fallback SECTORS en dur
+      }
 
       const { data: { session } } = await supabase.auth.getSession();
 
