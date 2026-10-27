@@ -3,7 +3,10 @@
 @tailwind utilities;
 
 :root {
-  --font-inter: 'Inter';
+  /* Police système (sans fetch réseau au build). 'Inter' est utilisé s'il
+     est installé localement, sinon pile système proche visuellement. */
+  --font-inter: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+    Helvetica, Arial, sans-serif;
 }
 
 html {
