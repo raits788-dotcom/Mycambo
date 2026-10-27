@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Search, Filter, Eye, CheckCircle2, XCircle, Star, Store, Loader2 } from 'lucide-react';
-import { getBusinesses, updateBusinessStatus, toggleFeatured, startImpersonation } from '@/lib/services';
+import { getBusinesses, updateBusinessStatus, toggleFeatured, startImpersonation, approveAllPending } from '@/lib/services';
 
 const STATUS_STYLES: Record<string, string> = {
   approved: 'bg-green-100 text-green-700',
@@ -66,6 +66,20 @@ export default function EstablishmentsPage() {
     }
   };
 
+  const handleApproveAll = async () => {
+    if (!confirm('Approuver TOUS les établissements en attente ? Ils seront publiés sur le site.')) return;
+    setProcessing('__all__');
+    try {
+      const n = await approveAllPending();
+      await reload();
+      alert(n + ' établissement(s) approuvé(s) et publié(s).');
+    } catch (err) {
+      alert('Erreur : ' + (err as Error).message);
+    } finally {
+      setProcessing(null);
+    }
+  };
+
   const handleToggleFeatured = async (id: string) => {
     setProcessing(id);
     try {
@@ -116,11 +130,24 @@ export default function EstablishmentsPage() {
 
   return (
     <>
-      <div className="mb-8">
-        <h1 className="text-2xl md:text-3xl font-extrabold text-marine mb-1">Établissements</h1>
-        <p className="text-sm text-gris-texte">
-          {loading ? 'Chargement...' : counts.total + ' établissements · ' + counts.featured + ' coups de cœur'}
-        </p>
+      <div className="mb-8 flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h1 className="text-2xl md:text-3xl font-extrabold text-marine mb-1">Établissements</h1>
+          <p className="text-sm text-gris-texte">
+            {loading ? 'Chargement...' : counts.total + ' établissements · ' + counts.featured + ' coups de cœur'}
+          </p>
+        </div>
+        {counts.pending > 0 && (
+          <button
+            onClick={handleApproveAll}
+            disabled={processing === '__all__'}
+            className="bg-green-600 text-white font-bold text-sm px-5 py-2.5 rounded-full hover:bg-green-700 disabled:opacity-50"
+          >
+            {processing === '__all__'
+              ? 'Validation…'
+              : 'Tout approuver (' + counts.pending + ')'}
+          </button>
+        )}
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
