@@ -90,6 +90,32 @@ begin
       'https://enfantsdasie.com/', 'https://www.facebook.com/enfants.dasie/', 'https://www.instagram.com/enfantsdasie/', '[]'::jsonb);
   end if;
 
+-- ----- Attribuer la formule Association (gratuite) à toutes les assos importées -----
+  declare
+    v_plan_assoc uuid;
+    v_ver_assoc uuid;
+  begin
+    select id into v_plan_assoc from public.plans where slug = 'association' limit 1;
+    if v_plan_assoc is not null then
+      select id into v_ver_assoc from public.plan_versions where plan_id = v_plan_assoc and status = 'current' limit 1;
+      -- formule sur tenants + fiches en gérance de catégorie association
+      update public.tenants t set plan_id = v_plan_assoc
+        where t.managed_by_mycambo = true and t.plan_id is null
+          and exists (select 1 from public.businesses b where b.tenant_id = t.id
+                      and b.category_id = v_cat_association);
+      update public.businesses b set plan_id = v_plan_assoc
+        where b.category_id = v_cat_association and b.plan_id is null
+          and exists (select 1 from public.tenants t where t.id = b.tenant_id and t.managed_by_mycambo = true);
+      -- souscription active pour chaque fiche sans souscription
+      insert into public.subscriptions (tenant_id, business_id, plan_id, plan_version_id, status, current_period_start, current_period_end)
+      select b.tenant_id, b.id, v_plan_assoc, v_ver_assoc, 'active', now(), now() + interval '1 year'
+      from public.businesses b
+      join public.tenants t on t.id = b.tenant_id
+      where t.managed_by_mycambo = true and b.category_id = v_cat_association
+        and not exists (select 1 from public.subscriptions s where s.business_id = b.id);
+    end if;
+  end;
+
 end$$;
 
 select '✅ Import lot 1 terminé' as resultat,
