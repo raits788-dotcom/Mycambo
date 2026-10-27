@@ -6,6 +6,7 @@
 // ============================================================================
 
 import { createBrowserClient } from '@supabase/ssr';
+import { getImpersonateToken } from '@/lib/impersonation';
 
 const supabase = () =>
   createBrowserClient(
@@ -173,6 +174,39 @@ export async function updateEstablishment(
   id: string,
   payload: Partial<StoredEstablishment>
 ): Promise<boolean> {
+  // En mode SUPERADMIN (impersonation), la session navigateur n'est pas celle
+  // du tenant : la RLS bloquerait l'UPDATE. On passe alors par l'Edge Function
+  // update-business qui écrit avec le service_role après avoir validé le token
+  // (et restreint l'écriture à la fiche du tenant impersonné).
+  const impersonateToken = getImpersonateToken();
+  if (impersonateToken) {
+    const res = await fetch(
+      `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/update-business`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+        },
+        body: JSON.stringify({
+          token: impersonateToken,
+          business_id: id,
+          payload,
+        }),
+      }
+    );
+    const out = await res.json().catch(() => ({}));
+    if (!res.ok || !out?.ok) {
+      const msg =
+        out?.error ||
+        "Échec de la mise à jour (mode superadmin). Le lien d'impersonation a peut-être expiré.";
+      console.error('updateEstablishment (impersonation):', msg);
+      throw new Error(msg);
+    }
+    return true;
+  }
+
+  // Cas normal : vrai partenaire connecté, écriture directe couverte par la RLS.
   const { data, error } = await supabase()
     .from('businesses')
     .update(payload)
