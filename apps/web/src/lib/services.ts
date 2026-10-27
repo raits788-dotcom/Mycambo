@@ -400,3 +400,112 @@ export async function getPaymentSettings(): Promise<PaymentSettings> {
     return fallback;
   }
 }
+
+// ============================================================================
+// GESTION PARTENAIRE — Offres du moment (CRUD)
+// ============================================================================
+export async function getOffersForBusiness(businessId: string) {
+  const { data } = await supabase()
+    .from('offers')
+    .select('*')
+    .eq('business_id', businessId)
+    .order('created_at', { ascending: false });
+  return data || [];
+}
+
+export async function createOffer(payload: {
+  business_id: string; tenant_id?: string | null;
+  title: string; description?: string; discount?: string;
+  valid_from?: string; valid_to?: string;
+}) {
+  const { error } = await supabase().from('offers').insert({
+    business_id: payload.business_id,
+    tenant_id: payload.tenant_id ?? null,
+    title: payload.title,
+    description: payload.description ?? null,
+    discount: payload.discount ?? null,
+    valid_from: payload.valid_from ?? null,
+    valid_to: payload.valid_to ?? null,
+  });
+  if (error) throw error;
+}
+
+export async function toggleOffer(offerId: string, isActive: boolean) {
+  const { error } = await supabase().from('offers').update({ is_active: isActive }).eq('id', offerId);
+  if (error) throw error;
+}
+
+export async function deleteOffer(offerId: string) {
+  const { error } = await supabase().from('offers').delete().eq('id', offerId);
+  if (error) throw error;
+}
+
+// ============================================================================
+// GESTION PARTENAIRE — Offres d'emploi + candidatures
+// ============================================================================
+export async function getJobOffersForBusiness(businessId: string) {
+  const { data } = await supabase()
+    .from('job_offers')
+    .select('*')
+    .eq('business_id', businessId)
+    .order('created_at', { ascending: false });
+  return data || [];
+}
+
+export async function createJobOffer(payload: {
+  business_id: string; tenant_id?: string | null;
+  title: string; description?: string; contract_type?: string;
+  location?: string; salary?: string;
+}) {
+  const { error } = await supabase().from('job_offers').insert({
+    business_id: payload.business_id,
+    tenant_id: payload.tenant_id ?? null,
+    title: payload.title,
+    description: payload.description ?? null,
+    contract_type: payload.contract_type ?? null,
+    location: payload.location ?? null,
+    salary: payload.salary ?? null,
+  });
+  if (error) throw error;
+}
+
+export async function toggleJobOffer(id: string, isActive: boolean) {
+  const { error } = await supabase().from('job_offers').update({ is_active: isActive }).eq('id', id);
+  if (error) throw error;
+}
+
+export async function deleteJobOffer(id: string) {
+  const { error } = await supabase().from('job_offers').delete().eq('id', id);
+  if (error) throw error;
+}
+
+export async function getApplicationsForBusiness(businessId: string) {
+  const { data } = await supabase()
+    .from('job_applications')
+    .select('*, job_offers(title)')
+    .eq('business_id', businessId)
+    .order('created_at', { ascending: false });
+  return data || [];
+}
+
+export async function setApplicationStatus(id: string, status: string) {
+  const { error } = await supabase().from('job_applications').update({ status }).eq('id', id);
+  if (error) throw error;
+}
+
+// ============================================================================
+// GESTION PARTENAIRE — Réservations reçues
+// ============================================================================
+export async function getReservationsForBusiness(businessId: string) {
+  const { data } = await supabase()
+    .from('reservations')
+    .select('*')
+    .eq('business_id', businessId)
+    .order('created_at', { ascending: false });
+  return data || [];
+}
+
+export async function setReservationStatus(id: string, status: string) {
+  const { error } = await supabase().from('reservations').update({ status }).eq('id', id);
+  if (error) throw error;
+}

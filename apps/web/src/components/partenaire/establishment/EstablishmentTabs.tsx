@@ -1,8 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
+import { createBrowserClient } from '@supabase/ssr';
 import type { StoredEstablishment } from '@/lib/establishment-storage';
+import { getPlanPermissionsFromDB, getPlanPermissions, type PlanPermissions } from '@/lib/plan-permissions';
 import InfoTab from './InfoTab';
 import PhotosTab from './PhotosTab';
 import ServicesTab from './ServicesTab';
@@ -10,8 +12,13 @@ import StatsTab from './StatsTab';
 import SubscriptionTab from './SubscriptionTab';
 import ReviewsTab from './ReviewsTab';
 import RequestsTab from './RequestsTab';
+import OffersTab from './OffersTab';
+import JobsTab from './JobsTab';
+import ReservationsTab from './ReservationsTab';
 
-type TabId = 'info' | 'photos' | 'services' | 'stats' | 'reviews' | 'requests' | 'subscription';
+type TabId =
+  | 'info' | 'photos' | 'services' | 'stats' | 'reviews' | 'requests'
+  | 'subscription' | 'offers' | 'jobs' | 'reservations';
 
 interface EstablishmentTabsProps {
   establishment: StoredEstablishment;
@@ -23,20 +30,41 @@ export default function EstablishmentTabs({
   onUpdate,
 }: EstablishmentTabsProps) {
   const [tab, setTab] = useState<TabId>('info');
+  const [perms, setPerms] = useState<PlanPermissions>(() => getPlanPermissions('decouverte'));
+
+  // Charge les permissions de la formule active de l'établissement.
+  useEffect(() => {
+    (async () => {
+      try {
+        const sb = createBrowserClient(
+          process.env.NEXT_PUBLIC_SUPABASE_URL!,
+          process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+        );
+        const { data } = await sb
+          .from('subscriptions')
+          .select('plans(slug)')
+          .eq('business_id', establishment.id)
+          .maybeSingle();
+        const slug = (data?.plans as any)?.slug || 'decouverte';
+        setPerms(await getPlanPermissionsFromDB(slug));
+      } catch {
+        /* garde Découverte par défaut */
+      }
+    })();
+  }, [establishment.id]);
 
   const tabs = [
-    { id: 'info' as TabId, label: 'Informations', icon: 'fa-pencil' },
-    { id: 'photos' as TabId, label: 'Photos', icon: 'fa-images' },
-    { id: 'services' as TabId, label: 'Services', icon: 'fa-gift' },
-    { id: 'stats' as TabId, label: 'Statistiques', icon: 'fa-chart-line' },
-    { id: 'reviews' as TabId, label: 'Avis', icon: 'fa-star' },
-    { id: 'requests' as TabId, label: 'Demandes', icon: 'fa-inbox' },
-    {
-      id: 'subscription' as TabId,
-      label: 'Abonnement',
-      icon: 'fa-credit-card',
-    },
-  ];
+    { id: 'info' as TabId, label: 'Informations', icon: 'fa-pencil', show: true },
+    { id: 'photos' as TabId, label: 'Photos', icon: 'fa-images', show: true },
+    { id: 'services' as TabId, label: 'Services', icon: 'fa-gift', show: true },
+    { id: 'offers' as TabId, label: 'Offres', icon: 'fa-bullhorn', show: perms.canPublishOffers },
+    { id: 'reservations' as TabId, label: 'Réservations', icon: 'fa-calendar-check', show: perms.canReceiveReservations },
+    { id: 'jobs' as TabId, label: 'Emploi', icon: 'fa-briefcase', show: perms.canReceiveApplications },
+    { id: 'stats' as TabId, label: 'Statistiques', icon: 'fa-chart-line', show: true },
+    { id: 'reviews' as TabId, label: 'Avis', icon: 'fa-star', show: true },
+    { id: 'requests' as TabId, label: 'Demandes', icon: 'fa-inbox', show: true },
+    { id: 'subscription' as TabId, label: 'Abonnement', icon: 'fa-credit-card', show: true },
+  ].filter((t) => t.show);
 
   return (
     <>
@@ -67,6 +95,15 @@ export default function EstablishmentTabs({
         )}
         {tab === 'services' && (
           <ServicesTab establishment={establishment} onUpdate={onUpdate} />
+        )}
+        {tab === 'offers' && (
+          <OffersTab establishment={establishment} onUpdate={onUpdate} />
+        )}
+        {tab === 'reservations' && (
+          <ReservationsTab establishment={establishment} onUpdate={onUpdate} />
+        )}
+        {tab === 'jobs' && (
+          <JobsTab establishment={establishment} onUpdate={onUpdate} />
         )}
         {tab === 'stats' && <StatsTab establishment={establishment} />}
         {tab === 'reviews' && <ReviewsTab establishment={establishment} />}
