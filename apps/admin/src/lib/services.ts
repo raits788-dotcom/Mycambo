@@ -1840,3 +1840,132 @@ export async function approveAllPending(): Promise<number> {
   if (error) throw error;
   return (data || []).length;
 }
+
+// ============================================================================
+// GÉRANCE myCAMBO — associations importées en masse (managed_by_mycambo)
+// ============================================================================
+
+export interface GeranceTenant {
+  id: string;
+  name: string;
+  slug: string;
+  email: string | null;
+  city: string | null;
+  status: string;
+  managed_by_mycambo: boolean;
+  claimed_at: string | null;
+  created_at: string;
+  plan_name: string | null;
+  business_id: string | null;
+  business_slug: string | null;
+  business_status: string | null;
+}
+
+/**
+ * Liste des associations/fiches en gérance myCAMBO (import en masse).
+ * Une ligne par tenant géré, enrichie de sa fiche principale et de sa formule.
+ */
+export async function getGeranceTenants(): Promise<GeranceTenant[]> {
+  const supabase = getSupabase();
+  const { data, error } = await supabase
+    .from('tenants')
+    .select(`
+      id, name, slug, email, city, status, managed_by_mycambo, claimed_at, created_at,
+      plans(name),
+      businesses(id, slug, status)
+    `)
+    .eq('managed_by_mycambo', true)
+    .order('created_at', { ascending: false });
+
+  if (error) { console.error('getGeranceTenants:', error); return []; }
+
+  return (data || []).map((t: any) => {
+    const plan = Array.isArray(t.plans) ? t.plans[0] : t.plans;
+    const biz = Array.isArray(t.businesses) ? t.businesses[0] : t.businesses;
+    return {
+      id: t.id,
+      name: t.name,
+      slug: t.slug,
+      email: t.email ?? null,
+      city: t.city ?? null,
+      status: t.status,
+      managed_by_mycambo: t.managed_by_mycambo,
+      claimed_at: t.claimed_at ?? null,
+      created_at: t.created_at,
+      plan_name: plan?.name ?? null,
+      business_id: biz?.id ?? null,
+      business_slug: biz?.slug ?? null,
+      business_status: biz?.status ?? null,
+    };
+  });
+}
+
+/**
+ * Statistiques rapides pour l'en-tête de la page Gérance.
+ */
+export async function getGeranceStats(): Promise<{
+  total: number;
+  published: number;
+  pending: number;
+  claimed: number;
+  unclaimed: number;
+}> {
+  const list = await getGeranceTenants();
+  return {
+    total: list.length,
+    published: list.filter((t) => t.business_status === 'approved').length,
+    pending: list.filter((t) => t.business_status === 'pending').length,
+    claimed: list.filter((t) => t.claimed_at != null).length,
+    unclaimed: list.filter((t) => t.claimed_at == null).length,
+  };
+}
+
+/**
+ * Valide MANUELLEMENT la réclamation d'accès d'un partenaire sur une asso en
+ * gérance : lie le compte utilisateur au tenant, marque la date de réclamation
+ * et sort le tenant de la gérance myCAMBO. Jamais automatique : c'est myCAMBO
+ * qui garantit la qualité de la saisie avant de donner l'accès.
+ *
+ * @param tenantId  tenant en gérance à réclamer
+ * @param userId    compte utilisateur (auth) à lier comme propriétaire
+ */
+export async function claimGeranceAccess(
+  tenantId: string,
+  userId: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const supabase = getSupabase();
+
+  // 1. Lier le compte au tenant (propriétaire) — idempotent
+  const { data: existing } = await supabase
+    .from('tenant_users')
+    .select('id')
+    .eq('tenant_id', tenantId)
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  if (!existing) {
+    const { error: linkErr } = await supabase
+      .from('tenant_users')
+      .insert({ tenant_id: tenantId, user_id: userId, role: 'owner' });
+    if (linkErr) {
+      console.error('claimGeranceAccess link:', linkErr);
+      return { ok: false, error: linkErr.message };
+    }
+  }
+
+  // 2. Sortir de la gérance + horodater la réclamation
+  const { data, error } = await supabase
+    .from('tenants')
+    .update({ managed_by_mycambo: false, claimed_at: new Date().toISOString() })
+    .eq('id', tenantId)
+    .select('id');
+  if (error) {
+    console.error('claimGeranceAccess update:', error);
+    return { ok: false, error: error.message };
+  }
+  if (!data || data.length === 0) {
+    return { ok: false, error: 'Tenant introuvable ou non modifiable.' };
+  }
+
+  return { ok: true };
+}
