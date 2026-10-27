@@ -20,6 +20,7 @@ import {
   getEstablishmentBySlug,
   type StoredEstablishment,
 } from '@/lib/establishment-storage';
+import { formatHours } from '@/lib/utils';
 
 export default function ApercuPublicPage() {
   const params = useParams();
@@ -378,10 +379,10 @@ export default function ApercuPublicPage() {
                     <span>{establishment.website}</span>
                   </div>
                 )}
-                {establishment.hours && (
+                {formatHours(establishment.hours) && (
                   <div className="flex items-center gap-2.5">
                     <Clock size={15} className="text-gris-doux" />
-                    <span>{JSON.stringify(establishment.hours)}</span>
+                    <span>{formatHours(establishment.hours)}</span>
                   </div>
                 )}
               </div>

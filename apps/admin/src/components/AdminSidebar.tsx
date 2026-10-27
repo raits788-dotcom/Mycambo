@@ -27,6 +27,7 @@ import {
   HardDrive,
   Loader2,
   Tag, // ← Ajouté pour les catégories
+  HeartHandshake, // ← Gérance myCAMBO (associations importées)
 } from 'lucide-react';
 import { cn } from '@my-cambo/utils';
 import { getCurrentAdmin, getInitials } from '@/lib/auth';
@@ -60,6 +61,7 @@ const NAV_SECTIONS: NavSection[] = [
     items: [
       { id: 'tenants', label: 'Tenants', icon: Building2, href: '/tenants' },
       { id: 'etablissements', label: 'Établissements', icon: Store, href: '/etablissements' },
+      { id: 'gerance', label: 'Gérance myCAMBO', icon: HeartHandshake, href: '/gerance' },
       { id: 'coups-de-coeur', label: 'Coups de cœur', icon: Star, href: '/coups-de-coeur' },
     ],
   },
