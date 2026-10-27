@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { X, Check, Info, Sparkles, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getSubscriptionPlans, type SubscriptionPlan } from '@/lib/subscription';
-import { createOrUpdateSubscription } from '@/lib/services';
+import { createOrUpdateSubscription, getPaymentSettings, type PaymentSettings } from '@/lib/services';
 
 interface ChangePlanModalProps {
   currentPlanId: string;
@@ -30,6 +30,11 @@ export default function ChangePlanModal({
   const [confirmed, setConfirmed] = useState(false);
   const [blocking, setBlocking] = useState<any[]>([]);
   const [paymentRef, setPaymentRef] = useState<string | null>(null);
+  const [paySettings, setPaySettings] = useState<PaymentSettings | null>(null);
+
+  useEffect(() => {
+    getPaymentSettings().then(setPaySettings);
+  }, []);
 
   useEffect(() => {
     (async () => {
@@ -108,8 +113,8 @@ export default function ChangePlanModal({
             <div className="bg-gris-fond rounded-xl p-5 text-left text-sm space-y-2 mb-6">
               <div className="font-bold text-marine">Paiement par virement (abonnement annuel)</div>
               <p className="text-gris-texte">
-                Effectuez votre virement ABA / Wing puis indiquez la référence ci-dessous.
-                Votre établissement sera mis en ligne dès validation.
+                {paySettings?.instructions ||
+                  'Effectuez votre virement puis indiquez la référence ci-dessous. Votre établissement sera mis en ligne dès validation.'}
               </p>
               {paymentRef && (
                 <div className="bg-white border border-gris-ligne rounded-lg px-3 py-2 font-mono text-marine">
@@ -117,7 +122,10 @@ export default function ChangePlanModal({
                 </div>
               )}
               <p className="text-xs text-gris-doux">
-                Bénéficiaire : myCAMBO · ABA 000 123 456 · Wing 012 345 678 · mentionnez la référence.
+                Bénéficiaire : {paySettings?.beneficiary || 'myCAMBO'}
+                {paySettings?.aba && <> · ABA {paySettings.aba}</>}
+                {paySettings?.wing && <> · Wing {paySettings.wing}</>}
+                {' '}· mentionnez la référence.
               </p>
             </div>
           </div>

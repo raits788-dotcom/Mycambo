@@ -47,6 +47,18 @@ export async function createOrUpdateSubscription(payload: {
   const paymentRef =
     'CAMBO-' + now.getFullYear() + '-' + Math.random().toString(36).slice(2, 8).toUpperCase();
 
+  // Version COURANTE de la formule : on la fige sur l'abonnement, pour qu'une
+  // future édition de la formule n'impacte pas cet abonnement.
+  let planVersionId: string | null = null;
+  try {
+    const { data: ver } = await client.rpc('current_plan_version', {
+      p_plan_slug: payload.planSlug,
+    });
+    planVersionId = ver?.id ?? null;
+  } catch {
+    planVersionId = null;
+  }
+
   // Souscription existante pour ce business ?
   const { data: existing } = await client
     .from('subscriptions')
@@ -62,6 +74,7 @@ export async function createOrUpdateSubscription(payload: {
       .from('subscriptions')
       .update({
         plan_id: payload.planId,
+        plan_version_id: planVersionId,
         status: 'pending_payment',
         updated_at: now.toISOString(),
       })
@@ -75,6 +88,7 @@ export async function createOrUpdateSubscription(payload: {
         tenant_id: payload.tenantId,
         business_id: payload.businessId,
         plan_id: payload.planId,
+        plan_version_id: planVersionId,
         status: 'pending_payment',
         current_period_start: now.toISOString(),
         current_period_end: now.toISOString(), // fixé à +1 an à la validation du paiement
@@ -349,4 +363,40 @@ export async function getPendingPayments() {
     return [];
   }
   return data || [];
+}
+
+// ============================================================================
+// PARAMÈTRES PLATEFORME (coordonnées de virement, etc.)
+// ============================================================================
+export type PaymentSettings = {
+  beneficiary: string;
+  aba: string;
+  wing: string;
+  instructions: string;
+};
+
+export async function getPaymentSettings(): Promise<PaymentSettings> {
+  const fallback: PaymentSettings = {
+    beneficiary: 'myCAMBO',
+    aba: '',
+    wing: '',
+    instructions:
+      'Effectuez votre virement puis indiquez la référence. Votre établissement sera mis en ligne dès validation.',
+  };
+  try {
+    const { data } = await supabase()
+      .from('platform_settings')
+      .select('key, value')
+      .in('key', ['payment_beneficiary', 'payment_aba', 'payment_wing', 'payment_instructions']);
+    const map: Record<string, string> = {};
+    for (const row of data || []) map[row.key] = row.value || '';
+    return {
+      beneficiary: map['payment_beneficiary'] || fallback.beneficiary,
+      aba: map['payment_aba'] || fallback.aba,
+      wing: map['payment_wing'] || fallback.wing,
+      instructions: map['payment_instructions'] || fallback.instructions,
+    };
+  } catch {
+    return fallback;
+  }
 }
