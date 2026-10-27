@@ -556,32 +556,55 @@ export async function createPlanWithVersion(payload: {
   return plan.id;
 }
 
+// Publie une nouvelle version de formule via la fonction SQL migrée
+// publish_plan_version : archive l'ancienne "current", crée la nouvelle.
+// Les abonnements en cours gardent leur version (plan_version_id figé).
 export async function createNewPlanVersion(payload: {
   plan_id: string; price_monthly: number; price_yearly: number | null;
   max_businesses: number; trial_days: number; feature_ids: string[];
   notes?: string;
 }) {
   const supabase = getSupabase();
-  const { data, error } = await supabase.rpc('admin_create_plan_version', {
+  // Récupérer les permissions actuelles de la formule pour les transmettre
+  const { data: plan } = await supabase
+    .from('plans')
+    .select('permissions, features')
+    .eq('id', payload.plan_id)
+    .maybeSingle();
+
+  const { data, error } = await supabase.rpc('publish_plan_version', {
     p_plan_id: payload.plan_id,
     p_price_monthly: payload.price_monthly,
     p_price_yearly: payload.price_yearly,
     p_max_businesses: payload.max_businesses,
-    p_trial_days: payload.trial_days,
-    p_feature_ids: payload.feature_ids,
-    p_notes: payload.notes || null,
+    p_permissions: plan?.permissions ?? {},
+    p_features: plan?.features ?? [],
   });
   if (error) throw error;
-  return data as string;
+  if (data && (data as any).ok === false) throw new Error((data as any).error);
+  return (data as any)?.version_id as string;
 }
 
+// Migrer les abonnements en cours vers la version courante (option explicite
+// du superadmin : "appliquer aussi aux abonnements existants").
 export async function migrateSubscriptionsToCurrentVersion(planId: string) {
   const supabase = getSupabase();
-  const { data, error } = await supabase.rpc('admin_migrate_subscriptions_to_current_version', {
-    p_plan_id: planId,
-  });
+  // Repointe les souscriptions actives du plan vers sa version "current".
+  const { data: cur } = await supabase
+    .from('plan_versions')
+    .select('id')
+    .eq('plan_id', planId)
+    .eq('status', 'current')
+    .maybeSingle();
+  if (!cur) return 0;
+  const { data, error } = await supabase
+    .from('subscriptions')
+    .update({ plan_version_id: cur.id })
+    .eq('plan_id', planId)
+    .in('status', ['active', 'expiring'])
+    .select('id');
   if (error) throw error;
-  return data as number;
+  return (data || []).length;
 }
 
 // ============================================================================
