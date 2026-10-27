@@ -11,10 +11,11 @@ import CommerceTabsPublic from '@/components/commerce/CommerceTabsPublic';
 import AssociationActionsBar from '@/components/association/AssociationActionsBar';
 import ContactModal from '@/components/commerce/ContactModal';
 import ReservationModal from '@/components/commerce/ReservationModal';
+import ApplyModal from '@/components/commerce/ApplyModal';
 import { LevelBadge, SubLabels } from '@/components/ui/LevelBadge';
 import { createBrowserClient } from '@supabase/ssr';
 import { getPlanPermissions, getPlanPermissionsFromDB, type PlanPermissions } from '@/lib/plan-permissions';
-import { getActiveOffers, type Offer } from '@/lib/services';
+import { getActiveOffers, getJobOffers, type Offer, type JobOffer } from '@/lib/services';
 
 export default function CommercePage() {
   const params = useParams();
@@ -29,6 +30,8 @@ export default function CommercePage() {
   const [showContactModal, setShowContactModal] = useState(false);
   const [showReservation, setShowReservation] = useState(false);
   const [offers, setOffers] = useState<Offer[]>([]);
+  const [jobs, setJobs] = useState<JobOffer[]>([]);
+  const [applyTo, setApplyTo] = useState<JobOffer | null>(null);
 
   useEffect(() => {
     if (!slug) return;
@@ -68,6 +71,10 @@ export default function CommercePage() {
       // Offres du moment (si la formule le permet)
       if (perms.canPublishOffers) {
         setOffers(await getActiveOffers(business.id));
+      }
+      // Offres d'emploi (si la formule permet les candidatures)
+      if (perms.canReceiveApplications) {
+        setJobs(await getJobOffers(business.id));
       }
 
       // 3. Formate l'objet commerce (avec détection association robuste)
@@ -251,6 +258,39 @@ export default function CommercePage() {
               </div>
             )}
 
+            {/* Recrutement (si la formule permet les candidatures et qu'il y a des offres) */}
+            {permissions.canReceiveApplications && jobs.length > 0 && (
+              <div className="mb-6 space-y-3">
+                <h2 className="text-lg font-extrabold text-marine flex items-center gap-2">
+                  💼 Cet établissement recrute
+                </h2>
+                {jobs.map((j) => (
+                  <div
+                    key={j.id}
+                    className="border border-gris-ligne rounded-xl p-4 flex items-start justify-between gap-4"
+                  >
+                    <div>
+                      <div className="font-bold text-marine">{j.title}</div>
+                      <div className="flex flex-wrap gap-2 mt-1 text-xs text-gris-doux">
+                        {j.contract_type && <span className="bg-gris-fond px-2 py-0.5 rounded">{j.contract_type}</span>}
+                        {j.location && <span>📍 {j.location}</span>}
+                        {j.salary && <span>💰 {j.salary}</span>}
+                      </div>
+                      {j.description && (
+                        <p className="text-sm text-gris-texte mt-2">{j.description}</p>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => setApplyTo(j)}
+                      className="shrink-0 bg-marine text-white font-bold text-sm px-4 py-2 rounded-full hover:bg-marine-dark transition-colors"
+                    >
+                      Postuler
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
             <CommerceTabsPublic
               commerce={{
                 ...commerce,
@@ -368,6 +408,17 @@ export default function CommercePage() {
           tenantId={commerce.tenant_id}
           kind={commerce.type === 'hotel' ? 'hotel' : 'restaurant'}
           onClose={() => setShowReservation(false)}
+        />
+      )}
+
+      {/* Modale de candidature emploi */}
+      {applyTo && permissions.canReceiveApplications && (
+        <ApplyModal
+          jobOfferId={applyTo.id}
+          jobTitle={applyTo.title}
+          businessId={commerce.id}
+          tenantId={commerce.tenant_id}
+          onClose={() => setApplyTo(null)}
         />
       )}
     </>

@@ -258,3 +258,52 @@ export async function getActiveOffers(businessId: string): Promise<Offer[]> {
   }
   return data || [];
 }
+
+// ============================================================================
+// EMPLOI — offres d'emploi d'un établissement + candidatures
+// ============================================================================
+export type JobOffer = {
+  id: string;
+  title: string;
+  description: string | null;
+  contract_type: string | null;
+  location: string | null;
+  salary: string | null;
+};
+
+// Offres d'emploi actives d'un établissement (fiche publique).
+export async function getJobOffers(businessId: string): Promise<JobOffer[]> {
+  const { data, error } = await supabase()
+    .from('job_offers')
+    .select('id, title, description, contract_type, location, salary')
+    .eq('business_id', businessId)
+    .eq('is_active', true)
+    .order('created_at', { ascending: false });
+  if (error) {
+    console.error('getJobOffers:', error);
+    return [];
+  }
+  return data || [];
+}
+
+// Postuler à une offre.
+export async function submitApplication(payload: {
+  job_offer_id: string;
+  business_id: string;
+  tenant_id?: string | null;
+  candidate_name: string;
+  candidate_email?: string;
+  candidate_phone?: string;
+  message?: string;
+}): Promise<{ ok: boolean; error?: string }> {
+  const { error } = await supabase().from('job_applications').insert({
+    job_offer_id: payload.job_offer_id,
+    business_id: payload.business_id,
+    tenant_id: payload.tenant_id ?? null,
+    candidate_name: payload.candidate_name,
+    candidate_email: payload.candidate_email ?? null,
+    candidate_phone: payload.candidate_phone ?? null,
+    message: payload.message ?? null,
+  });
+  return error ? { ok: false, error: error.message } : { ok: true };
+}
