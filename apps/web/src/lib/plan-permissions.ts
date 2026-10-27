@@ -15,7 +15,20 @@ export interface PlanPermissions {
   canUseMessaging: boolean;
   maxPhotos: number;
   maxEstablishments: number;
+  // ===== Permissions d'INTERACTION (ce que le public peut faire sur la fiche) =====
+  canReceiveMessages: boolean;      // bouton Contact actif
+  canReceiveReservations: boolean;  // réservation hôtel / restaurant
+  canPublishOffers: boolean;        // offres du moment visibles
+  canReceiveApplications: boolean;  // candidatures emploi / bénévolat
 }
+
+// Valeurs d'interaction par défaut selon qu'une formule est "active" ou "bridée".
+const INTERACTIONS_OFF = {
+  canReceiveMessages: false,
+  canReceiveReservations: false,
+  canPublishOffers: false,
+  canReceiveApplications: false,
+};
 
 export const PLAN_PERMISSIONS: Record<PlanSlug, PlanPermissions> = {
   decouverte: {
@@ -29,6 +42,7 @@ export const PLAN_PERMISSIONS: Record<PlanSlug, PlanPermissions> = {
     canUseMessaging: false,
     maxPhotos: 0,
     maxEstablishments: 1,
+    canReceiveMessages: false, canReceiveReservations: false, canPublishOffers: false, canReceiveApplications: false,
   },
   essentiel: {
     canShowPhotos: true,
@@ -41,6 +55,7 @@ export const PLAN_PERMISSIONS: Record<PlanSlug, PlanPermissions> = {
     canUseMessaging: true,
     maxPhotos: 20,
     maxEstablishments: 1,
+    canReceiveMessages: true, canReceiveReservations: false, canPublishOffers: false, canReceiveApplications: false,
   },
   pro: {
     canShowPhotos: true,
@@ -53,6 +68,7 @@ export const PLAN_PERMISSIONS: Record<PlanSlug, PlanPermissions> = {
     canUseMessaging: true,
     maxPhotos: 999,
     maxEstablishments: 3,
+    canReceiveMessages: true, canReceiveReservations: true, canPublishOffers: false, canReceiveApplications: true,
   },
   business: {
     canShowPhotos: true,
@@ -65,6 +81,7 @@ export const PLAN_PERMISSIONS: Record<PlanSlug, PlanPermissions> = {
     canUseMessaging: true,
     maxPhotos: 999,
     maxEstablishments: 10,
+    canReceiveMessages: true, canReceiveReservations: true, canPublishOffers: true, canReceiveApplications: true,
   },
   entreprise: {
     canShowPhotos: true,
@@ -77,6 +94,7 @@ export const PLAN_PERMISSIONS: Record<PlanSlug, PlanPermissions> = {
     canUseMessaging: true,
     maxPhotos: 999,
     maxEstablishments: 999,
+    canReceiveMessages: true, canReceiveReservations: true, canPublishOffers: true, canReceiveApplications: true,
   },
   association: {
     canShowPhotos: true,
@@ -89,6 +107,7 @@ export const PLAN_PERMISSIONS: Record<PlanSlug, PlanPermissions> = {
     canUseMessaging: true,
     maxPhotos: 10,
     maxEstablishments: 3,
+    canReceiveMessages: true, canReceiveReservations: false, canPublishOffers: false, canReceiveApplications: true,
   },
 };
 

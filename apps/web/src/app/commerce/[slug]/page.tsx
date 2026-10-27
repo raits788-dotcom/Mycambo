@@ -239,12 +239,14 @@ export default function CommercePage() {
                 </div>
               ) : (
                 <div className="space-y-2 mb-5">
-                  <button
-                    onClick={() => setShowContactModal(true)}
-                    className="w-full bg-marine text-white font-bold py-3 rounded-full hover:bg-marine-dark transition-colors text-sm"
-                  >
-                    Contacter
-                  </button>
+                  {permissions.canReceiveMessages && (
+                    <button
+                      onClick={() => setShowContactModal(true)}
+                      className="w-full bg-marine text-white font-bold py-3 rounded-full hover:bg-marine-dark transition-colors text-sm"
+                    >
+                      Contacter
+                    </button>
+                  )}
                   {commerce.city && (
                     <a
                       href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
@@ -300,7 +302,7 @@ export default function CommercePage() {
       </section>
 
       {/* Modale de contact (commerces uniquement) */}
-      {showContactModal && !isAssociation && (
+      {showContactModal && !isAssociation && permissions.canReceiveMessages && (
         <ContactModal
           businessId={commerce.id}
           businessName={commerce.name}
