@@ -10,9 +10,11 @@ import {
 import CommerceTabsPublic from '@/components/commerce/CommerceTabsPublic';
 import AssociationActionsBar from '@/components/association/AssociationActionsBar';
 import ContactModal from '@/components/commerce/ContactModal';
+import ReservationModal from '@/components/commerce/ReservationModal';
 import { LevelBadge, SubLabels } from '@/components/ui/LevelBadge';
 import { createBrowserClient } from '@supabase/ssr';
 import { getPlanPermissions, getPlanPermissionsFromDB, type PlanPermissions } from '@/lib/plan-permissions';
+import { getActiveOffers, type Offer } from '@/lib/services';
 
 export default function CommercePage() {
   const params = useParams();
@@ -25,6 +27,8 @@ export default function CommercePage() {
   const [permissions, setPermissions] = useState<PlanPermissions>(() => getPlanPermissions('decouverte'));
   const [mounted, setMounted] = useState(false);
   const [showContactModal, setShowContactModal] = useState(false);
+  const [showReservation, setShowReservation] = useState(false);
+  const [offers, setOffers] = useState<Offer[]>([]);
 
   useEffect(() => {
     if (!slug) return;
@@ -59,7 +63,12 @@ export default function CommercePage() {
       // 2. Détermine le plan + charge ses permissions depuis la base
       const tenantPlan = (business.tenants as any)?.plans?.slug || 'decouverte';
       setPlanSlug(tenantPlan);
-      setPermissions(await getPlanPermissionsFromDB(tenantPlan));
+      const perms = await getPlanPermissionsFromDB(tenantPlan);
+      setPermissions(perms);
+      // Offres du moment (si la formule le permet)
+      if (perms.canPublishOffers) {
+        setOffers(await getActiveOffers(business.id));
+      }
 
       // 3. Formate l'objet commerce (avec détection association robuste)
       const categoryName = business.categories?.name || '';
@@ -210,6 +219,38 @@ export default function CommercePage() {
       <section className="max-w-wrap mx-auto px-4 md:px-8 lg:px-12 xl:px-20 py-6">
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-10">
           <div>
+            {/* Offres du moment (si la formule le permet et qu'il y en a) */}
+            {permissions.canPublishOffers && offers.length > 0 && (
+              <div className="mb-6 space-y-3">
+                <h2 className="text-lg font-extrabold text-marine flex items-center gap-2">
+                  <span className="text-rouge-khmer">★</span> Offres du moment
+                </h2>
+                {offers.map((o) => (
+                  <div
+                    key={o.id}
+                    className="border border-rouge-khmer/30 bg-rouge-khmer/5 rounded-xl p-4 flex items-start justify-between gap-4"
+                  >
+                    <div>
+                      <div className="font-bold text-marine">{o.title}</div>
+                      {o.description && (
+                        <p className="text-sm text-gris-texte mt-1">{o.description}</p>
+                      )}
+                      {o.valid_to && (
+                        <p className="text-xs text-gris-doux mt-1">
+                          Jusqu&apos;au {new Date(o.valid_to).toLocaleDateString('fr-FR')}
+                        </p>
+                      )}
+                    </div>
+                    {o.discount && (
+                      <span className="shrink-0 bg-rouge-khmer text-white font-extrabold text-sm px-3 py-1.5 rounded-full">
+                        {o.discount}
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
             <CommerceTabsPublic
               commerce={{
                 ...commerce,
@@ -247,6 +288,15 @@ export default function CommercePage() {
                       Contacter
                     </button>
                   )}
+                  {permissions.canReceiveReservations &&
+                    commerce.services?.reservations && (
+                      <button
+                        onClick={() => setShowReservation(true)}
+                        className="w-full bg-ic-vert text-white font-bold py-3 rounded-full hover:opacity-90 transition-opacity text-sm"
+                      >
+                        Réserver
+                      </button>
+                    )}
                   {commerce.city && (
                     <a
                       href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
@@ -307,6 +357,17 @@ export default function CommercePage() {
           businessId={commerce.id}
           businessName={commerce.name}
           onClose={() => setShowContactModal(false)}
+        />
+      )}
+
+      {/* Modale de réservation (hôtel / restaurant, selon formule + service activé) */}
+      {showReservation && permissions.canReceiveReservations && (
+        <ReservationModal
+          businessId={commerce.id}
+          businessName={commerce.name}
+          tenantId={commerce.tenant_id}
+          kind={commerce.type === 'hotel' ? 'hotel' : 'restaurant'}
+          onClose={() => setShowReservation(false)}
         />
       )}
     </>

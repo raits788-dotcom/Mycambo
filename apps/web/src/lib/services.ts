@@ -201,3 +201,60 @@ export async function getPlans(): Promise<PlanRow[]> {
 export function formatPlanPrice(priceMonthly: number): string {
   return priceMonthly > 0 ? `${priceMonthly} $` : 'Gratuit';
 }
+
+// ============================================================================
+// RÉSERVATIONS (hôtel / restaurant) — table reservations
+// ============================================================================
+export async function submitReservation(payload: {
+  business_id: string;
+  tenant_id?: string | null;
+  customer_name: string;
+  customer_email?: string;
+  customer_phone?: string;
+  party_size?: number;
+  date_from?: string;
+  date_to?: string;
+  time_slot?: string;
+  message?: string;
+}): Promise<{ ok: boolean; error?: string }> {
+  const { error } = await supabase().from('reservations').insert({
+    business_id: payload.business_id,
+    tenant_id: payload.tenant_id ?? null,
+    customer_name: payload.customer_name,
+    customer_email: payload.customer_email ?? null,
+    customer_phone: payload.customer_phone ?? null,
+    party_size: payload.party_size ?? null,
+    date_from: payload.date_from ?? null,
+    date_to: payload.date_to ?? null,
+    time_slot: payload.time_slot ?? null,
+    message: payload.message ?? null,
+  });
+  return error ? { ok: false, error: error.message } : { ok: true };
+}
+
+// ============================================================================
+// OFFRES DU MOMENT — table offers
+// ============================================================================
+export type Offer = {
+  id: string;
+  title: string;
+  description: string | null;
+  discount: string | null;
+  valid_from: string | null;
+  valid_to: string | null;
+};
+
+// Offres actives d'un établissement (pour la fiche publique).
+export async function getActiveOffers(businessId: string): Promise<Offer[]> {
+  const { data, error } = await supabase()
+    .from('offers')
+    .select('id, title, description, discount, valid_from, valid_to')
+    .eq('business_id', businessId)
+    .eq('is_active', true)
+    .order('created_at', { ascending: false });
+  if (error) {
+    console.error('getActiveOffers:', error);
+    return [];
+  }
+  return data || [];
+}
