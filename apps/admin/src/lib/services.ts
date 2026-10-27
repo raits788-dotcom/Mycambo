@@ -1822,3 +1822,16 @@ export async function setPlatformSetting(key: string, value: string) {
     .upsert({ key, value, updated_at: new Date().toISOString() }, { onConflict: 'key' });
   if (error) throw error;
 }
+
+// Approuve en lot tous les établissements en attente (validation de masse).
+// Renvoie le nombre d'établissements approuvés.
+export async function approveAllPending(): Promise<number> {
+  const supabase = getSupabase();
+  const { data, error } = await supabase
+    .from('businesses')
+    .update({ status: 'approved' })
+    .eq('status', 'pending')
+    .select('id');
+  if (error) throw error;
+  return (data || []).length;
+}
