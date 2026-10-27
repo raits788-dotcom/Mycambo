@@ -2,44 +2,69 @@
 
 import { useState, useEffect } from 'react';
 import { Star, Eye, ArrowUp, ArrowDown, Info, Loader2, X } from 'lucide-react';
-import { getFeaturedBusinesses, getBusinesses } from '@/lib/services';
+import {
+  getFeaturedBusinesses, getBusinesses,
+  addFeatured, removeFeatured, setFeaturedPosition,
+} from '@/lib/services';
 
 export default function FeaturedPage() {
   const [featured, setFeatured] = useState<any[]>([]);
   const [allBusinesses, setAllBusinesses] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+
+  const reload = async () => {
+    const [f, b] = await Promise.all([getFeaturedBusinesses(), getBusinesses()]);
+    setFeatured(f);
+    setAllBusinesses(b);
+  };
 
   useEffect(() => {
     (async () => {
-      const [f, b] = await Promise.all([getFeaturedBusinesses(), getBusinesses()]);
-      setFeatured(f);
-      setAllBusinesses(b);
+      await reload();
       setLoading(false);
     })();
   }, []);
 
   const available = allBusinesses.filter((b) => !b.is_featured && b.status === 'approved');
 
+  // Ajoute en base (is_featured = true), puis recharge.
+  const add = async (id: string) => {
+    setBusy(true);
+    try { await addFeatured(id); await reload(); }
+    catch (e) { alert('Erreur : ' + (e as Error).message); }
+    finally { setBusy(false); }
+  };
+
+  const remove = async (id: string) => {
+    if (!confirm('Retirer cet établissement des coups de cœur ?')) return;
+    setBusy(true);
+    try { await removeFeatured(id); await reload(); }
+    catch (e) { alert('Erreur : ' + (e as Error).message); }
+    finally { setBusy(false); }
+  };
+
+  // Échange les positions en base puis recharge.
+  const swap = async (idx: number, other: number) => {
+    if (other < 0 || other >= featured.length) return;
+    setBusy(true);
+    try {
+      const a = featured[idx], b = featured[other];
+      await setFeaturedPosition(a.id, b.featured_position ?? other + 1);
+      await setFeaturedPosition(b.id, a.featured_position ?? idx + 1);
+      await reload();
+    } catch (e) { alert('Erreur : ' + (e as Error).message); }
+    finally { setBusy(false); }
+  };
+
   const moveUp = (id: string) => {
     const idx = featured.findIndex((f) => f.id === id);
-    if (idx <= 0) return;
-    const newList = [...featured];
-    [newList[idx - 1], newList[idx]] = [newList[idx], newList[idx - 1]];
-    setFeatured(newList);
+    swap(idx, idx - 1);
   };
 
   const moveDown = (id: string) => {
     const idx = featured.findIndex((f) => f.id === id);
-    if (idx < 0 || idx >= featured.length - 1) return;
-    const newList = [...featured];
-    [newList[idx], newList[idx + 1]] = [newList[idx + 1], newList[idx]];
-    setFeatured(newList);
-  };
-
-  const remove = (id: string) => {
-    if (confirm('Retirer cet établissement des coups de cœur ?')) {
-      setFeatured((prev) => prev.filter((f) => f.id !== id));
-    }
+    swap(idx, idx + 1);
   };
 
   return (
@@ -113,8 +138,9 @@ export default function FeaturedPage() {
                 </div>
               </div>
               <button
-                onClick={() => setFeatured((prev) => [...prev, a])}
-                className="flex items-center gap-1.5 text-xs font-bold bg-yellow-500 text-white px-3 py-1.5 rounded-full hover:bg-yellow-600"
+                onClick={() => add(a.id)}
+                disabled={busy}
+                className="flex items-center gap-1.5 text-xs font-bold bg-yellow-500 text-white px-3 py-1.5 rounded-full hover:bg-yellow-600 disabled:opacity-50"
               >
                 <Star size={12} fill="currentColor" />
                 Ajouter

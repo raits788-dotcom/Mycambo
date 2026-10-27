@@ -1684,6 +1684,45 @@ export async function toggleFeatured(businessId: string) {
 
   if (error) throw error;
 }
+
+// Ajoute un établissement aux coups de cœur (persiste en base + position en fin de liste).
+export async function addFeatured(businessId: string) {
+  const supabase = getSupabase();
+  // Prochaine position = max + 1
+  const { data: maxRow } = await supabase
+    .from('businesses')
+    .select('featured_position')
+    .eq('is_featured', true)
+    .order('featured_position', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const nextPos = ((maxRow?.featured_position as number) ?? 0) + 1;
+  const { error } = await supabase
+    .from('businesses')
+    .update({ is_featured: true, featured_position: nextPos })
+    .eq('id', businessId);
+  if (error) throw error;
+}
+
+// Retire un établissement des coups de cœur (persiste en base).
+export async function removeFeatured(businessId: string) {
+  const supabase = getSupabase();
+  const { error } = await supabase
+    .from('businesses')
+    .update({ is_featured: false, featured_position: null })
+    .eq('id', businessId);
+  if (error) throw error;
+}
+
+// Change l'ordre d'affichage d'un coup de cœur.
+export async function setFeaturedPosition(businessId: string, position: number) {
+  const supabase = getSupabase();
+  const { error } = await supabase
+    .from('businesses')
+    .update({ featured_position: position })
+    .eq('id', businessId);
+  if (error) throw error;
+}
 // ============================================================================
 // CATÉGORIES — CRUD
 // ============================================================================
@@ -1761,5 +1800,25 @@ export async function deleteCategory(id: string) {
   }
 
   const { error } = await supabase.from('categories').delete().eq('id', id);
+  if (error) throw error;
+}
+
+// ============================================================================
+// PARAMÈTRES PLATEFORME (coordonnées de virement, durée d'essai, etc.)
+// ============================================================================
+export async function getPlatformSettings(keys?: string[]) {
+  const supabase = getSupabase();
+  let q = supabase.from('platform_settings').select('key, value, label');
+  if (keys && keys.length) q = q.in('key', keys);
+  const { data, error } = await q;
+  if (error) { console.error('getPlatformSettings:', error); return []; }
+  return data || [];
+}
+
+export async function setPlatformSetting(key: string, value: string) {
+  const supabase = getSupabase();
+  const { error } = await supabase
+    .from('platform_settings')
+    .upsert({ key, value, updated_at: new Date().toISOString() }, { onConflict: 'key' });
   if (error) throw error;
 }
