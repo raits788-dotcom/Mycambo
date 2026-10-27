@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { X, Check, Info, Sparkles, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getSubscriptionPlans, type SubscriptionPlan } from '@/lib/subscription';
-import { createOrUpdateSubscription, getPaymentSettings, type PaymentSettings } from '@/lib/services';
+import { createOrUpdateSubscription, getPaymentSettings, isTrialAvailable, startTrial, type PaymentSettings } from '@/lib/services';
 
 interface ChangePlanModalProps {
   currentPlanId: string;
@@ -31,10 +31,23 @@ export default function ChangePlanModal({
   const [blocking, setBlocking] = useState<any[]>([]);
   const [paymentRef, setPaymentRef] = useState<string | null>(null);
   const [paySettings, setPaySettings] = useState<PaymentSettings | null>(null);
+  const [trialAvailable, setTrialAvailable] = useState(false);
+  const [trialStarted, setTrialStarted] = useState<{ days: number } | null>(null);
 
   useEffect(() => {
     getPaymentSettings().then(setPaySettings);
-  }, []);
+    isTrialAvailable(establishmentId).then(setTrialAvailable);
+  }, [establishmentId]);
+
+  const handleTrial = async () => {
+    if (!selected) return;
+    setConfirming(true);
+    const plan = plans.find((p) => p.id === selected);
+    const res = await startTrial(establishmentId, (plan as any)?.slug || '');
+    setConfirming(false);
+    if (res.ok) setTrialStarted({ days: res.days || 7 });
+    else alert('Erreur : ' + (res.error || 'essai indisponible'));
+  };
 
   useEffect(() => {
     (async () => {
@@ -98,6 +111,24 @@ export default function ChangePlanModal({
         {loading ? (
           <div className="p-12 text-center">
             <Loader2 size={24} className="text-marine animate-spin mx-auto" />
+          </div>
+        ) : trialStarted ? (
+          <div className="p-10 text-center">
+            <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4">
+              <Sparkles size={30} className="text-ic-vert" />
+            </div>
+            <h3 className="text-2xl font-extrabold text-marine mb-2">Essai activé !</h3>
+            <p className="text-sm text-gris-texte leading-relaxed mb-6">
+              Votre établissement profite de toutes les fonctionnalités de la formule
+              pendant <b>{trialStarted.days} jours</b>. À la fin de l&apos;essai, il reviendra
+              en formule Découverte si aucun paiement n&apos;est validé.
+            </p>
+            <button
+              onClick={() => { onConfirm(selected!); onClose(); }}
+              className="bg-marine text-white font-bold px-8 py-3 rounded-full hover:bg-marine-dark transition-colors text-sm"
+            >
+              Commencer
+            </button>
           </div>
         ) : confirmed ? (
           <div className="p-12 text-center">
@@ -231,6 +262,18 @@ export default function ChangePlanModal({
               >
                 Annuler
               </button>
+              {trialAvailable &&
+                selected &&
+                (plans.find((p) => p.id === selected)?.price || 0) > 0 && (
+                  <button
+                    type="button"
+                    onClick={handleTrial}
+                    disabled={confirming}
+                    className="inline-flex items-center gap-2 border-2 border-ic-vert text-ic-vert font-bold rounded-full px-6 py-3 hover:bg-ic-vert hover:text-white transition-colors text-sm disabled:opacity-50"
+                  >
+                    <Sparkles size={14} /> Essayer 1 semaine gratuitement
+                  </button>
+                )}
               <button
                 type="button"
                 onClick={handleConfirm}

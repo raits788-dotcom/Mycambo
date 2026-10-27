@@ -509,3 +509,30 @@ export async function setReservationStatus(id: string, status: string) {
   const { error } = await supabase().from('reservations').update({ status }).eq('id', id);
   if (error) throw error;
 }
+
+// ============================================================================
+// PÉRIODE D'ESSAI GRATUITE
+// ============================================================================
+// Vérifie si un établissement peut encore bénéficier de l'essai (jamais utilisé).
+export async function isTrialAvailable(businessId: string): Promise<boolean> {
+  const { data } = await supabase()
+    .from('businesses')
+    .select('trial_used')
+    .eq('id', businessId)
+    .maybeSingle();
+  return data ? data.trial_used === false : false;
+}
+
+// Démarre l'essai gratuit sur une formule (durée configurée en base).
+export async function startTrial(
+  businessId: string,
+  planSlug: string
+): Promise<{ ok: boolean; error?: string; trialEndsAt?: string; days?: number }> {
+  const { data, error } = await supabase().rpc('start_trial', {
+    p_business: businessId,
+    p_plan_slug: planSlug,
+  });
+  if (error) return { ok: false, error: error.message };
+  if (data?.ok) return { ok: true, trialEndsAt: data.trial_ends_at, days: data.days };
+  return { ok: false, error: data?.error || 'Essai indisponible' };
+}
