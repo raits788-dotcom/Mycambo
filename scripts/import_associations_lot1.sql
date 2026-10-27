@@ -24,14 +24,14 @@ begin
   -- ----- 1. ASKEP (Association Sportive de Kep) -----
   if not exists (select 1 from public.tenants where slug = 'askep') then
     insert into public.tenants (slug, name, email, city, description, status, managed_by_mycambo, verification_level)
-    values ('askep', 'ASKEP - Association Sportive de Kep', 'contact@askep.org', 'Kep',
+    values ('askep', 'ASKEP - Association Sportive de Kep', 'askep1901@gmail.com', 'Kep',
             'Association franco-cambodgienne (2010) qui utilise le tennis comme outil éducatif : activités sportives gratuites pour les enfants de milieux modestes.',
             'active', true, 'none')
     returning id into v_tenant;
 
     insert into public.businesses (tenant_id, category_id, name, slug, city, email, status,
       short_description, long_description, website, facebook, instagram, photos)
-    values (v_tenant, v_cat_association, 'ASKEP - Association Sportive de Kep', 'askep-kep', 'Kep', 'contact@askep.org', 'pending',
+    values (v_tenant, v_cat_association, 'ASKEP - Association Sportive de Kep', 'askep-kep', 'Kep', 'askep1901@gmail.com', 'pending',
       'Le tennis comme outil éducatif pour les enfants de Kep.',
       'Association franco-cambodgienne créée en 2010, l''ASKEP utilise le tennis comme outil éducatif au Cambodge. Elle propose gratuitement des activités sportives aux enfants de milieux modestes et vise l''inclusion sociale, la confiance en soi et des valeurs comme le respect, la discipline et l''entraide, en y intégrant la santé et l''hygiène.',
       'https://askep.org/', 'https://www.facebook.com/askepofficiel/', 'https://www.instagram.com/askepofficiel/', '[]'::jsonb);
