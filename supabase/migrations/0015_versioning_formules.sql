@@ -7,9 +7,16 @@
 -- courante.
 -- ============================================================================
 
--- 1. plan_versions : statut (draft/current/archived) + snapshot des permissions
-alter table public.plan_versions add column if not exists status text not null default 'current'
-  check (status in ('draft', 'current', 'archived'));
+-- 1. plan_versions : colonnes nécessaires au versioning (ajoutées si absentes).
+--    status peut déjà exister avec sa propre contrainte : on ne l'ajoute que
+--    s'il manque, sans imposer un CHECK qui entrerait en conflit.
+do $$
+begin
+  if not exists (select 1 from information_schema.columns
+                 where table_schema='public' and table_name='plan_versions' and column_name='status') then
+    alter table public.plan_versions add column status text not null default 'current';
+  end if;
+end$$;
 alter table public.plan_versions add column if not exists max_businesses int;
 alter table public.plan_versions add column if not exists permissions jsonb default '{}'::jsonb;
 alter table public.plan_versions add column if not exists features jsonb default '[]'::jsonb;
@@ -22,10 +29,10 @@ create unique index if not exists uniq_plan_version_current
 alter table public.subscriptions add column if not exists plan_version_id uuid
   references public.plan_versions(id) on delete set null;
 
--- 3. Créer une version "current" pour chaque formule existante si elle n'en a pas
---    (initialise le versioning à partir de l'état actuel de la formule).
-insert into public.plan_versions (plan_id, version, price_monthly, price_yearly, max_businesses, permissions, features, status)
-select p.id, 1, p.price_monthly, p.price_yearly, p.max_businesses, p.permissions, p.features, 'current'
+-- 3. Créer une version "current" pour chaque formule existante si elle n'en a pas.
+--    trial_days est fourni (NOT NULL dans le schéma), repris depuis la formule.
+insert into public.plan_versions (plan_id, version, price_monthly, price_yearly, max_businesses, trial_days, permissions, features, status)
+select p.id, 1, p.price_monthly, p.price_yearly, p.max_businesses, coalesce(p.trial_days, 0), p.permissions, p.features, 'current'
 from public.plans p
 where not exists (
   select 1 from public.plan_versions v where v.plan_id = p.id and v.status = 'current'
@@ -80,11 +87,13 @@ begin
   select coalesce(max(version), 0) + 1 into v_next
     from public.plan_versions where plan_id = p_plan_id;
 
-  -- Nouvelle version courante
+  -- Nouvelle version courante (trial_days repris de la formule, NOT NULL).
   insert into public.plan_versions
-    (plan_id, version, price_monthly, price_yearly, max_businesses, permissions, features, status)
+    (plan_id, version, price_monthly, price_yearly, max_businesses, trial_days, permissions, features, status)
   values
-    (p_plan_id, v_next, p_price_monthly, p_price_yearly, p_max_businesses, p_permissions, p_features, 'current')
+    (p_plan_id, v_next, p_price_monthly, p_price_yearly, p_max_businesses,
+     coalesce((select trial_days from public.plans where id = p_plan_id), 0),
+     p_permissions, p_features, 'current')
   returning id into v_id;
 
   -- Refléter la version courante sur la ligne "plans" (pour l'affichage public)

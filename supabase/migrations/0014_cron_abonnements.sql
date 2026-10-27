@@ -26,9 +26,10 @@ begin
   )
   select count(*) into v_expiring from soon;
 
-  -- Notification de relance (une par tenant concerné, sans doublon du jour)
-  insert into public.notifications (tenant_id, scope, title, body)
-  select s.tenant_id, 'tenant',
+  -- Notification de relance (une par tenant concerné, sans doublon récent).
+  -- Schéma notifications : recipient_type / recipient_id / type / title / message.
+  insert into public.notifications (recipient_type, recipient_id, type, title, message)
+  select 'tenant', s.tenant_id, 'subscription_expiring',
          'Votre abonnement arrive à échéance',
          'Pensez à renouveler votre abonnement avant le '
            || to_char(s.current_period_end, 'DD/MM/YYYY')
@@ -38,7 +39,7 @@ begin
     and s.current_period_end between now() and now() + interval '30 days'
     and not exists (
       select 1 from public.notifications n
-      where n.tenant_id = s.tenant_id
+      where n.recipient_id = s.tenant_id
         and n.title = 'Votre abonnement arrive à échéance'
         and n.created_at > now() - interval '7 days'
     );

@@ -56,7 +56,7 @@ begin
   where business_id = any(v_biz) and status = 'approved';
 
   -- Vues par mois sur 6 mois (pour le graphique d'évolution)
-  select coalesce(jsonb_agg(row_to_json(t) order by (t->>'mois')), '[]'::jsonb) into v_monthly
+  select coalesce(jsonb_agg(row_to_json(t) order by t.mois), '[]'::jsonb) into v_monthly
   from (
     select to_char(date_trunc('month', created_at), 'YYYY-MM') as mois,
            count(*) as views

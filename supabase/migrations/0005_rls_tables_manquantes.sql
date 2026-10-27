@@ -30,10 +30,16 @@ begin
                            'verification_history','contact_messages','referral_codes',
                            'storage_alerts'] loop
     execute format('alter table public.%I enable row level security', t);
-    execute format('drop policy if exists %I_read on public.%I', t, t);
-    execute format('create policy %I_read on public.%I for select using (public.is_superadmin() or tenant_id = public.current_tenant_id())', t, t);
     execute format('drop policy if exists %I_staff on public.%I', t, t);
     execute format('create policy %I_staff on public.%I for all using (public.is_superadmin()) with check (public.is_superadmin())', t, t);
+    execute format('drop policy if exists %I_read on public.%I', t, t);
+    -- La policy de lecture par tenant n'est posée que si la table a bien une colonne tenant_id.
+    if exists (select 1 from information_schema.columns
+               where table_schema='public' and table_name=t and column_name='tenant_id') then
+      execute format('create policy %I_read on public.%I for select using (public.is_superadmin() or tenant_id = public.current_tenant_id())', t, t);
+    else
+      execute format('create policy %I_read on public.%I for select using (public.is_superadmin())', t, t);
+    end if;
   end loop;
 end$$;
 
@@ -53,10 +59,14 @@ create policy referrals_write on public.referrals for all
   using (public.is_superadmin()) with check (public.is_superadmin());
 
 -- Avis : lecture publique des avis approuvés, écriture staff
+-- Avis : lecture publique des avis approuvés ; le tenant voit ceux de ses
+-- établissements (reviews est lié par business_id, pas par tenant_id).
 alter table public.reviews enable row level security;
 drop policy if exists reviews_read on public.reviews;
 create policy reviews_read on public.reviews for select
-  using (status = 'approved' or public.is_superadmin() or tenant_id = public.current_tenant_id());
+  using (status = 'approved' or public.is_superadmin() or exists (
+    select 1 from public.businesses b
+    where b.id = reviews.business_id and b.tenant_id = public.current_tenant_id()));
 drop policy if exists reviews_write on public.reviews;
 create policy reviews_write on public.reviews for all
   using (public.is_superadmin()) with check (public.is_superadmin());
@@ -67,11 +77,22 @@ drop policy if exists favorites_own on public.favorites;
 create policy favorites_own on public.favorites for all
   using (user_id = auth.uid()) with check (user_id = auth.uid());
 
--- Notifications : chacun voit les siennes (user ou tenant) + admin
+-- Notifications : chacun voit les siennes + admin. Le schéma utilise
+-- recipient_id (destinataire), pas user_id/tenant_id.
 alter table public.notifications enable row level security;
 drop policy if exists notifications_read on public.notifications;
-create policy notifications_read on public.notifications for select
-  using (user_id = auth.uid() or tenant_id = public.current_tenant_id() or public.is_superadmin());
+do $$
+begin
+  if exists (select 1 from information_schema.columns
+             where table_schema='public' and table_name='notifications' and column_name='recipient_id') then
+    execute 'create policy notifications_read on public.notifications for select using (recipient_id = auth.uid() or public.is_superadmin())';
+  elsif exists (select 1 from information_schema.columns
+             where table_schema='public' and table_name='notifications' and column_name='user_id') then
+    execute 'create policy notifications_read on public.notifications for select using (user_id = auth.uid() or public.is_superadmin())';
+  else
+    execute 'create policy notifications_read on public.notifications for select using (public.is_superadmin())';
+  end if;
+end$$;
 drop policy if exists notifications_write on public.notifications;
 create policy notifications_write on public.notifications for all
   using (public.is_superadmin()) with check (public.is_superadmin());

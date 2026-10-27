@@ -10,6 +10,22 @@
 
 alter table public.plans add column if not exists permissions jsonb default '{}'::jsonb;
 
+-- Garantit une contrainte unique sur plans.slug (nécessaire au ON CONFLICT).
+-- Sans elle, l'upsert échoue. On la crée si elle n'existe pas déjà.
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint c
+    join pg_class t on t.oid = c.conrelid
+    where t.relname = 'plans' and c.contype in ('u','p')
+      and pg_get_constraintdef(c.oid) ilike '%(slug)%'
+  ) and not exists (
+    select 1 from pg_indexes where tablename = 'plans' and indexdef ilike '%unique%(slug)%'
+  ) then
+    execute 'alter table public.plans add constraint plans_slug_unique unique (slug)';
+  end if;
+end$$;
+
 -- Upsert des 6 formules avec leurs permissions.
 -- On insère si le slug n'existe pas, sinon on met à jour price/permissions.
 insert into public.plans (name, slug, price_monthly, price_yearly, currency, max_businesses, features, permissions, trial_days, position, is_active)

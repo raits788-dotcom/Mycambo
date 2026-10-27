@@ -60,7 +60,7 @@ begin
   ) t;
 
   -- Vues par mois sur les 12 derniers mois
-  select coalesce(jsonb_agg(row_to_json(t) order by (t->>'mois')), '[]'::jsonb) into v_monthly from (
+  select coalesce(jsonb_agg(row_to_json(t) order by t.mois), '[]'::jsonb) into v_monthly from (
     select to_char(date_trunc('month', created_at), 'YYYY-MM') as mois,
            count(*) as views
     from public.business_events

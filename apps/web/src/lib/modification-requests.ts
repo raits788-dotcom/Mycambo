@@ -57,7 +57,7 @@ type ModificationRequestRow = {
   tenant_id: string | null;
   requested_by: string | null;
   field: ModificationField;
-  current_value: string | null;
+  old_value: string | null;
   new_value: string | null;
   reason: string | null;
   status: ModificationStatus;
@@ -72,7 +72,7 @@ function mapRow(row: ModificationRequestRow): ModificationRequest {
     establishmentSlug: row.business_id ?? '',
     field: row.field,
     fieldLabel: MODIFICATION_FIELD_LABELS[row.field] ?? '',
-    oldValue: row.current_value ?? '',
+    oldValue: row.old_value ?? '',
     newValue: row.new_value ?? '',
     reason: row.reason ?? '',
     status: row.status,
@@ -112,7 +112,7 @@ export async function addModificationRequest(
     .insert({
       business_id: data.establishmentSlug,
       field: data.field,
-      current_value: data.oldValue,
+      old_value: data.oldValue,
       new_value: data.newValue,
       reason: data.reason,
       status: 'pending',

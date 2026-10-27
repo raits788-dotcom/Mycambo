@@ -105,7 +105,7 @@ create table if not exists public.modification_requests (
   tenant_id uuid references public.tenants(id) on delete cascade,
   requested_by uuid,
   field text,
-  current_value text,
+  old_value text,
   new_value text,
   reason text,
   status text not null default 'pending'
@@ -212,7 +212,17 @@ create table if not exists public.notifications (
   is_read boolean not null default false,
   created_at timestamptz not null default now()
 );
-create index if not exists idx_notifications_user on public.notifications(user_id);
+-- Index sur la colonne destinataire (nom variable selon le schéma : user_id ou recipient_id).
+do $$
+begin
+  if exists (select 1 from information_schema.columns
+             where table_schema='public' and table_name='notifications' and column_name='user_id') then
+    execute 'create index if not exists idx_notifications_user on public.notifications(user_id)';
+  elsif exists (select 1 from information_schema.columns
+             where table_schema='public' and table_name='notifications' and column_name='recipient_id') then
+    execute 'create index if not exists idx_notifications_recipient on public.notifications(recipient_id)';
+  end if;
+end$$;
 
 create table if not exists public.contact_messages (
   id uuid primary key default gen_random_uuid(),
