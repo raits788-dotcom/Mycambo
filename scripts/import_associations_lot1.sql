@@ -26,7 +26,7 @@ begin
     insert into public.tenants (slug, name, email, city, description, status, managed_by_mycambo, verification_level)
     values ('askep', 'ASKEP - Association Sportive de Kep', 'askep1901@gmail.com', 'Kep',
             'Association franco-cambodgienne (2010) qui utilise le tennis comme outil éducatif : activités sportives gratuites pour les enfants de milieux modestes.',
-            'active', true, 'none')
+            'active', true, 'inscrit')
     returning id into v_tenant;
 
     insert into public.businesses (tenant_id, category_id, name, slug, city, email, status,
@@ -43,7 +43,7 @@ begin
     values ('kepchildren', 'KEPCHILDREN - Kep Children', 'kepchildren@gmail.com', '+855 97 648 2737',
             'NR33A, Krong Kaeb', 'Kep',
             'Association franco-cambodgienne (2012) : scolarisation, santé, alimentation et logement pour les enfants démunis de Kep.',
-            'active', true, 'none')
+            'active', true, 'inscrit')
     returning id into v_tenant;
 
     insert into public.businesses (tenant_id, category_id, name, slug, city, address, phone, email, status,
@@ -61,7 +61,7 @@ begin
     values ('audela-les-rizieres', 'Au-Delà Les Rizières', 'audelalesrizieres@gmail.com',
             'O''Krassar, Krong Kaeb, Province de Kep', 'O''Krassar',
             'Association (2018) gérant un centre socio-éducatif pour enfants défavorisés à O''Krassar, province de Kep.',
-            'active', true, 'none')
+            'active', true, 'inscrit')
     returning id into v_tenant;
 
     insert into public.businesses (tenant_id, category_id, name, slug, city, address, email, status,
@@ -78,7 +78,7 @@ begin
     insert into public.tenants (slug, name, email, phone, city, description, status, managed_by_mycambo, verification_level)
     values ('enfants-dasie', 'Enfants d''Asie', 'contacts@enfantsdasie.com', '+33 1 47 00 19 00', 'Phnom Penh',
             'Association reconnue d''utilité publique (1991) : scolarisation, formation et insertion des enfants défavorisés au Cambodge et en Asie du Sud-Est.',
-            'active', true, 'none')
+            'active', true, 'inscrit')
     returning id into v_tenant;
 
     insert into public.businesses (tenant_id, category_id, name, slug, city, email, phone, status,
