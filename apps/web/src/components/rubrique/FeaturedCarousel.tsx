@@ -82,7 +82,10 @@ export default function FeaturedCarousel({ type }: FeaturedCarouselProps) {
   const goPrev = () => setCurrentIndex((prev) => (prev - 1 + items.length) % items.length);
   const goNext = () => setCurrentIndex((prev) => (prev + 1) % items.length);
 
-  const visible = [0, 1, 2].map((i) => items[(currentIndex + i) % items.length]);
+  // On affiche jusqu'à 3 cartes, sans jamais répéter un établissement :
+  // si la liste a moins de 3 items, on n'en montre que le nombre réel.
+  const count = Math.min(3, items.length);
+  const visible = Array.from({ length: count }, (_, i) => items[(currentIndex + i) % items.length]);
 
   return (
     <div className="w-full">
