@@ -30,7 +30,7 @@ export default function ModificationRequestModal({
 
   const fieldLabel = MODIFICATION_FIELD_LABELS[field];
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
@@ -51,7 +51,7 @@ export default function ModificationRequestModal({
 
     setSubmitting(true);
 
-    addModificationRequest({
+    await addModificationRequest({
       establishmentSlug,
       field,
       fieldLabel,

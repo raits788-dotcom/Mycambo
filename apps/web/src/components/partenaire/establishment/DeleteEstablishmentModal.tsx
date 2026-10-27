@@ -36,7 +36,7 @@ export default function DeleteEstablishmentModal({
   const needsCustomReason = reason === 'other';
   const isCustomValid = !needsCustomReason || customReason.trim().length >= 20;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
@@ -57,7 +57,7 @@ export default function DeleteEstablishmentModal({
 
     setSubmitting(true);
 
-    addDeletionRequest({
+    await addDeletionRequest({
       establishmentSlug,
       establishmentName,
       reason,

@@ -1,6 +1,14 @@
 // ============================================================================
-// SUSPENSIONS D'ÉTABLISSEMENTS (mock — localStorage)
+// SUSPENSIONS D'ÉTABLISSEMENTS (Supabase)
 // ============================================================================
+
+import { createBrowserClient } from '@supabase/ssr';
+
+const sb = () =>
+  createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
 
 export type SuspensionReason =
   | 'inappropriate_photos'
@@ -56,70 +64,110 @@ export type Suspension = {
   liftReason?: string;
 };
 
-const STORAGE_KEY = 'mycambo_suspensions';
+// ----------------------------------------------------------------------------
+// Mapping colonnes Supabase (snake_case) -> type de retour (camelCase).
+// La table `suspensions` : id, business_id, tenant_id, reason, custom_reason,
+// detail, suspended_by, active bool, created_at, lifted_at.
+// Certains champs historiques (establishmentName, tenantNotified, liftedBy,
+// liftReason) ne sont pas stockés : on les laisse vides/par défaut pour
+// conserver la MÊME forme de retour.
+// ----------------------------------------------------------------------------
+type SuspensionRow = {
+  id: string;
+  business_id: string | null;
+  tenant_id: string | null;
+  reason: SuspensionReason;
+  custom_reason: string | null;
+  detail: string | null;
+  suspended_by: string | null;
+  active: boolean;
+  created_at: string;
+  lifted_at: string | null;
+};
 
-export function getSuspensions(): Suspension[] {
-  if (typeof window === 'undefined') return [];
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch {
-    return [];
-  }
+function mapSuspension(row: SuspensionRow): Suspension {
+  return {
+    id: row.id,
+    establishmentSlug: row.business_id ?? '',
+    establishmentName: '',
+    reason: row.reason,
+    customReason: row.custom_reason ?? undefined,
+    detail: row.detail ?? '',
+    suspendedBy: row.suspended_by ?? '',
+    suspendedAt: row.created_at,
+    tenantNotified: false,
+    status: row.active ? 'active' : 'lifted',
+    liftedAt: row.lifted_at ?? undefined,
+    liftedBy: undefined,
+    liftReason: undefined,
+  };
 }
 
-export function getActiveSuspensions(): Suspension[] {
-  return getSuspensions().filter((s) => s.status === 'active');
+export async function getSuspensions(): Promise<Suspension[]> {
+  const { data, error } = await sb()
+    .from('suspensions')
+    .select('*')
+    .order('created_at', { ascending: false });
+  if (error || !data) return [];
+  return (data as SuspensionRow[]).map(mapSuspension);
 }
 
-export function getSuspensionBySlug(slug: string): Suspension | null {
-  const suspensions = getSuspensions();
-  return (
-    suspensions.find(
-      (s) => s.establishmentSlug === slug && s.status === 'active'
-    ) || null
-  );
+export async function getActiveSuspensions(): Promise<Suspension[]> {
+  const { data, error } = await sb()
+    .from('suspensions')
+    .select('*')
+    .eq('active', true)
+    .order('created_at', { ascending: false });
+  if (error || !data) return [];
+  return (data as SuspensionRow[]).map(mapSuspension);
 }
 
-export function addSuspension(
+// NOTE: filtre désormais par business_id (passez un businessId).
+export async function getSuspensionBySlug(
+  businessId: string
+): Promise<Suspension | null> {
+  const { data, error } = await sb()
+    .from('suspensions')
+    .select('*')
+    .eq('business_id', businessId)
+    .eq('active', true)
+    .order('created_at', { ascending: false })
+    .limit(1);
+  if (error || !data || data.length === 0) return null;
+  return mapSuspension(data[0] as SuspensionRow);
+}
+
+export async function addSuspension(
   data: Omit<Suspension, 'id' | 'suspendedAt' | 'status'>
-): Suspension {
-  const all = getSuspensions();
-  const suspension: Suspension = {
-    ...data,
-    id: 'susp_' + Date.now(),
-    status: 'active',
-    suspendedAt: new Date().toISOString(),
-  };
-  all.push(suspension);
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(all));
-  return suspension;
+): Promise<Suspension> {
+  const { data: inserted, error } = await sb()
+    .from('suspensions')
+    .insert({
+      business_id: data.establishmentSlug,
+      reason: data.reason,
+      custom_reason: data.customReason ?? null,
+      detail: data.detail,
+      suspended_by: data.suspendedBy,
+      active: true,
+    })
+    .select('*')
+    .single();
+  if (error || !inserted) {
+    throw error ?? new Error('Insertion suspension échouée');
+  }
+  return mapSuspension(inserted as SuspensionRow);
 }
 
-export function liftSuspension(
-  slug: string,
-  liftedBy: string,
-  liftReason: string
-): boolean {
-  const all = getSuspensions();
-  const index = all.findIndex(
-    (s) => s.establishmentSlug === slug && s.status === 'active'
-  );
-  if (index === -1) return false;
-
-  all[index] = {
-    ...all[index],
-    status: 'lifted',
-    liftedAt: new Date().toISOString(),
-    liftedBy,
-    liftReason,
-  };
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(all));
-  return true;
+export async function liftSuspension(id: string): Promise<boolean> {
+  const { error } = await sb()
+    .from('suspensions')
+    .update({ active: false, lifted_at: new Date().toISOString() })
+    .eq('id', id);
+  return !error;
 }
 
 // ============================================================================
-// SIGNALEMENTS AUTOMATIQUES
+// SIGNALEMENTS AUTOMATIQUES (table suspension_alerts)
 // ============================================================================
 
 export type ContentAlert = {
@@ -133,37 +181,64 @@ export type ContentAlert = {
   reviewed: boolean;
 };
 
-const ALERTS_KEY = 'mycambo_content_alerts';
+// ----------------------------------------------------------------------------
+// Table `suspension_alerts` : id, business_id, type, message, resolved bool,
+// created_at. Les champs historiques establishmentName et severity ne sont pas
+// stockés : valeurs par défaut pour conserver la MÊME forme de retour.
+// ----------------------------------------------------------------------------
+type ContentAlertRow = {
+  id: string;
+  business_id: string | null;
+  type: ContentAlert['type'];
+  message: string | null;
+  resolved: boolean;
+  created_at: string;
+};
 
-export function getContentAlerts(): ContentAlert[] {
-  if (typeof window === 'undefined') return [];
-  try {
-    const raw = localStorage.getItem(ALERTS_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch {
-    return [];
-  }
-}
-
-export function addContentAlert(
-  data: Omit<ContentAlert, 'id' | 'detectedAt' | 'reviewed'>
-): ContentAlert {
-  const all = getContentAlerts();
-  const alert: ContentAlert = {
-    ...data,
-    id: 'alert_' + Date.now(),
-    detectedAt: new Date().toISOString(),
-    reviewed: false,
+function mapAlert(row: ContentAlertRow): ContentAlert {
+  return {
+    id: row.id,
+    establishmentSlug: row.business_id ?? '',
+    establishmentName: '',
+    type: row.type,
+    message: row.message ?? '',
+    severity: 'low',
+    detectedAt: row.created_at,
+    reviewed: row.resolved,
   };
-  all.push(alert);
-  localStorage.setItem(ALERTS_KEY, JSON.stringify(all));
-  return alert;
 }
 
-export function markAlertReviewed(id: string): void {
-  const all = getContentAlerts();
-  const updated = all.map((a) =>
-    a.id === id ? { ...a, reviewed: true } : a
-  );
-  localStorage.setItem(ALERTS_KEY, JSON.stringify(updated));
+export async function getContentAlerts(): Promise<ContentAlert[]> {
+  const { data, error } = await sb()
+    .from('suspension_alerts')
+    .select('*')
+    .order('created_at', { ascending: false });
+  if (error || !data) return [];
+  return (data as ContentAlertRow[]).map(mapAlert);
+}
+
+export async function addContentAlert(
+  data: Omit<ContentAlert, 'id' | 'detectedAt' | 'reviewed'>
+): Promise<ContentAlert> {
+  const { data: inserted, error } = await sb()
+    .from('suspension_alerts')
+    .insert({
+      business_id: data.establishmentSlug,
+      type: data.type,
+      message: data.message,
+      resolved: false,
+    })
+    .select('*')
+    .single();
+  if (error || !inserted) {
+    throw error ?? new Error('Insertion suspension_alert échouée');
+  }
+  return mapAlert(inserted as ContentAlertRow);
+}
+
+export async function markAlertReviewed(id: string): Promise<void> {
+  await sb()
+    .from('suspension_alerts')
+    .update({ resolved: true })
+    .eq('id', id);
 }

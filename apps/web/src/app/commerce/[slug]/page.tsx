@@ -10,9 +10,12 @@ import {
 import CommerceTabsPublic from '@/components/commerce/CommerceTabsPublic';
 import AssociationActionsBar from '@/components/association/AssociationActionsBar';
 import ContactModal from '@/components/commerce/ContactModal';
+import ReservationModal from '@/components/commerce/ReservationModal';
+import ApplyModal from '@/components/commerce/ApplyModal';
 import { LevelBadge, SubLabels } from '@/components/ui/LevelBadge';
 import { createBrowserClient } from '@supabase/ssr';
-import { getPlanPermissions } from '@/lib/plan-permissions';
+import { getPlanPermissions, getPlanPermissionsFromDB, type PlanPermissions } from '@/lib/plan-permissions';
+import { getActiveOffers, getJobOffers, type Offer, type JobOffer } from '@/lib/services';
 
 export default function CommercePage() {
   const params = useParams();
@@ -22,8 +25,13 @@ export default function CommercePage() {
   const [tenantLevel, setTenantLevel] = useState<string | null>(null);
   const [tenantLabels, setTenantLabels] = useState<any[]>([]);
   const [planSlug, setPlanSlug] = useState<string>('decouverte');
+  const [permissions, setPermissions] = useState<PlanPermissions>(() => getPlanPermissions('decouverte'));
   const [mounted, setMounted] = useState(false);
   const [showContactModal, setShowContactModal] = useState(false);
+  const [showReservation, setShowReservation] = useState(false);
+  const [offers, setOffers] = useState<Offer[]>([]);
+  const [jobs, setJobs] = useState<JobOffer[]>([]);
+  const [applyTo, setApplyTo] = useState<JobOffer | null>(null);
 
   useEffect(() => {
     if (!slug) return;
@@ -55,9 +63,19 @@ export default function CommercePage() {
         return;
       }
 
-      // 2. Détermine le plan
+      // 2. Détermine le plan + charge ses permissions depuis la base
       const tenantPlan = (business.tenants as any)?.plans?.slug || 'decouverte';
       setPlanSlug(tenantPlan);
+      const perms = await getPlanPermissionsFromDB(tenantPlan);
+      setPermissions(perms);
+      // Offres du moment (si la formule le permet)
+      if (perms.canPublishOffers) {
+        setOffers(await getActiveOffers(business.id));
+      }
+      // Offres d'emploi (si la formule permet les candidatures)
+      if (perms.canReceiveApplications) {
+        setJobs(await getJobOffers(business.id));
+      }
 
       // 3. Formate l'objet commerce (avec détection association robuste)
       const categoryName = business.categories?.name || '';
@@ -120,7 +138,7 @@ export default function CommercePage() {
   }
 
   const isAssociation = commerce.type === 'association';
-  const permissions = getPlanPermissions(planSlug);
+  // `permissions` vient de la base (state), avec fallback en dur au premier rendu.
 
   const visiblePhotos = permissions.canShowPhotos ? commerce.gallery : [];
   const heroImage = permissions.canShowPhotos && commerce.image
@@ -208,6 +226,71 @@ export default function CommercePage() {
       <section className="max-w-wrap mx-auto px-4 md:px-8 lg:px-12 xl:px-20 py-6">
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-10">
           <div>
+            {/* Offres du moment (si la formule le permet et qu'il y en a) */}
+            {permissions.canPublishOffers && offers.length > 0 && (
+              <div className="mb-6 space-y-3">
+                <h2 className="text-lg font-extrabold text-marine flex items-center gap-2">
+                  <span className="text-rouge-khmer">★</span> Offres du moment
+                </h2>
+                {offers.map((o) => (
+                  <div
+                    key={o.id}
+                    className="border border-rouge-khmer/30 bg-rouge-khmer/5 rounded-xl p-4 flex items-start justify-between gap-4"
+                  >
+                    <div>
+                      <div className="font-bold text-marine">{o.title}</div>
+                      {o.description && (
+                        <p className="text-sm text-gris-texte mt-1">{o.description}</p>
+                      )}
+                      {o.valid_to && (
+                        <p className="text-xs text-gris-doux mt-1">
+                          Jusqu&apos;au {new Date(o.valid_to).toLocaleDateString('fr-FR')}
+                        </p>
+                      )}
+                    </div>
+                    {o.discount && (
+                      <span className="shrink-0 bg-rouge-khmer text-white font-extrabold text-sm px-3 py-1.5 rounded-full">
+                        {o.discount}
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Recrutement (si la formule permet les candidatures et qu'il y a des offres) */}
+            {permissions.canReceiveApplications && jobs.length > 0 && (
+              <div className="mb-6 space-y-3">
+                <h2 className="text-lg font-extrabold text-marine flex items-center gap-2">
+                  💼 Cet établissement recrute
+                </h2>
+                {jobs.map((j) => (
+                  <div
+                    key={j.id}
+                    className="border border-gris-ligne rounded-xl p-4 flex items-start justify-between gap-4"
+                  >
+                    <div>
+                      <div className="font-bold text-marine">{j.title}</div>
+                      <div className="flex flex-wrap gap-2 mt-1 text-xs text-gris-doux">
+                        {j.contract_type && <span className="bg-gris-fond px-2 py-0.5 rounded">{j.contract_type}</span>}
+                        {j.location && <span>📍 {j.location}</span>}
+                        {j.salary && <span>💰 {j.salary}</span>}
+                      </div>
+                      {j.description && (
+                        <p className="text-sm text-gris-texte mt-2">{j.description}</p>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => setApplyTo(j)}
+                      className="shrink-0 bg-marine text-white font-bold text-sm px-4 py-2 rounded-full hover:bg-marine-dark transition-colors"
+                    >
+                      Postuler
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
             <CommerceTabsPublic
               commerce={{
                 ...commerce,
@@ -237,12 +320,23 @@ export default function CommercePage() {
                 </div>
               ) : (
                 <div className="space-y-2 mb-5">
-                  <button
-                    onClick={() => setShowContactModal(true)}
-                    className="w-full bg-marine text-white font-bold py-3 rounded-full hover:bg-marine-dark transition-colors text-sm"
-                  >
-                    Contacter
-                  </button>
+                  {permissions.canReceiveMessages && (
+                    <button
+                      onClick={() => setShowContactModal(true)}
+                      className="w-full bg-marine text-white font-bold py-3 rounded-full hover:bg-marine-dark transition-colors text-sm"
+                    >
+                      Contacter
+                    </button>
+                  )}
+                  {permissions.canReceiveReservations &&
+                    commerce.services?.reservations && (
+                      <button
+                        onClick={() => setShowReservation(true)}
+                        className="w-full bg-ic-vert text-white font-bold py-3 rounded-full hover:opacity-90 transition-opacity text-sm"
+                      >
+                        Réserver
+                      </button>
+                    )}
                   {commerce.city && (
                     <a
                       href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
@@ -298,11 +392,33 @@ export default function CommercePage() {
       </section>
 
       {/* Modale de contact (commerces uniquement) */}
-      {showContactModal && !isAssociation && (
+      {showContactModal && !isAssociation && permissions.canReceiveMessages && (
         <ContactModal
           businessId={commerce.id}
           businessName={commerce.name}
           onClose={() => setShowContactModal(false)}
+        />
+      )}
+
+      {/* Modale de réservation (hôtel / restaurant, selon formule + service activé) */}
+      {showReservation && permissions.canReceiveReservations && (
+        <ReservationModal
+          businessId={commerce.id}
+          businessName={commerce.name}
+          tenantId={commerce.tenant_id}
+          kind={commerce.type === 'hotel' ? 'hotel' : 'restaurant'}
+          onClose={() => setShowReservation(false)}
+        />
+      )}
+
+      {/* Modale de candidature emploi */}
+      {applyTo && permissions.canReceiveApplications && (
+        <ApplyModal
+          jobOfferId={applyTo.id}
+          jobTitle={applyTo.title}
+          businessId={commerce.id}
+          tenantId={commerce.tenant_id}
+          onClose={() => setApplyTo(null)}
         />
       )}
     </>

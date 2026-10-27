@@ -52,7 +52,7 @@ export default function ContactModal({
     try {
       await submitContact({ association_slug: associationSlug, ...form });
       if (form.subject === 'Don' || form.subject === 'Bénévolat') {
-        incrementSupports(associationSlug);
+        void incrementSupports(associationSlug);
       }
       setSent(true);
     } catch (err) {

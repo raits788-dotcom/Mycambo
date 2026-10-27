@@ -57,7 +57,7 @@ export default function DonateModal({
         message: message || undefined,
         anonymous,
       });
-      incrementSupports(associationSlug);
+      void incrementSupports(associationSlug);
       setMode('sent');
     } catch (err) {
       console.error('Erreur don:', err);

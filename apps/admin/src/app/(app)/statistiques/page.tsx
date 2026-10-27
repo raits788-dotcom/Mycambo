@@ -1,5 +1,7 @@
 'use client';
 
+import { useState, useEffect } from 'react';
+import { createClient } from '@/lib/supabase';
 import {
   TrendingUp,
   Users,
@@ -10,33 +12,66 @@ import {
   MapPin,
 } from 'lucide-react';
 
-const KPIS = [
-  { label: 'Visiteurs uniques (30j)', value: '24 580', delta: '+15%', icon: Users, color: 'text-blue-600' },
-  { label: 'Pages vues (30j)', value: '85 240', delta: '+22%', icon: Eye, color: 'text-purple-600' },
-  { label: 'Clics fiches commerces', value: '12 340', delta: '+8%', icon: MousePointerClick, color: 'text-orange-600' },
-  { label: 'Demandes partenaires', value: '23', delta: '+45%', icon: TrendingUp, color: 'text-green-600' },
-];
-
-const TOP_CATEGORIES = [
-  { name: 'Restaurants', clicks: 3240, percent: 85 },
-  { name: 'Hôtels', clicks: 2890, percent: 76 },
-  { name: 'Activités', clicks: 2140, percent: 56 },
-  { name: 'Associations', clicks: 1580, percent: 41 },
-  { name: 'Shopping', clicks: 1120, percent: 29 },
-];
-
-const TOP_CITIES = [
-  { name: 'Phnom Penh', visitors: 9840, percent: 92 },
-  { name: 'Siem Reap', visitors: 7120, percent: 66 },
-  { name: 'Kampot', visitors: 2340, percent: 22 },
-  { name: 'Battambang', visitors: 1890, percent: 18 },
-  { name: 'Koh Rong', visitors: 1450, percent: 13 },
-];
-
-const MONTHLY = [40, 55, 48, 70, 62, 85, 78, 92, 88, 75, 95, 100];
-const MONTHS = ['Oct', 'Nov', 'Déc', 'Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sep'];
+// Les icônes des KPI restent côté code ; les valeurs viennent de la base.
+const KPI_META = [
+  { key: 'views_30d', label: 'Pages vues (30j)', icon: Eye, color: 'text-purple-600' },
+  { key: 'clicks_30d', label: 'Clics fiches commerces (30j)', icon: MousePointerClick, color: 'text-orange-600' },
+  { key: 'requests_30d', label: 'Demandes partenaires (30j)', icon: TrendingUp, color: 'text-green-600' },
+  { key: 'establishments', label: 'Établissements publiés', icon: Users, color: 'text-blue-600' },
+] as const;
 
 export default function StatsPage() {
+  const [stats, setStats] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const supabase = createClient();
+        const { data } = await supabase.rpc('admin_stats');
+        if (data && !data.error) setStats(data);
+      } catch {
+        /* laisse stats à null : l'UI affiche des tirets */
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  const fmt = (n: number | undefined) =>
+    typeof n === 'number' ? n.toLocaleString('fr-FR') : '—';
+
+  // KPI à partir des données base
+  const KPIS = KPI_META.map((m) => ({
+    label: m.label,
+    value: fmt(stats?.[m.key]),
+    icon: m.icon,
+    color: m.color,
+  }));
+
+  // Top catégories / villes (normalisés en %)
+  const rawCats = (stats?.top_categories || []) as { name: string; count: number }[];
+  const maxCat = Math.max(1, ...rawCats.map((c) => c.count));
+  const TOP_CATEGORIES = rawCats.map((c) => ({
+    name: c.name,
+    clicks: c.count,
+    percent: Math.round((c.count / maxCat) * 100),
+  }));
+
+  const rawCities = (stats?.top_cities || []) as { name: string; count: number }[];
+  const maxCity = Math.max(1, ...rawCities.map((c) => c.count));
+  const TOP_CITIES = rawCities.map((c) => ({
+    name: c.name,
+    visitors: c.count,
+    percent: Math.round((c.count / maxCity) * 100),
+  }));
+
+  // Courbe mensuelle (hauteurs normalisées 0-100)
+  const rawMonthly = (stats?.monthly || []) as { mois: string; views: number }[];
+  const maxM = Math.max(1, ...rawMonthly.map((m) => m.views));
+  const MONTHLY = rawMonthly.map((m) => Math.round((m.views / maxM) * 100));
+  const MONTHS = rawMonthly.map((m) => m.mois.slice(5)); // "MM"
+
   return (
     <>
       <div className="flex items-center justify-between mb-8 flex-wrap gap-3">
@@ -73,7 +108,7 @@ export default function StatsPage() {
                 {kpi.label}
               </div>
               <div className="text-3xl font-extrabold text-marine mb-1">{kpi.value}</div>
-              <div className="text-xs text-green-600">▲ {kpi.delta} vs période précédente</div>
+              <div className="text-xs text-gris-doux">sur les 30 derniers jours</div>
             </div>
           );
         })}
