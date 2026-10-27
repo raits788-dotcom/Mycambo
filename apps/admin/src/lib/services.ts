@@ -1540,25 +1540,13 @@ export async function validatePaymentManually(paymentId: string) {
   if (payErr || !payment) throw new Error('PAYMENT_NOT_FOUND');
   if (payment.status === 'paid') throw new Error('ALREADY_PAID');
 
-  // 2. Mettre à jour le paiement
-  const now = new Date().toISOString();
-  await supabase
-    .from('payments')
-    .update({ status: 'paid', paid_at: now })
-    .eq('id', paymentId);
-
-  // 3. Mettre à jour la souscription
-  if (payment.subscription_id) {
-    const nextMonth = new Date();
-    nextMonth.setMonth(nextMonth.getMonth() + 1);
-    await supabase
-      .from('subscriptions')
-      .update({
-        status: 'active',
-        current_period_end: nextMonth.toISOString(),
-      })
-      .eq('id', payment.subscription_id);
-  }
+  // 2+3. Valider le paiement de façon atomique : paiement -> paid,
+  // souscription -> active pour 1 AN, tenant -> active (fonction SQL dédiée).
+  const { data: result, error: rpcErr } = await supabase.rpc('validate_manual_payment', {
+    p_payment: paymentId,
+  });
+  if (rpcErr) throw rpcErr;
+  if (result && result.ok === false) throw new Error(result.error || 'VALIDATION_FAILED');
 
   // 4. Publier l'établissement
   if (payment.business_id) {

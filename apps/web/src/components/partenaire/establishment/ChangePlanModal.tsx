@@ -28,6 +28,8 @@ export default function ChangePlanModal({
   const [selected, setSelected] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
+  const [blocking, setBlocking] = useState<any[]>([]);
+  const [paymentRef, setPaymentRef] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -40,20 +42,34 @@ export default function ChangePlanModal({
   const handleConfirm = async () => {
     if (!selected) return;
     setConfirming(true);
+    setBlocking([]);
+    setPaymentRef(null);
 
     try {
       const plan = plans.find((p) => p.id === selected);
-      await createOrUpdateSubscription({
+      // Abonnement ANNUEL : le prix affiché est mensuel, on facture 12 mois.
+      const annualAmount = (plan?.price || 0) * 12;
+      const res = await createOrUpdateSubscription({
         businessId: establishmentId,
         tenantId: tenantId,
         planId: selected,
-        amount: plan?.price || 0,
+        planSlug: (plan as any)?.slug || '',
+        amount: annualAmount,
       });
+
+      // Downgrade bloqué : on affiche les dépassements à corriger.
+      if (res.blocked && res.blocked.length) {
+        setBlocking(res.blocked);
+        return;
+      }
+      if (res.error) {
+        alert('Erreur : ' + res.error);
+        return;
+      }
+
+      // Souscription enregistrée EN ATTENTE DE PAIEMENT : on montre la référence.
+      setPaymentRef(res.paymentRef || null);
       setConfirmed(true);
-      setTimeout(() => {
-        onConfirm(selected);
-        onClose();
-      }, 1500);
     } catch (err) {
       alert('Erreur : ' + (err as Error).message);
     } finally {
@@ -85,10 +101,49 @@ export default function ChangePlanModal({
             </div>
             <h3 className="text-2xl font-extrabold text-marine mb-3">Formule changée !</h3>
             <p className="text-sm text-gris-texte leading-relaxed mb-6 max-w-md mx-auto">
-              Votre nouvelle formule pour <b className="text-marine">{establishmentName}</b> est active.
-              <br />
-              Un paiement en attente de validation a été créé. L&apos;administrateur confirmera sous 48h.
+              Votre demande pour <b className="text-marine">{establishmentName}</b> est enregistrée.
+              Elle sera active <b>dès réception et validation de votre paiement</b> par myCAMBO.
             </p>
+
+            <div className="bg-gris-fond rounded-xl p-5 text-left text-sm space-y-2 mb-6">
+              <div className="font-bold text-marine">Paiement par virement (abonnement annuel)</div>
+              <p className="text-gris-texte">
+                Effectuez votre virement ABA / Wing puis indiquez la référence ci-dessous.
+                Votre établissement sera mis en ligne dès validation.
+              </p>
+              {paymentRef && (
+                <div className="bg-white border border-gris-ligne rounded-lg px-3 py-2 font-mono text-marine">
+                  Référence : <b>{paymentRef}</b>
+                </div>
+              )}
+              <p className="text-xs text-gris-doux">
+                Bénéficiaire : myCAMBO · ABA 000 123 456 · Wing 012 345 678 · mentionnez la référence.
+              </p>
+            </div>
+          </div>
+        ) : blocking.length > 0 ? (
+          <div className="p-8">
+            <h3 className="text-2xl font-extrabold text-rouge-khmer mb-2">
+              Changement impossible
+            </h3>
+            <p className="text-sm text-gris-texte mb-5">
+              Cette formule est plus limitée que votre contenu actuel. Corrigez les points
+              suivants avant de pouvoir y passer :
+            </p>
+            <ul className="space-y-2 mb-6">
+              {blocking.map((b, i) => (
+                <li key={i} className="flex items-start gap-2 text-sm text-gris-texte">
+                  <span className="text-rouge-khmer mt-0.5">●</span>
+                  <span>{b.message}</span>
+                </li>
+              ))}
+            </ul>
+            <button
+              onClick={() => setBlocking([])}
+              className="w-full bg-marine text-white font-bold py-3 rounded-full hover:bg-marine-dark transition-colors text-sm"
+            >
+              Retour
+            </button>
           </div>
         ) : (
           <div className="p-8">

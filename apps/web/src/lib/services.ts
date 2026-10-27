@@ -10,82 +10,94 @@ const supabase = () =>
 // SOUSCRIPTIONS — Création / Mise à jour
 // ============================================================================
 
+// Vérifie si un tenant peut passer à une formule (contrôle downgrade).
+// Renvoie { ok, blocking } : si ok=false, blocking liste les dépassements à corriger.
+export async function canSwitchPlan(
+  tenantId: string,
+  planSlug: string
+): Promise<{ ok: boolean; blocking: any[]; error?: string }> {
+  const { data, error } = await supabase().rpc('can_switch_plan', {
+    p_tenant: tenantId,
+    p_plan_slug: planSlug,
+  });
+  if (error) return { ok: false, blocking: [], error: error.message };
+  return { ok: !!data?.ok, blocking: data?.blocking || [], error: data?.error };
+}
+
+// Crée/met à jour une souscription : la formule n'est PAS active tant que
+// myCAMBO n'a pas validé le paiement manuel. Abonnement ANNUEL.
+// Un downgrade qui dépasse les limites de la nouvelle formule est refusé.
 export async function createOrUpdateSubscription(payload: {
   businessId: string;
   tenantId: string;
   planId: string;
+  planSlug: string;
   amount: number;
-}) {
+}): Promise<{ subscriptionId?: string; paymentRef?: string; blocked?: any[]; error?: string }> {
   const client = supabase();
 
-  // 1. Vérifier si une souscription existe déjà pour ce business
+  // Contrôle downgrade : si le tenant dépasse les limites de la formule visée, on refuse.
+  const check = await canSwitchPlan(payload.tenantId, payload.planSlug);
+  if (!check.ok) {
+    return { blocked: check.blocking, error: check.error };
+  }
+
+  const now = new Date();
+  // Référence de paiement unique (affichée au partenaire pour son virement)
+  const paymentRef =
+    'CAMBO-' + now.getFullYear() + '-' + Math.random().toString(36).slice(2, 8).toUpperCase();
+
+  // Souscription existante pour ce business ?
   const { data: existing } = await client
     .from('subscriptions')
     .select('id')
     .eq('business_id', payload.businessId)
     .maybeSingle();
 
-  const now = new Date();
-  const oneMonthLater = new Date(now);
-  oneMonthLater.setMonth(oneMonthLater.getMonth() + 1);
+  let subscriptionId: string;
 
   if (existing) {
-    // Mise à jour
+    // On enregistre la formule demandée mais en attente de paiement (pas active).
     const { error } = await client
       .from('subscriptions')
       .update({
         plan_id: payload.planId,
-        status: 'active',
-        current_period_start: now.toISOString(),
-        current_period_end: oneMonthLater.toISOString(),
+        status: 'pending_payment',
         updated_at: now.toISOString(),
       })
       .eq('id', existing.id);
-
     if (error) throw error;
-
-    // Créer un paiement
-    await client.from('payments').insert({
-      tenant_id: payload.tenantId,
-      business_id: payload.businessId,
-      subscription_id: existing.id,
-      amount: payload.amount,
-      currency: 'USD',
-      method: 'manual',
-      status: 'pending',
-    });
-
-    return existing.id;
+    subscriptionId = existing.id;
+  } else {
+    const { data: sub, error } = await client
+      .from('subscriptions')
+      .insert({
+        tenant_id: payload.tenantId,
+        business_id: payload.businessId,
+        plan_id: payload.planId,
+        status: 'pending_payment',
+        current_period_start: now.toISOString(),
+        current_period_end: now.toISOString(), // fixé à +1 an à la validation du paiement
+      })
+      .select()
+      .single();
+    if (error) throw error;
+    subscriptionId = sub.id;
   }
 
-  // Création
-  const { data: sub, error } = await client
-    .from('subscriptions')
-    .insert({
-      tenant_id: payload.tenantId,
-      business_id: payload.businessId,
-      plan_id: payload.planId,
-      status: 'active',
-      current_period_start: now.toISOString(),
-      current_period_end: oneMonthLater.toISOString(),
-    })
-    .select()
-    .single();
-
-  if (error) throw error;
-
-  // Créer un paiement
+  // Paiement manuel en attente de validation par myCAMBO.
   await client.from('payments').insert({
     tenant_id: payload.tenantId,
     business_id: payload.businessId,
-    subscription_id: sub.id,
+    subscription_id: subscriptionId,
     amount: payload.amount,
     currency: 'USD',
     method: 'manual',
     status: 'pending',
+    reference: paymentRef,
   });
 
-  return sub.id;
+  return { subscriptionId, paymentRef };
 }
 
 // ============================================================================
@@ -306,4 +318,35 @@ export async function submitApplication(payload: {
     message: payload.message ?? null,
   });
   return error ? { ok: false, error: error.message } : { ok: true };
+}
+
+// ============================================================================
+// VALIDATION MANUELLE DU PAIEMENT (superadmin)
+// ============================================================================
+// Valide un paiement manuel : le paiement passe "paid", la souscription
+// devient "active" pour 1 an, et le tenant est activé.
+export async function validateManualPayment(
+  paymentId: string
+): Promise<{ ok: boolean; error?: string; validUntil?: string }> {
+  const { data, error } = await supabase().rpc('validate_manual_payment', {
+    p_payment: paymentId,
+  });
+  if (error) return { ok: false, error: error.message };
+  if (data?.ok) return { ok: true, validUntil: data.valid_until };
+  return { ok: false, error: data?.error || 'Validation impossible' };
+}
+
+// Liste des paiements en attente de validation (pour la console superadmin).
+export async function getPendingPayments() {
+  const { data, error } = await supabase()
+    .from('payments')
+    .select('id, tenant_id, business_id, amount, currency, reference, proof_url, created_at')
+    .eq('method', 'manual')
+    .eq('status', 'pending')
+    .order('created_at', { ascending: false });
+  if (error) {
+    console.error('getPendingPayments:', error);
+    return [];
+  }
+  return data || [];
 }
