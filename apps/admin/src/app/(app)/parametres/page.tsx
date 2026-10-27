@@ -1,10 +1,10 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Tag, MapPin, Mail, KeyRound, Loader2 } from 'lucide-react';
-import { getCategories, getCities } from '@/lib/services';
+import { Tag, MapPin, Mail, KeyRound, Loader2, Banknote, Check } from 'lucide-react';
+import { getCategories, getCities, getPlatformSettings, setPlatformSetting } from '@/lib/services';
 
-type Tab = 'categories' | 'cities' | 'email' | 'api';
+type Tab = 'categories' | 'cities' | 'email' | 'api' | 'virement';
 
 export default function SettingsPage() {
   const [tab, setTab] = useState<Tab>('categories');
@@ -43,6 +43,9 @@ export default function SettingsPage() {
         </button>
         <button onClick={() => setTab('api')} className={'flex items-center gap-2 px-4 py-2.5 text-sm font-bold border-b-2 ' + (tab === 'api' ? 'border-marine text-marine' : 'border-transparent text-gris-texte')}>
           <KeyRound size={14} /> Clés API
+        </button>
+        <button onClick={() => setTab('virement')} className={'flex items-center gap-2 px-4 py-2.5 text-sm font-bold border-b-2 ' + (tab === 'virement' ? 'border-marine text-marine' : 'border-transparent text-gris-texte')}>
+          <Banknote size={14} /> Virement
         </button>
       </div>
 
@@ -145,6 +148,82 @@ export default function SettingsPage() {
           ))}
         </div>
       )}
+
+      {tab === 'virement' && <VirementSettings />}
     </>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Coordonnées de virement affichées au partenaire (table platform_settings)
+// ---------------------------------------------------------------------------
+function VirementSettings() {
+  const KEYS = [
+    { key: 'payment_beneficiary', label: 'Bénéficiaire du virement', placeholder: 'myCAMBO' },
+    { key: 'payment_aba', label: 'Compte ABA', placeholder: 'Ex : 000 123 456' },
+    { key: 'payment_wing', label: 'Compte Wing', placeholder: 'Ex : 012 345 678' },
+    { key: 'payment_instructions', label: 'Instructions affichées au partenaire', placeholder: 'Texte…', textarea: true },
+    { key: 'trial_days', label: 'Durée de la période d\'essai (jours)', placeholder: '7' },
+  ];
+  const [vals, setVals] = useState<Record<string, string>>({});
+  const [loading, setLoading] = useState(true);
+  const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      const rows = await getPlatformSettings(KEYS.map((k) => k.key));
+      const map: Record<string, string> = {};
+      for (const r of rows) map[r.key] = r.value || '';
+      setVals(map);
+      setLoading(false);
+    })();
+  }, []);
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      for (const k of KEYS) {
+        await setPlatformSetting(k.key, vals[k.key] ?? '');
+      }
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch (e) {
+      alert('Erreur : ' + (e as Error).message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) return <div className="p-8 text-center"><Loader2 size={20} className="text-marine animate-spin mx-auto" /></div>;
+
+  return (
+    <div className="max-w-2xl bg-white rounded-xl border border-gris-ligne p-6 shadow-cb-sm space-y-4">
+      <div>
+        <h3 className="font-bold text-marine">Coordonnées de virement</h3>
+        <p className="text-xs text-gris-texte mt-1">
+          Ces informations s&apos;affichent au partenaire quand il choisit une formule,
+          pour qu&apos;il effectue son virement. Vous validez ensuite le paiement dans « Paiements ».
+        </p>
+      </div>
+      {KEYS.map((k) => (
+        <div key={k.key}>
+          <label className="block text-xs font-bold text-ink mb-1">{k.label}</label>
+          {k.textarea ? (
+            <textarea rows={3} value={vals[k.key] ?? ''} placeholder={k.placeholder}
+              onChange={(e) => setVals({ ...vals, [k.key]: e.target.value })}
+              className="w-full px-3 py-2 text-sm rounded-lg border border-gris-ligne resize-none" />
+          ) : (
+            <input type="text" value={vals[k.key] ?? ''} placeholder={k.placeholder}
+              onChange={(e) => setVals({ ...vals, [k.key]: e.target.value })}
+              className="w-full px-3 py-2 text-sm rounded-lg border border-gris-ligne" />
+          )}
+        </div>
+      ))}
+      <button onClick={save} disabled={saving}
+        className="inline-flex items-center gap-2 bg-marine text-white font-bold px-6 py-2.5 rounded-full hover:bg-marine-dark text-sm disabled:opacity-50">
+        {saved ? <><Check size={15} /> Enregistré</> : saving ? 'Enregistrement…' : 'Enregistrer'}
+      </button>
+    </div>
   );
 }

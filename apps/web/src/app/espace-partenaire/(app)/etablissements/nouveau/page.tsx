@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Loader2, Check } from 'lucide-react';
+import { ArrowLeft, Loader2, Check, Info } from 'lucide-react';
 import { createBrowserClient } from '@supabase/ssr';
 import { useCurrentTenant } from '@/lib/use-current-tenant';
 
@@ -24,6 +24,7 @@ export default function NouvelEtablissementPage() {
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -82,7 +83,19 @@ export default function NouvelEtablissementPage() {
       return;
     }
 
-    router.push('/espace-partenaire/etablissements');
+    // Notifier myCAMBO qu'un établissement attend validation (best-effort).
+    try {
+      await supabase.from('notifications').insert({
+        recipient_type: 'admin',
+        recipient_id: tenant.id,
+        type: 'establishment_pending',
+        title: 'Nouvel établissement à valider',
+        message: 'Le partenaire « ' + tenant.name + ' » a créé « ' + form.name + ' ». À vérifier avant publication.',
+      });
+    } catch { /* non bloquant */ }
+
+    setSaving(false);
+    setSuccess(true);
   };
 
   if (tenantLoading) {
@@ -91,6 +104,30 @@ export default function NouvelEtablissementPage() {
 
   if (!tenant) {
     return <div className="p-12 text-center text-gris-texte">Aucun tenant associé.</div>;
+  }
+
+  // Écran de confirmation : la fiche est créée mais en attente de validation myCAMBO.
+  if (success) {
+    return (
+      <div className="max-w-lg mx-auto mt-10 bg-white rounded-2xl border border-gris-ligne p-8 text-center">
+        <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4">
+          <Check size={32} className="text-green-600" />
+        </div>
+        <h2 className="text-2xl font-extrabold text-marine mb-2">Établissement créé !</h2>
+        <p className="text-sm text-gris-texte leading-relaxed mb-6">
+          Votre établissement <b>{form.name}</b> a bien été enregistré. Il est
+          <b> en attente de vérification par myCAMBO</b> et sera publié dès validation,
+          conformément à notre engagement qualité. Vous pouvez dès maintenant compléter
+          sa fiche (photos, services, horaires).
+        </p>
+        <div className="flex gap-3 justify-center">
+          <Link href="/espace-partenaire/etablissements"
+            className="bg-marine text-white font-bold px-6 py-3 rounded-full hover:bg-marine-dark transition-colors text-sm">
+            Voir mes établissements
+          </Link>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -109,6 +146,15 @@ export default function NouvelEtablissementPage() {
         </h1>
         <p className="text-sm text-gris-texte">
           Ajoutez un nouvel établissement à votre compte.
+        </p>
+      </div>
+
+      <div className="max-w-2xl bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6 flex items-start gap-3">
+        <Info size={18} className="text-marine shrink-0 mt-0.5" />
+        <p className="text-sm text-marine">
+          Chaque établissement est <b>vérifié par l&apos;équipe myCAMBO</b> avant
+          d&apos;être publié sur le site. Renseignez des informations exactes pour
+          accélérer la validation.
         </p>
       </div>
 
