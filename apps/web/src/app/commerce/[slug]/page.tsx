@@ -16,6 +16,7 @@ import { LevelBadge, SubLabels } from '@/components/ui/LevelBadge';
 import { createBrowserClient } from '@supabase/ssr';
 import { getPlanPermissions, getPlanPermissionsFromDB, type PlanPermissions } from '@/lib/plan-permissions';
 import { getActiveOffers, getJobOffers, type Offer, type JobOffer } from '@/lib/services';
+import { formatHours } from '@/lib/utils';
 
 export default function CommercePage() {
   const params = useParams();
@@ -371,14 +372,10 @@ export default function CommercePage() {
                     <span>{commerce.website}</span>
                   </div>
                 )}
-                {commerce.hours && (
+                {formatHours(commerce.hours) && (
                   <div className="flex items-center gap-2.5">
                     <Clock size={15} className="text-gris-doux" />
-                    <span>
-                      {typeof commerce.hours === 'string'
-                        ? commerce.hours
-                        : JSON.stringify(commerce.hours)}
-                    </span>
+                    <span>{formatHours(commerce.hours)}</span>
                   </div>
                 )}
               </div>

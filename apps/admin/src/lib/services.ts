@@ -1210,7 +1210,7 @@ export async function getPendingVerifications() {
     .from('businesses')
     .select(`
       id, name, email, city, phone, status, tenant_id, plan_id, created_at,
-      tenants!businesses_tenant_id_fkey(id, name, email),
+      tenants!businesses_tenant_id_fkey(id, name, email, managed_by_mycambo),
       tenant_verifications(status, last_submitted_at, business_id)
     `)
     .eq('status', 'approved')
@@ -1219,6 +1219,11 @@ export async function getPendingVerifications() {
   if (error) { console.error('getPendingVerifications:', error); return []; }
 
   return (businesses || []).filter((b: any) => {
+    // Les fiches en gérance myCAMBO (import en masse, non réclamées) ne sont
+    // pas en "attente de dossier" : personne ne gère encore leur vérification.
+    const t = Array.isArray(b.tenants) ? b.tenants[0] : b.tenants;
+    if (t?.managed_by_mycambo) return false;
+
     const verif = Array.isArray(b.tenant_verifications)
       ? b.tenant_verifications.find((v: any) => v.business_id === b.id)
       : (b.tenant_verifications?.business_id === b.id ? b.tenant_verifications : null);

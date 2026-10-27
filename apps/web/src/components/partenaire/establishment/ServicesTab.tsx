@@ -240,14 +240,18 @@ export default function ServicesTab({
     setActive((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
-  const handleSave = () => {
-    updateEstablishment(establishment.id, {
-      // @ts-ignore
-      services: active,
-    });
-    setSaved(true);
-    onUpdate();
-    setTimeout(() => setSaved(false), 2000);
+  const handleSave = async () => {
+    try {
+      await updateEstablishment(establishment.id, {
+        // @ts-ignore
+        services: active,
+      });
+      setSaved(true);
+      onUpdate();
+      setTimeout(() => setSaved(false), 2000);
+    } catch (e) {
+      alert('Erreur lors de l\'enregistrement des services : ' + (e as Error).message);
+    }
   };
 
   if (services.length === 0) {

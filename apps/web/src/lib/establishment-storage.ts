@@ -173,13 +173,21 @@ export async function updateEstablishment(
   id: string,
   payload: Partial<StoredEstablishment>
 ): Promise<boolean> {
-  const { error } = await supabase()
+  const { data, error } = await supabase()
     .from('businesses')
     .update(payload)
-    .eq('id', id);
+    .eq('id', id)
+    .select('id');
   if (error) {
     console.error('updateEstablishment:', error);
-    return false;
+    throw new Error(error.message || 'Échec de la mise à jour');
+  }
+  // PostgREST ne renvoie pas d'erreur si l'UPDATE matche 0 ligne (ex. bloqué
+  // par RLS). On le détecte via .select() pour remonter un vrai échec.
+  if (!data || data.length === 0) {
+    throw new Error(
+      "Aucune fiche modifiée : vous n'avez peut-être pas les droits sur cet établissement."
+    );
   }
   return true;
 }
