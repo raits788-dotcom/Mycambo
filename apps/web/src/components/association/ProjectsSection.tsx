@@ -28,10 +28,16 @@ export default function ProjectsSection({
   }, [businessId]);
 
   if (loading) return null;
-  if (projects.length === 0) return null;
+  if (projects.length === 0) {
+    return (
+      <div className="text-center py-8 text-sm text-gris-texte">
+        Aucun projet en cours pour le moment.
+      </div>
+    );
+  }
 
   return (
-    <div className="mt-8">
+    <div>
       <div className="flex items-center gap-2 mb-4">
         <Target size={18} className="text-marine" />
         <h3 className="font-extrabold text-marine text-base">Nos projets</h3>

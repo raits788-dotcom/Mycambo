@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Image from 'next/image';
-import { Info, Image as ImageIcon, Gift, Star, Lock, BarChart3, X } from 'lucide-react';
+import { Info, Image as ImageIcon, Gift, Star, Lock, BarChart3, X, Target } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import ReviewsSection from '@/components/avis/ReviewsSection';
 import ProjectsSection from '@/components/association/ProjectsSection';
@@ -19,7 +19,7 @@ const SERVICE_LABELS: Record<string, string> = {
   products: 'Produits',
 };
 
-type TabId = 'info' | 'photos' | 'services' | 'impact' | 'reviews';
+type TabId = 'info' | 'photos' | 'services' | 'projects' | 'impact' | 'reviews';
 
 interface Commerce {
   slug: string;
@@ -62,6 +62,12 @@ export default function CommerceTabsPublic({
     maxPhotos: 999,
   };
 
+  // Label du 3e onglet selon le type d'établissement.
+  const servicesLabel = isAssociation ? 'Nos actions' : 'Services';
+
+  // L'association a-t-elle des projets ? (chargé par ProjectsSection ; on
+  // affiche l'onglet dès qu'il s'agit d'une asso — la section se masque seule
+  // si aucun projet actif.)
   const tabs: { id: TabId; label: string; icon: any; locked?: boolean; reason?: string }[] = [
     { id: 'info', label: 'À propos', icon: Info },
     {
@@ -71,10 +77,12 @@ export default function CommerceTabsPublic({
       locked: !perms.canShowPhotos,
       reason: 'Photos non disponibles pour cet établissement',
     },
-    { id: 'services', label: 'Équipements', icon: Gift },
-    // Onglet "Notre impact" : visible uniquement si l'association a renseigné
-    // des chiffres d'impact. Remplace l'ancien onglet "Statistiques" (interne,
-    // sans intérêt pour le public).
+    { id: 'services', label: servicesLabel, icon: Gift },
+    // Onglet "Nos projets" dédié (associations uniquement).
+    ...(isAssociation
+      ? [{ id: 'projects' as TabId, label: 'Nos projets', icon: Target }]
+      : []),
+    // Onglet "Notre impact" : visible si l'association a renseigné des chiffres.
     ...(commerce.impact && commerce.impact.length > 0
       ? [{ id: 'impact' as TabId, label: 'Notre impact', icon: BarChart3 }]
       : []),
@@ -148,20 +156,7 @@ export default function CommerceTabsPublic({
                     <p className="text-sm text-gris-texte leading-relaxed">{commerce.mission}</p>
                   </div>
                 )}
-
-                {commerce.impact && commerce.impact.length > 0 && (
-                  <div>
-                    <h3 className="font-bold text-marine text-base mb-3">Notre impact</h3>
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                      {commerce.impact.map((item: any, i: number) => (
-                        <div key={i} className="bg-gris-fond rounded-lg p-4 text-center">
-                          <div className="text-2xl font-extrabold text-marine">{item.value}</div>
-                          <div className="text-xs text-gris-texte mt-1">{item.label}</div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
+                {/* "Notre impact" a son propre onglet : plus de doublon ici. */}
               </div>
             ) : (
               <div className="text-center py-8">
@@ -240,7 +235,7 @@ export default function CommerceTabsPublic({
           </>
         )}
 
-        {/* Onglet Services / Équipements */}
+        {/* Onglet Nos actions / Services */}
         {tab === 'services' && (
           <>
             {commerce.services && Object.keys(commerce.services).length > 0 ? (
@@ -256,19 +251,21 @@ export default function CommerceTabsPublic({
               </div>
             ) : (
               <div className="text-center py-8 text-sm text-gris-texte">
-                Aucun service activé pour le moment.
+                {isAssociation
+                  ? 'Aucune action renseignée pour le moment.'
+                  : 'Aucun service renseigné pour le moment.'}
               </div>
             )}
-
-            {/* Projets de l'association avec promesses de don fléchées */}
-            {isAssociation && commerce.id && (
-              <ProjectsSection
-                businessId={commerce.id}
-                associationSlug={commerce.slug}
-                associationName={commerce.name}
-              />
-            )}
           </>
+        )}
+
+        {/* Onglet Nos projets (associations) */}
+        {tab === 'projects' && isAssociation && commerce.id && (
+          <ProjectsSection
+            businessId={commerce.id}
+            associationSlug={commerce.slug}
+            associationName={commerce.name}
+          />
         )}
 
         {/* Onglet Notre impact */}
