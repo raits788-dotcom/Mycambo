@@ -2,6 +2,7 @@
 // Projets d'association (avec promesses de don fléchées)
 // ============================================================================
 import { createBrowserClient } from '@supabase/ssr';
+import { isImpersonatingNow, impersonateAction } from '@/lib/impersonate-action';
 
 function supabase() {
   return createBrowserClient(
@@ -46,6 +47,12 @@ export async function getPublicProjects(
 export async function getProjects(
   businessId: string
 ): Promise<AssociationProject[]> {
+  if (isImpersonatingNow()) {
+    try {
+      const out = await impersonateAction('projects_list', { business_id: businessId });
+      return (out.projects || []) as AssociationProject[];
+    } catch { return []; }
+  }
   const { data, error } = await supabase()
     .from('association_projects')
     .select('*')
@@ -64,6 +71,16 @@ export async function createProject(payload: {
   goal_amount?: number | null;
   deadline?: string | null;
 }): Promise<boolean> {
+  if (isImpersonatingNow()) {
+    await impersonateAction('project_create', {
+      business_id: payload.business_id,
+      title: payload.title,
+      description: payload.description ?? null,
+      goal_amount: payload.goal_amount ?? null,
+      deadline: payload.deadline ?? null,
+    });
+    return true;
+  }
   const { error } = await supabase().from('association_projects').insert({
     business_id: payload.business_id,
     tenant_id: payload.tenant_id,
@@ -80,6 +97,10 @@ export async function updateProject(
   id: string,
   payload: Partial<Pick<AssociationProject, 'title' | 'description' | 'goal_amount' | 'raised_amount' | 'deadline' | 'status'>>
 ): Promise<boolean> {
+  if (isImpersonatingNow()) {
+    await impersonateAction('project_update', { id, fields: payload });
+    return true;
+  }
   const { data, error } = await supabase()
     .from('association_projects')
     .update(payload)
@@ -93,6 +114,10 @@ export async function updateProject(
 }
 
 export async function deleteProject(id: string): Promise<boolean> {
+  if (isImpersonatingNow()) {
+    await impersonateAction('project_delete', { id });
+    return true;
+  }
   const { error } = await supabase()
     .from('association_projects')
     .delete()

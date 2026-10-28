@@ -1,4 +1,5 @@
 import { createBrowserClient } from '@supabase/ssr';
+import { isImpersonatingNow, impersonateAction } from '@/lib/impersonate-action';
 
 const supabase = () =>
   createBrowserClient(
@@ -11,6 +12,16 @@ const supabase = () =>
 // ═══════════════════════════════════════════════════════════
 
 export async function getMyReferralCode(tenantId: string) {
+  // En impersonation, la RLS bloque la lecture (pas de tenant courant) :
+  // on passe par l'Edge Function en service_role.
+  if (isImpersonatingNow()) {
+    try {
+      const out = await impersonateAction('referral_get');
+      return out.code || null;
+    } catch {
+      return null;
+    }
+  }
   const { data } = await supabase()
     .from('referral_codes')
     .select('code')
