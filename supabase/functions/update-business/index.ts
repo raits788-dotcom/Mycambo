@@ -41,6 +41,7 @@ const ALLOWED_FIELDS = new Set<string>([
   "photos",
   "hours",
   "services",
+  "impact",
 ]);
 
 serve(async (req) => {

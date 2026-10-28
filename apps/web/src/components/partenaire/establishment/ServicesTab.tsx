@@ -16,6 +16,7 @@ import { cn } from '@/lib/utils';
 import { createBrowserClient } from '@supabase/ssr';
 import type { StoredEstablishment } from '@/lib/establishment-storage';
 import { updateEstablishment } from '@/lib/establishment-storage';
+import ImpactEditor from './ImpactEditor';
 
 // Mapping clé d'icône (base) -> composant lucide (ne peut pas vivre en base).
 const ICONS: Record<string, typeof Heart> = {
@@ -356,6 +357,11 @@ export default function ServicesTab({
           )}
         </button>
       </div>
+
+      {/* Chiffres d'impact (associations uniquement) */}
+      {serviceType === 'association' && (
+        <ImpactEditor establishment={establishment} onUpdate={onUpdate} />
+      )}
     </div>
   );
 }
