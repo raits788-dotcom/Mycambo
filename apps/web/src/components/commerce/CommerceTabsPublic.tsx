@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { Info, Image as ImageIcon, Gift, Star, Lock, BarChart3, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import ReviewsSection from '@/components/avis/ReviewsSection';
+import ProjectsSection from '@/components/association/ProjectsSection';
 const SERVICE_LABELS: Record<string, string> = {
   menu: 'Menu',
   reservations: 'Réservations',
@@ -257,6 +258,15 @@ export default function CommerceTabsPublic({
               <div className="text-center py-8 text-sm text-gris-texte">
                 Aucun service activé pour le moment.
               </div>
+            )}
+
+            {/* Projets de l'association avec promesses de don fléchées */}
+            {isAssociation && commerce.id && (
+              <ProjectsSection
+                businessId={commerce.id}
+                associationSlug={commerce.slug}
+                associationName={commerce.name}
+              />
             )}
           </>
         )}
