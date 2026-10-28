@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { Info, Image as ImageIcon, Gift, Star, Lock, BarChart3, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import ReviewsSection from '@/components/avis/ReviewsSection';
+import ProjectsSection from '@/components/association/ProjectsSection';
 const SERVICE_LABELS: Record<string, string> = {
   menu: 'Menu',
   reservations: 'Réservations',
@@ -18,7 +19,7 @@ const SERVICE_LABELS: Record<string, string> = {
   products: 'Produits',
 };
 
-type TabId = 'info' | 'photos' | 'services' | 'stats' | 'reviews';
+type TabId = 'info' | 'photos' | 'services' | 'impact' | 'reviews';
 
 interface Commerce {
   slug: string;
@@ -71,13 +72,12 @@ export default function CommerceTabsPublic({
       reason: 'Photos non disponibles pour cet établissement',
     },
     { id: 'services', label: 'Équipements', icon: Gift },
-    {
-      id: 'stats',
-      label: 'Statistiques',
-      icon: BarChart3,
-      locked: !perms.canShowStats,
-      reason: 'Statistiques non disponibles',
-    },
+    // Onglet "Notre impact" : visible uniquement si l'association a renseigné
+    // des chiffres d'impact. Remplace l'ancien onglet "Statistiques" (interne,
+    // sans intérêt pour le public).
+    ...(commerce.impact && commerce.impact.length > 0
+      ? [{ id: 'impact' as TabId, label: 'Notre impact', icon: BarChart3 }]
+      : []),
     { id: 'reviews', label: 'Avis', icon: Star },
   ];
 
@@ -259,22 +259,40 @@ export default function CommerceTabsPublic({
                 Aucun service activé pour le moment.
               </div>
             )}
+
+            {/* Projets de l'association avec promesses de don fléchées */}
+            {isAssociation && commerce.id && (
+              <ProjectsSection
+                businessId={commerce.id}
+                associationSlug={commerce.slug}
+                associationName={commerce.name}
+              />
+            )}
           </>
         )}
 
-        {/* Onglet Stats */}
-        {tab === 'stats' && (
+        {/* Onglet Notre impact */}
+        {tab === 'impact' && (
           <>
-            {perms.canShowStats ? (
-              <div className="text-center py-8 text-sm text-gris-texte">
-                Les statistiques seront bientôt disponibles.
+            {commerce.impact && commerce.impact.length > 0 ? (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {commerce.impact.map((item, i) => (
+                  <div
+                    key={i}
+                    className="bg-gris-fond rounded-xl p-5 text-center"
+                  >
+                    <div className="text-2xl md:text-3xl font-extrabold text-marine">
+                      {item.value}
+                    </div>
+                    <div className="text-xs text-gris-texte mt-1">
+                      {item.label}
+                    </div>
+                  </div>
+                ))}
               </div>
             ) : (
-              <div className="text-center py-8">
-                <Lock size={32} className="text-gris-doux mx-auto mb-3" />
-                <p className="text-sm text-gris-texte">
-                  Les statistiques ne sont pas disponibles en formule Découverte.
-                </p>
+              <div className="text-center py-8 text-sm text-gris-texte">
+                Aucun chiffre d&apos;impact renseigné pour le moment.
               </div>
             )}
           </>

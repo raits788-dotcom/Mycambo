@@ -49,6 +49,7 @@ export interface StoredEstablishment {
   photos_limit: number | null;
   hours: Record<string, unknown> | null;
   services: Record<string, boolean> | null; // ← AJOUT
+  impact: { label: string; value: string }[] | null; // ← chiffres d'impact publics
   status: 'pending' | 'approved' | 'suspended';
   is_featured: boolean;
   featured_position: number | null;
