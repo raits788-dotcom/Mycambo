@@ -1969,3 +1969,69 @@ export async function claimGeranceAccess(
 
   return { ok: true };
 }
+
+// ============================================================================
+// RÉCLAMATION D'ACCÈS (invitations) — via Edge Functions
+// ============================================================================
+
+async function callClaimFn(fn: string, body: any) {
+  const supabase = getSupabase();
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) throw new Error('NOT_AUTHENTICATED');
+  const res = await fetch(
+    `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/${fn}`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${session.access_token}`,
+      },
+      body: JSON.stringify(body),
+    }
+  );
+  const out = await res.json().catch(() => ({}));
+  if (!res.ok || !out?.ok) {
+    throw new Error(out?.error || `Échec ${fn}`);
+  }
+  return out;
+}
+
+/** Envoie une invitation de réclamation à une asso en gérance. */
+export async function inviteToClaim(tenantId: string, emailOverride?: string) {
+  return callClaimFn('claim-invite', {
+    tenant_id: tenantId,
+    email_override: emailOverride || undefined,
+  });
+}
+
+/** Valide une demande de réclamation soumise. */
+export async function approveClaim(invitationId: string) {
+  return callClaimFn('claim-review', { invitation_id: invitationId, action: 'approve' });
+}
+
+/** Refuse une demande de réclamation soumise. */
+export async function rejectClaim(invitationId: string, reason: string) {
+  return callClaimFn('claim-review', {
+    invitation_id: invitationId,
+    action: 'reject',
+    rejection_reason: reason,
+  });
+}
+
+/** Liste les invitations/demandes de réclamation (lecture superadmin directe). */
+export async function getClaimInvitations() {
+  const supabase = getSupabase();
+  const { data, error } = await supabase
+    .from('claim_invitations')
+    .select(`
+      id, tenant_id, invited_email, status, requester_name, justificatif_url,
+      rejection_reason, submitted_at, created_at,
+      tenants(id, name, slug)
+    `)
+    .order('created_at', { ascending: false });
+  if (error) { console.error('getClaimInvitations:', error); return []; }
+  return (data || []).map((r: any) => ({
+    ...r,
+    tenant: Array.isArray(r.tenants) ? r.tenants[0] : r.tenants,
+  }));
+}
