@@ -2,6 +2,7 @@
 // Équipe du partenaire : membres, invitations, rôles
 // ============================================================================
 import { createBrowserClient } from '@supabase/ssr';
+import { isImpersonatingNow, impersonateAction } from '@/lib/impersonate-action';
 
 function supabase() {
   return createBrowserClient(
@@ -62,6 +63,12 @@ async function callFn(fn: string, body: any) {
 
 /** Membres actuels du tenant. */
 export async function getTeamMembers(tenantId: string): Promise<TeamMember[]> {
+  if (isImpersonatingNow()) {
+    try {
+      const out = await impersonateAction('team_list');
+      return (out.members || []).map((m: any) => ({ ...m, email: null }));
+    } catch { return []; }
+  }
   const { data, error } = await supabase()
     .from('tenant_users')
     .select('id, user_id, role, created_at')
@@ -73,6 +80,12 @@ export async function getTeamMembers(tenantId: string): Promise<TeamMember[]> {
 
 /** Invitations en attente. */
 export async function getTeamInvitations(tenantId: string): Promise<TeamInvitation[]> {
+  if (isImpersonatingNow()) {
+    try {
+      const out = await impersonateAction('team_list');
+      return (out.invitations || []) as TeamInvitation[];
+    } catch { return []; }
+  }
   const { data, error } = await supabase()
     .from('team_invitations')
     .select('id, email, role, status, created_at')
@@ -84,11 +97,18 @@ export async function getTeamInvitations(tenantId: string): Promise<TeamInvitati
 }
 
 export async function inviteMember(tenantId: string, email: string, role: TeamRole) {
+  if (isImpersonatingNow()) {
+    return impersonateAction('team_invite', { email, role });
+  }
   return callFn('team-invite', { tenant_id: tenantId, email, role });
 }
 
 /** Changer le rôle d'un membre (owner uniquement). */
 export async function updateMemberRole(memberId: string, role: TeamRole): Promise<boolean> {
+  if (isImpersonatingNow()) {
+    await impersonateAction('team_update_role', { member_id: memberId, role });
+    return true;
+  }
   const { data, error } = await supabase()
     .from('tenant_users')
     .update({ role })
@@ -101,6 +121,10 @@ export async function updateMemberRole(memberId: string, role: TeamRole): Promis
 
 /** Retirer un membre. */
 export async function removeMember(memberId: string): Promise<boolean> {
+  if (isImpersonatingNow()) {
+    await impersonateAction('team_remove', { member_id: memberId });
+    return true;
+  }
   const { error } = await supabase()
     .from('tenant_users')
     .delete()
@@ -111,6 +135,10 @@ export async function removeMember(memberId: string): Promise<boolean> {
 
 /** Révoquer une invitation en attente. */
 export async function revokeInvitation(invitationId: string): Promise<boolean> {
+  if (isImpersonatingNow()) {
+    await impersonateAction('team_revoke_invitation', { invitation_id: invitationId });
+    return true;
+  }
   const { error } = await supabase()
     .from('team_invitations')
     .update({ status: 'revoked' })
