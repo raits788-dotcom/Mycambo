@@ -18,7 +18,8 @@ export async function getMyReferralCode(tenantId: string) {
     try {
       const out = await impersonateAction('referral_get');
       return out.code || null;
-    } catch {
+    } catch (e) {
+      console.error('[parrainage] referral_get impersonation a échoué:', e);
       return null;
     }
   }

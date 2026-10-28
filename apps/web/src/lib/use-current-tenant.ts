@@ -43,10 +43,12 @@ export function useCurrentTenant() {
         .from('tenant_users')
         .select('tenants(*)')
         .eq('user_id', user.id)
-        .maybeSingle();
+        .order('created_at', { ascending: true })
+        .limit(1);
 
-      if (data?.tenants) {
-        setTenant({ ...(data.tenants as any), isImpersonating: false });
+      const row = Array.isArray(data) ? data[0] : null;
+      if (row?.tenants) {
+        setTenant({ ...(row.tenants as any), isImpersonating: false });
       }
       setLoading(false);
     })();
