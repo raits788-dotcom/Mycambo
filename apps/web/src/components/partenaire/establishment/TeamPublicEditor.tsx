@@ -60,7 +60,7 @@ export default function TeamPublicEditor({ establishment, onUpdate }: Props) {
   };
 
   return (
-    <div className="mt-8 pt-6 border-t border-gris-ligne">
+    <div>
       <div className="flex items-center gap-2 mb-1">
         <Users size={18} className="text-marine" />
         <h2 className="font-extrabold text-marine text-base">Notre équipe</h2>
