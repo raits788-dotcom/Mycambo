@@ -52,8 +52,16 @@ export default function ProjectsSection({
           return (
             <div
               key={p.id}
-              className="border border-gris-ligne rounded-xl p-5 flex flex-col"
+              className="border border-gris-ligne rounded-xl overflow-hidden flex flex-col"
             >
+              {p.image_url && (
+                <img
+                  src={p.image_url}
+                  alt={p.title}
+                  className="w-full h-40 object-cover"
+                />
+              )}
+              <div className="p-5 flex flex-col flex-1">
               <div className="font-bold text-marine text-sm mb-1">{p.title}</div>
               {p.description && (
                 <p className="text-xs text-gris-texte leading-relaxed mb-3 flex-1">
@@ -90,6 +98,7 @@ export default function ProjectsSection({
               >
                 <Heart size={14} /> Soutenir ce projet
               </button>
+              </div>
             </div>
           );
         })}

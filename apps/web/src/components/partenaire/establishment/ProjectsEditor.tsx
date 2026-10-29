@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { Target, Plus, Trash2, Loader2, Pencil, X } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { Target, Plus, Trash2, Loader2, Pencil, X, Camera } from 'lucide-react';
 import type { StoredEstablishment } from '@/lib/establishment-storage';
 import {
   getProjects,
@@ -10,6 +10,7 @@ import {
   deleteProject,
   type AssociationProject,
 } from '@/lib/projects';
+import { uploadPhoto } from '@/lib/upload-photo';
 
 interface Props {
   establishment: StoredEstablishment;
@@ -20,16 +21,23 @@ type Draft = {
   title: string;
   description: string;
   goal_amount: string;
+  raised_amount: string;
   deadline: string;
+  image_url: string;
 };
 
-const EMPTY: Draft = { title: '', description: '', goal_amount: '', deadline: '' };
+const EMPTY: Draft = {
+  title: '', description: '', goal_amount: '', raised_amount: '',
+  deadline: '', image_url: '',
+};
 
 export default function ProjectsEditor({ establishment }: Props) {
   const [projects, setProjects] = useState<AssociationProject[]>([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<Draft | null>(null);
   const [saving, setSaving] = useState(false);
+  const [uploadingImg, setUploadingImg] = useState(false);
+  const fileRef = useRef<HTMLInputElement | null>(null);
 
   const reload = async () => {
     setLoading(true);
@@ -46,8 +54,23 @@ export default function ProjectsEditor({ establishment }: Props) {
       title: p.title,
       description: p.description || '',
       goal_amount: p.goal_amount != null ? String(p.goal_amount) : '',
+      raised_amount: p.raised_amount != null ? String(p.raised_amount) : '',
       deadline: p.deadline || '',
+      image_url: p.image_url || '',
     });
+
+  const handleImage = async (file: File) => {
+    if (!editing) return;
+    setUploadingImg(true);
+    try {
+      const url = await uploadPhoto(establishment.id, file, 'projects');
+      setEditing({ ...editing, image_url: url });
+    } catch (e) {
+      alert((e as Error).message);
+    } finally {
+      setUploadingImg(false);
+    }
+  };
 
   const handleSave = async () => {
     if (!editing || !editing.title.trim()) {
@@ -56,15 +79,16 @@ export default function ProjectsEditor({ establishment }: Props) {
     }
     setSaving(true);
     try {
-      const goal = editing.goal_amount.trim()
-        ? Number(editing.goal_amount)
-        : null;
+      const goal = editing.goal_amount.trim() ? Number(editing.goal_amount) : null;
+      const raised = editing.raised_amount.trim() ? Number(editing.raised_amount) : 0;
       if (editing.id) {
         await updateProject(editing.id, {
           title: editing.title.trim(),
           description: editing.description.trim() || null,
           goal_amount: goal,
+          raised_amount: raised,
           deadline: editing.deadline || null,
+          image_url: editing.image_url || null,
         });
       } else {
         await createProject({
@@ -73,7 +97,9 @@ export default function ProjectsEditor({ establishment }: Props) {
           title: editing.title.trim(),
           description: editing.description.trim() || undefined,
           goal_amount: goal,
+          raised_amount: raised,
           deadline: editing.deadline || null,
+          image_url: editing.image_url || null,
         });
       }
       setEditing(null);
@@ -140,17 +166,74 @@ export default function ProjectsEditor({ establishment }: Props) {
             rows={3}
             className="w-full px-3 py-2.5 text-sm rounded-lg border border-gris-ligne focus:border-marine outline-none resize-none"
           />
-          <div className="grid grid-cols-2 gap-3">
+
+          {/* Photo du projet */}
+          <div>
+            <label className="block text-[11px] font-bold text-gris-texte uppercase mb-1">
+              Photo du projet
+            </label>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => fileRef.current?.click()}
+                className="w-20 h-20 rounded-lg bg-white border border-gris-ligne flex items-center justify-center overflow-hidden flex-shrink-0"
+                title="Ajouter une photo"
+              >
+                {uploadingImg ? (
+                  <Loader2 size={18} className="animate-spin text-marine" />
+                ) : editing.image_url ? (
+                  <img src={editing.image_url} alt="" className="w-full h-full object-cover" />
+                ) : (
+                  <Camera size={20} className="text-gris-doux" />
+                )}
+              </button>
+              {editing.image_url && (
+                <button
+                  type="button"
+                  onClick={() => setEditing({ ...editing, image_url: '' })}
+                  className="text-xs font-bold text-red-500"
+                >
+                  Retirer la photo
+                </button>
+              )}
+              <input
+                ref={fileRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) handleImage(f);
+                  e.target.value = '';
+                }}
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
               <label className="block text-[11px] font-bold text-gris-texte uppercase mb-1">
-                Objectif de collecte ($)
+                Objectif ($)
               </label>
               <input
                 type="number"
                 min="0"
                 value={editing.goal_amount}
                 onChange={(e) => setEditing({ ...editing, goal_amount: e.target.value })}
-                placeholder="Ex. 5000 (optionnel)"
+                placeholder="Ex. 5000"
+                className="w-full px-3 py-2.5 text-sm rounded-lg border border-gris-ligne focus:border-marine outline-none"
+              />
+            </div>
+            <div>
+              <label className="block text-[11px] font-bold text-gris-texte uppercase mb-1">
+                Déjà collecté ($)
+              </label>
+              <input
+                type="number"
+                min="0"
+                value={editing.raised_amount}
+                onChange={(e) => setEditing({ ...editing, raised_amount: e.target.value })}
+                placeholder="Ex. 1200"
                 className="w-full px-3 py-2.5 text-sm rounded-lg border border-gris-ligne focus:border-marine outline-none"
               />
             </div>

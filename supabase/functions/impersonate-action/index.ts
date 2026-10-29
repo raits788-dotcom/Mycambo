@@ -113,7 +113,9 @@ serve(async (req) => {
           title: p.title,
           description: p.description ?? null,
           goal_amount: p.goal_amount ?? null,
+          raised_amount: p.raised_amount ?? 0,
           deadline: p.deadline ?? null,
+          image_url: p.image_url ?? null,
         });
         if (error) return json({ error: error.message }, 500);
         return json({ ok: true }, 200);
