@@ -44,6 +44,7 @@ const ALLOWED_FIELDS = new Set<string>([
   "impact",
   "history",
   "public_team",
+  "support_options",
 ]);
 
 serve(async (req) => {

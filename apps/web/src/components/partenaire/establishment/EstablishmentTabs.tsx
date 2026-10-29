@@ -19,9 +19,10 @@ import ProjectsEditor from './ProjectsEditor';
 import HistoryEditor from './HistoryEditor';
 import TeamPublicEditor from './TeamPublicEditor';
 import ImpactEditor from './ImpactEditor';
+import SupportEditor from './SupportEditor';
 
 type TabId =
-  | 'info' | 'photos' | 'services' | 'projects' | 'history' | 'team' | 'impact'
+  | 'info' | 'photos' | 'services' | 'projects' | 'support' | 'history' | 'team' | 'impact'
   | 'stats' | 'reviews' | 'requests' | 'subscription' | 'offers' | 'jobs' | 'reservations';
 
 interface EstablishmentTabsProps {
@@ -85,6 +86,7 @@ export default function EstablishmentTabs({
     { id: 'services' as TabId, label: asso ? 'Nos actions' : 'Services', icon: 'fa-gift', show: true },
     // Onglets dédiés — associations uniquement
     { id: 'projects' as TabId, label: 'Nos projets', icon: 'fa-bullseye', show: asso },
+    { id: 'support' as TabId, label: 'Nous soutenir', icon: 'fa-hand-holding-heart', show: asso },
     { id: 'history' as TabId, label: 'Notre histoire', icon: 'fa-clock-rotate-left', show: asso },
     { id: 'team' as TabId, label: 'Notre équipe', icon: 'fa-users', show: asso },
     { id: 'impact' as TabId, label: 'Notre impact', icon: 'fa-chart-column', show: asso },
@@ -129,6 +131,7 @@ export default function EstablishmentTabs({
         {tab === 'photos' && <PhotosTab establishment={establishment} onUpdate={onUpdate} />}
         {tab === 'services' && <ServicesTab establishment={establishment} onUpdate={onUpdate} />}
         {tab === 'projects' && <ProjectsEditor establishment={establishment} />}
+        {tab === 'support' && <SupportEditor establishment={establishment} onUpdate={onUpdate} />}
         {tab === 'history' && <HistoryEditor establishment={establishment} onUpdate={onUpdate} />}
         {tab === 'team' && <TeamPublicEditor establishment={establishment} onUpdate={onUpdate} />}
         {tab === 'impact' && <ImpactEditor establishment={establishment} onUpdate={onUpdate} />}

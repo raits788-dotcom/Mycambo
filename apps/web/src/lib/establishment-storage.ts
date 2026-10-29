@@ -52,6 +52,7 @@ export interface StoredEstablishment {
   impact: { label: string; value: string }[] | null; // ← chiffres d'impact publics
   history: { year: string; text: string }[] | null; // ← frise chronologique publique
   public_team: { name: string; role: string; photo_url?: string }[] | null; // ← membres publics
+  support_options: { type: string; enabled: boolean; description?: string; url?: string }[] | null; // ← façons de soutenir
   status: 'pending' | 'approved' | 'suspended';
   is_featured: boolean;
   featured_position: number | null;

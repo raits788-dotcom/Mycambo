@@ -1,0 +1,162 @@
+'use client';
+
+import { useState } from 'react';
+import { HandHeart, Loader2 } from 'lucide-react';
+import type { StoredEstablishment } from '@/lib/establishment-storage';
+import { updateEstablishment } from '@/lib/establishment-storage';
+
+interface Props {
+  establishment: StoredEstablishment;
+  onUpdate: () => void;
+}
+
+type Option = { type: string; enabled: boolean; description?: string; url?: string };
+
+// Les façons de soutenir possibles, avec leur présentation.
+const SUPPORT_TYPES: {
+  type: string;
+  label: string;
+  emoji: string;
+  hint: string;
+  hasUrl?: boolean;
+  hasDescription?: boolean;
+}[] = [
+  { type: 'don', label: 'Faire un don', emoji: '❤️', hint: 'Promesse de don ponctuel ou mensuel (mise en relation).' },
+  { type: 'parrainage', label: 'Parrainer un enfant', emoji: '👶', hint: 'Soutien régulier d’un enfant.', hasDescription: true },
+  { type: 'benevolat', label: 'Devenir bénévole', emoji: '🙋', hint: 'Recevoir des candidatures de bénévoles.' },
+  { type: 'adhesion', label: 'Adhérer', emoji: '🎟️', hint: 'Devenir membre de l’association.', hasUrl: true },
+  { type: 'mecenat', label: 'Mécénat entreprise', emoji: '🏢', hint: 'Soutien d’entreprise, défiscalisation.', hasDescription: true },
+  { type: 'boutique', label: 'Boutique solidaire', emoji: '🛍️', hint: 'Produits vendus au profit de l’association.', hasUrl: true },
+];
+
+export default function SupportEditor({ establishment, onUpdate }: Props) {
+  const initial: Option[] = Array.isArray((establishment as any).support_options)
+    ? ((establishment as any).support_options as Option[])
+    : [];
+
+  // On part de la config existante, complétée par tous les types connus.
+  const [opts, setOpts] = useState<Record<string, Option>>(() => {
+    const map: Record<string, Option> = {};
+    SUPPORT_TYPES.forEach((t) => {
+      const found = initial.find((o) => o.type === t.type);
+      map[t.type] = found || { type: t.type, enabled: false };
+    });
+    return map;
+  });
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  const toggle = (type: string) =>
+    setOpts((p) => ({ ...p, [type]: { ...p[type], enabled: !p[type].enabled } }));
+  const setField = (type: string, field: 'description' | 'url', v: string) =>
+    setOpts((p) => ({ ...p, [type]: { ...p[type], [field]: v } }));
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const clean = Object.values(opts).map((o) => ({
+        type: o.type,
+        enabled: o.enabled,
+        ...(o.description ? { description: o.description } : {}),
+        ...(o.url ? { url: o.url } : {}),
+      }));
+      await updateEstablishment(establishment.id, {
+        // @ts-ignore — colonne jsonb support_options
+        support_options: clean,
+      });
+      setSaved(true);
+      onUpdate();
+      setTimeout(() => setSaved(false), 2000);
+    } catch (e) {
+      alert("Erreur lors de l'enregistrement : " + (e as Error).message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div>
+      <div className="flex items-center gap-2 mb-1">
+        <HandHeart size={18} className="text-marine" />
+        <h2 className="font-extrabold text-marine text-base">Nous soutenir</h2>
+      </div>
+      <p className="text-xs text-gris-texte mb-4">
+        Activez les façons d&apos;aider votre association. Elles apparaîtront dans
+        l&apos;onglet « Nous soutenir » de votre fiche publique.
+      </p>
+
+      <div className="space-y-3">
+        {SUPPORT_TYPES.map((t) => {
+          const o = opts[t.type];
+          return (
+            <div
+              key={t.type}
+              className={`border-2 rounded-xl p-4 transition-colors ${
+                o.enabled ? 'border-marine bg-marine/5' : 'border-gris-ligne'
+              }`}
+            >
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={o.enabled}
+                  onChange={() => toggle(t.type)}
+                  className="w-4 h-4 accent-marine mt-1"
+                />
+                <div className="flex-1 min-w-0">
+                  <div className="font-bold text-marine text-sm">
+                    {t.emoji} {t.label}
+                  </div>
+                  <div className="text-xs text-gris-texte">{t.hint}</div>
+                </div>
+              </label>
+
+              {o.enabled && (t.hasUrl || t.hasDescription) && (
+                <div className="mt-3 pl-7 space-y-2">
+                  {t.hasDescription && (
+                    <textarea
+                      value={o.description || ''}
+                      onChange={(e) => setField(t.type, 'description', e.target.value)}
+                      placeholder="Précisions (optionnel) : montant, conditions…"
+                      rows={2}
+                      className="w-full px-3 py-2 text-sm rounded-lg border border-gris-ligne focus:border-marine outline-none resize-none"
+                    />
+                  )}
+                  {t.hasUrl && (
+                    <input
+                      value={o.url || ''}
+                      onChange={(e) => setField(t.type, 'url', e.target.value)}
+                      placeholder="Lien (optionnel) : page d'adhésion, boutique…"
+                      className="w-full px-3 py-2 text-sm rounded-lg border border-gris-ligne focus:border-marine outline-none"
+                    />
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="pt-4 mt-4 flex justify-end border-t border-gris-ligne">
+        <button
+          onClick={handleSave}
+          disabled={saving || saved}
+          className="inline-flex items-center gap-2 text-xs font-bold bg-marine text-white px-5 py-2.5 rounded-full hover:bg-marine-dark transition-colors disabled:opacity-60"
+        >
+          {saving ? (
+            <>
+              <Loader2 className="animate-spin" size={14} /> Enregistrement…
+            </>
+          ) : saved ? (
+            <>
+              <i className="fas fa-check" /> Enregistré
+            </>
+          ) : (
+            <>
+              <i className="fas fa-save" /> Enregistrer
+            </>
+          )}
+        </button>
+      </div>
+    </div>
+  );
+}
