@@ -333,6 +333,7 @@ export default function CommercePage() {
                     donationLink={undefined}
                     variant="sidebar"
                     services={commerce.services}
+                    supportOptions={commerce.support_options}
                     onDonateClick={() => openSupport('donate')}
                     onVolunteerClick={() => openSupport('volunteer')}
                   />
