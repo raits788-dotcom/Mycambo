@@ -16,10 +16,6 @@ import { cn } from '@/lib/utils';
 import { createBrowserClient } from '@supabase/ssr';
 import type { StoredEstablishment } from '@/lib/establishment-storage';
 import { updateEstablishment } from '@/lib/establishment-storage';
-import ImpactEditor from './ImpactEditor';
-import ProjectsEditor from './ProjectsEditor';
-import HistoryEditor from './HistoryEditor';
-import TeamPublicEditor from './TeamPublicEditor';
 
 // Mapping clé d'icône (base) -> composant lucide (ne peut pas vivre en base).
 const ICONS: Record<string, typeof Heart> = {
@@ -361,15 +357,6 @@ export default function ServicesTab({
         </button>
       </div>
 
-      {/* Sections enrichies (associations uniquement) */}
-      {serviceType === 'association' && (
-        <>
-          <HistoryEditor establishment={establishment} onUpdate={onUpdate} />
-          <TeamPublicEditor establishment={establishment} onUpdate={onUpdate} />
-          <ImpactEditor establishment={establishment} onUpdate={onUpdate} />
-          <ProjectsEditor establishment={establishment} />
-        </>
-      )}
     </div>
   );
 }
