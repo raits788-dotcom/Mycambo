@@ -15,6 +15,10 @@ interface AssociationActionsBarProps {
   donationLink?: DonationLink | null;
   variant?: 'sidebar' | 'inline';
   services?: Record<string, boolean> | null; // ← AJOUT
+  // Si fournis, don/bénévolat délèguent au parent (consolidation dans
+  // l'onglet "Nous soutenir") au lieu d'ouvrir les modals internes.
+  onDonateClick?: () => void;
+  onVolunteerClick?: () => void;
 }
 
 export default function AssociationActionsBar({
@@ -23,6 +27,8 @@ export default function AssociationActionsBar({
   donationLink,
   variant = 'sidebar',
   services,
+  onDonateClick,
+  onVolunteerClick,
 }: AssociationActionsBarProps) {
   const [modal, setModal] = useState<ModalType>(null);
 
@@ -38,7 +44,7 @@ export default function AssociationActionsBar({
         <div className="space-y-2">
           {canDonate && (
             <button
-              onClick={() => setModal('donate')}
+              onClick={() => (onDonateClick ? onDonateClick() : setModal('donate'))}
               className="w-full bg-khmer text-white font-bold py-3 rounded-full hover:bg-khmer/90 transition-colors text-sm"
             >
               ❤️ Faire un don
@@ -46,7 +52,7 @@ export default function AssociationActionsBar({
           )}
           {canVolunteer && (
             <button
-              onClick={() => setModal('volunteer')}
+              onClick={() => (onVolunteerClick ? onVolunteerClick() : setModal('volunteer'))}
               className="w-full border-[1.5px] border-gris-ligne text-marine font-bold py-3 rounded-full hover:border-marine transition-colors text-sm"
             >
               🙋 Devenir bénévole

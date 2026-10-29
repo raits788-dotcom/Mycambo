@@ -12,6 +12,8 @@ import AssociationActionsBar from '@/components/association/AssociationActionsBa
 import ContactModal from '@/components/commerce/ContactModal';
 import ReservationModal from '@/components/commerce/ReservationModal';
 import ApplyModal from '@/components/commerce/ApplyModal';
+import DonateModal from '@/components/association/DonateModal';
+import VolunteerModal from '@/components/association/VolunteerModal';
 import { LevelBadge, SubLabels } from '@/components/ui/LevelBadge';
 import { createBrowserClient } from '@supabase/ssr';
 import { getPlanPermissions, getPlanPermissionsFromDB, type PlanPermissions } from '@/lib/plan-permissions';
@@ -30,6 +32,16 @@ export default function CommercePage() {
   const [mounted, setMounted] = useState(false);
   const [showContactModal, setShowContactModal] = useState(false);
   const [showReservation, setShowReservation] = useState(false);
+  // Onglet actif de la fiche (piloté pour consolider "Nous soutenir").
+  const [activeTab, setActiveTab] = useState<any>('info');
+  // Modal de soutien ouvert depuis l'onglet ou la barre latérale.
+  const [supportModal, setSupportModal] = useState<'donate' | 'volunteer' | null>(null);
+
+  // Ouvre l'onglet "Nous soutenir" puis le formulaire voulu.
+  const openSupport = (kind: 'donate' | 'volunteer') => {
+    setActiveTab('support');
+    setSupportModal(kind);
+  };
   const [offers, setOffers] = useState<Offer[]>([]);
   const [jobs, setJobs] = useState<JobOffer[]>([]);
   const [applyTo, setApplyTo] = useState<JobOffer | null>(null);
@@ -300,6 +312,10 @@ export default function CommercePage() {
               isAssociation={isAssociation}
               stats={null}
               permissions={permissions}
+              activeTab={activeTab}
+              onTabChange={setActiveTab}
+              onDonate={() => openSupport('donate')}
+              onVolunteer={() => openSupport('volunteer')}
             />
           </div>
 
@@ -317,6 +333,8 @@ export default function CommercePage() {
                     donationLink={undefined}
                     variant="sidebar"
                     services={commerce.services}
+                    onDonateClick={() => openSupport('donate')}
+                    onVolunteerClick={() => openSupport('volunteer')}
                   />
                 </div>
               ) : (
@@ -416,6 +434,25 @@ export default function CommercePage() {
           businessId={commerce.id}
           tenantId={commerce.tenant_id}
           onClose={() => setApplyTo(null)}
+        />
+      )}
+
+      {/* Modale de don (pilotée depuis l'onglet ou la barre latérale) */}
+      {supportModal === 'donate' && isAssociation && (
+        <DonateModal
+          associationSlug={slug}
+          associationName={commerce.name}
+          donationLink={undefined}
+          onClose={() => setSupportModal(null)}
+        />
+      )}
+
+      {/* Modale de bénévolat */}
+      {supportModal === 'volunteer' && isAssociation && (
+        <VolunteerModal
+          associationSlug={slug}
+          associationName={commerce.name}
+          onClose={() => setSupportModal(null)}
         />
       )}
     </>
