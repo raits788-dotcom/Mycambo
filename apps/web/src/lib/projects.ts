@@ -69,7 +69,9 @@ export async function createProject(payload: {
   title: string;
   description?: string;
   goal_amount?: number | null;
+  raised_amount?: number | null;
   deadline?: string | null;
+  image_url?: string | null;
 }): Promise<boolean> {
   if (isImpersonatingNow()) {
     await impersonateAction('project_create', {
@@ -77,7 +79,9 @@ export async function createProject(payload: {
       title: payload.title,
       description: payload.description ?? null,
       goal_amount: payload.goal_amount ?? null,
+      raised_amount: payload.raised_amount ?? null,
       deadline: payload.deadline ?? null,
+      image_url: payload.image_url ?? null,
     });
     return true;
   }
@@ -87,7 +91,9 @@ export async function createProject(payload: {
     title: payload.title,
     description: payload.description || null,
     goal_amount: payload.goal_amount ?? null,
+    raised_amount: payload.raised_amount ?? 0,
     deadline: payload.deadline || null,
+    image_url: payload.image_url || null,
   });
   if (error) { console.error('createProject:', error); throw new Error(error.message); }
   return true;
@@ -95,7 +101,7 @@ export async function createProject(payload: {
 
 export async function updateProject(
   id: string,
-  payload: Partial<Pick<AssociationProject, 'title' | 'description' | 'goal_amount' | 'raised_amount' | 'deadline' | 'status'>>
+  payload: Partial<Pick<AssociationProject, 'title' | 'description' | 'goal_amount' | 'raised_amount' | 'deadline' | 'status' | 'image_url'>>
 ): Promise<boolean> {
   if (isImpersonatingNow()) {
     await impersonateAction('project_update', { id, fields: payload });

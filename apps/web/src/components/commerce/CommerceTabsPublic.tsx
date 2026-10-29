@@ -2,10 +2,11 @@
 
 import { useState } from 'react';
 import Image from 'next/image';
-import { Info, Image as ImageIcon, Gift, Star, Lock, BarChart3, X, Target, Clock, Users } from 'lucide-react';
+import { Info, Image as ImageIcon, Gift, Star, Lock, BarChart3, X, Target, Clock, Users, HandHeart } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import ReviewsSection from '@/components/avis/ReviewsSection';
 import ProjectsSection from '@/components/association/ProjectsSection';
+import SupportSection from '@/components/association/SupportSection';
 const SERVICE_LABELS: Record<string, string> = {
   menu: 'Menu',
   reservations: 'Réservations',
@@ -19,7 +20,7 @@ const SERVICE_LABELS: Record<string, string> = {
   products: 'Produits',
 };
 
-type TabId = 'info' | 'photos' | 'services' | 'projects' | 'history' | 'team' | 'impact' | 'reviews';
+type TabId = 'info' | 'photos' | 'services' | 'projects' | 'support' | 'history' | 'team' | 'impact' | 'reviews';
 
 interface Commerce {
   slug: string;
@@ -81,6 +82,11 @@ export default function CommerceTabsPublic({
     // Onglet "Nos projets" dédié (associations uniquement).
     ...(isAssociation
       ? [{ id: 'projects' as TabId, label: 'Nos projets', icon: Target }]
+      : []),
+    // Onglet "Nous soutenir" : si des options de soutien sont activées.
+    ...(isAssociation &&
+    (commerce.support_options || []).some((o: any) => o.enabled)
+      ? [{ id: 'support' as TabId, label: 'Nous soutenir', icon: HandHeart }]
       : []),
     // Onglet "Notre histoire" : visible si une frise est renseignée.
     ...(commerce.history && commerce.history.length > 0
@@ -274,6 +280,11 @@ export default function CommerceTabsPublic({
             associationSlug={commerce.slug}
             associationName={commerce.name}
           />
+        )}
+
+        {/* Onglet Nous soutenir */}
+        {tab === 'support' && (
+          <SupportSection options={commerce.support_options || []} />
         )}
 
         {/* Onglet Notre histoire */}
