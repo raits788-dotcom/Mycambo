@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Image from 'next/image';
-import { Info, Image as ImageIcon, Gift, Star, Lock, BarChart3, X, Target } from 'lucide-react';
+import { Info, Image as ImageIcon, Gift, Star, Lock, BarChart3, X, Target, Clock, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import ReviewsSection from '@/components/avis/ReviewsSection';
 import ProjectsSection from '@/components/association/ProjectsSection';
@@ -19,7 +19,7 @@ const SERVICE_LABELS: Record<string, string> = {
   products: 'Produits',
 };
 
-type TabId = 'info' | 'photos' | 'services' | 'projects' | 'impact' | 'reviews';
+type TabId = 'info' | 'photos' | 'services' | 'projects' | 'history' | 'team' | 'impact' | 'reviews';
 
 interface Commerce {
   slug: string;
@@ -81,6 +81,14 @@ export default function CommerceTabsPublic({
     // Onglet "Nos projets" dédié (associations uniquement).
     ...(isAssociation
       ? [{ id: 'projects' as TabId, label: 'Nos projets', icon: Target }]
+      : []),
+    // Onglet "Notre histoire" : visible si une frise est renseignée.
+    ...(commerce.history && commerce.history.length > 0
+      ? [{ id: 'history' as TabId, label: 'Notre histoire', icon: Clock }]
+      : []),
+    // Onglet "Notre équipe" : visible si des membres publics sont renseignés.
+    ...(commerce.public_team && commerce.public_team.length > 0
+      ? [{ id: 'team' as TabId, label: 'Notre équipe', icon: Users }]
       : []),
     // Onglet "Notre impact" : visible si l'association a renseigné des chiffres.
     ...(commerce.impact && commerce.impact.length > 0
@@ -266,6 +274,49 @@ export default function CommerceTabsPublic({
             associationSlug={commerce.slug}
             associationName={commerce.name}
           />
+        )}
+
+        {/* Onglet Notre histoire */}
+        {tab === 'history' && (
+          <div className="relative">
+            {(commerce.history || []).map((h: any, i: number) => (
+              <div key={i} className="flex gap-4 pb-6 relative">
+                {i < (commerce.history?.length || 0) - 1 && (
+                  <div className="absolute left-[29px] top-7 bottom-0 w-0.5 bg-gris-ligne" />
+                )}
+                <div className="flex-shrink-0 w-16 text-right">
+                  <span className="font-extrabold text-khmer text-sm">{h.year}</span>
+                </div>
+                <div className="relative pl-4">
+                  <div className="absolute -left-[7px] top-1 w-3 h-3 rounded-full bg-khmer border-2 border-white" />
+                  <p className="text-sm text-gris-texte leading-relaxed">{h.text}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Onglet Notre équipe */}
+        {tab === 'team' && (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-5">
+            {(commerce.public_team || []).map((m: any, i: number) => (
+              <div key={i} className="text-center">
+                {m.photo_url ? (
+                  <img
+                    src={m.photo_url}
+                    alt={m.name}
+                    className="w-16 h-16 rounded-full object-cover mx-auto mb-2"
+                  />
+                ) : (
+                  <div className="w-16 h-16 rounded-full bg-gradient-to-br from-marine to-khmer text-white flex items-center justify-center font-extrabold text-lg mx-auto mb-2">
+                    {(m.name || '?').charAt(0).toUpperCase()}
+                  </div>
+                )}
+                <div className="font-bold text-marine text-sm">{m.name}</div>
+                <div className="text-xs text-gris-doux">{m.role}</div>
+              </div>
+            ))}
+          </div>
         )}
 
         {/* Onglet Notre impact */}
