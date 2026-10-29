@@ -9,12 +9,15 @@ import { cn } from '@/lib/utils';
 
 type ModalType = 'donate' | 'volunteer' | 'contact' | null;
 
+type SupportOption = { type: string; enabled: boolean; description?: string; url?: string };
+
 interface AssociationActionsBarProps {
   associationSlug: string;
   associationName: string;
   donationLink?: DonationLink | null;
   variant?: 'sidebar' | 'inline';
-  services?: Record<string, boolean> | null; // ← AJOUT
+  services?: Record<string, boolean> | null; // ancien système (fallback)
+  supportOptions?: SupportOption[] | null; // ← source unique "Nous soutenir"
   // Si fournis, don/bénévolat délèguent au parent (consolidation dans
   // l'onglet "Nous soutenir") au lieu d'ouvrir les modals internes.
   onDonateClick?: () => void;
@@ -27,14 +30,20 @@ export default function AssociationActionsBar({
   donationLink,
   variant = 'sidebar',
   services,
+  supportOptions,
   onDonateClick,
   onVolunteerClick,
 }: AssociationActionsBarProps) {
   const [modal, setModal] = useState<ModalType>(null);
 
-  // Services activés (si non fourni, on affiche tout par défaut)
-  const canDonate = services?.donations === true;
-  const canVolunteer = services?.volunteers === true;
+  // Source unique : support_options. Fallback sur l'ancien système services
+  // pour les fiches pas encore migrées.
+  const opts = supportOptions || [];
+  const hasSupport = opts.length > 0;
+  const optOn = (type: string) => opts.some((o) => o.type === type && o.enabled);
+
+  const canDonate = hasSupport ? optOn('don') : services?.donations === true;
+  const canVolunteer = hasSupport ? optOn('benevolat') : services?.volunteers === true;
   const canContact = true; // Le contact est toujours disponible
 
   // ===== Variante SIDEBAR (boutons empilés) =====

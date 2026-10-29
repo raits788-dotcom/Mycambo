@@ -78,12 +78,6 @@ export default function CommerceTabsPublic({
     maxPhotos: 999,
   };
 
-  // Label du 3e onglet selon le type d'établissement.
-  const servicesLabel = isAssociation ? 'Nos actions' : 'Services';
-
-  // L'association a-t-elle des projets ? (chargé par ProjectsSection ; on
-  // affiche l'onglet dès qu'il s'agit d'une asso — la section se masque seule
-  // si aucun projet actif.)
   const tabs: { id: TabId; label: string; icon: any; locked?: boolean; reason?: string }[] = [
     { id: 'info', label: 'À propos', icon: Info },
     {
@@ -93,15 +87,18 @@ export default function CommerceTabsPublic({
       locked: !perms.canShowPhotos,
       reason: 'Photos non disponibles pour cet établissement',
     },
-    { id: 'services', label: servicesLabel, icon: Gift },
-    // Onglet "Nos projets" dédié (associations uniquement).
-    ...(isAssociation
-      ? [{ id: 'projects' as TabId, label: 'Nos projets', icon: Target }]
+    // Commerces : onglet "Services". Associations : remplacé par "Nous soutenir".
+    ...(!isAssociation
+      ? [{ id: 'services' as TabId, label: 'Services', icon: Gift }]
       : []),
-    // Onglet "Nous soutenir" : si des options de soutien sont activées.
+    // Onglet "Nous soutenir" (associations) : si des options sont activées.
     ...(isAssociation &&
     (commerce.support_options || []).some((o: any) => o.enabled)
       ? [{ id: 'support' as TabId, label: 'Nous soutenir', icon: HandHeart }]
+      : []),
+    // Onglet "Nos projets" dédié (associations uniquement).
+    ...(isAssociation
+      ? [{ id: 'projects' as TabId, label: 'Nos projets', icon: Target }]
       : []),
     // Onglet "Notre histoire" : visible si une frise est renseignée.
     ...(commerce.history && commerce.history.length > 0

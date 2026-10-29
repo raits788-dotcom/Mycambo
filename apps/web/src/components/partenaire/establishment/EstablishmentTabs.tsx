@@ -83,10 +83,11 @@ export default function EstablishmentTabs({
   const tabs = [
     { id: 'info' as TabId, label: 'Informations', icon: 'fa-pencil', show: true },
     { id: 'photos' as TabId, label: 'Photos', icon: 'fa-images', show: true },
-    { id: 'services' as TabId, label: asso ? 'Nos actions' : 'Services', icon: 'fa-gift', show: true },
-    // Onglets dédiés — associations uniquement
-    { id: 'projects' as TabId, label: 'Nos projets', icon: 'fa-bullseye', show: asso },
+    // "Services" pour les commerces ; pour les associations, remplacé par
+    // "Nous soutenir" (source unique) ci-dessous.
+    { id: 'services' as TabId, label: 'Services', icon: 'fa-gift', show: !asso },
     { id: 'support' as TabId, label: 'Nous soutenir', icon: 'fa-hand-holding-heart', show: asso },
+    { id: 'projects' as TabId, label: 'Nos projets', icon: 'fa-bullseye', show: asso },
     { id: 'history' as TabId, label: 'Notre histoire', icon: 'fa-clock-rotate-left', show: asso },
     { id: 'team' as TabId, label: 'Notre équipe', icon: 'fa-users', show: asso },
     { id: 'impact' as TabId, label: 'Notre impact', icon: 'fa-chart-column', show: asso },
