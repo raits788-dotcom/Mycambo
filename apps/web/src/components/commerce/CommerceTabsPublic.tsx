@@ -45,6 +45,11 @@ interface Props {
     canShowStats: boolean;
     maxPhotos: number;
   };
+  // Onglet piloté par le parent (optionnel) + callbacks de soutien.
+  activeTab?: TabId;
+  onTabChange?: (t: TabId) => void;
+  onDonate?: () => void;
+  onVolunteer?: () => void;
 }
 
 export default function CommerceTabsPublic({
@@ -52,8 +57,18 @@ export default function CommerceTabsPublic({
   isAssociation,
   stats,
   permissions,
+  activeTab,
+  onTabChange,
+  onDonate,
+  onVolunteer,
 }: Props) {
-  const [tab, setTab] = useState<TabId>('info');
+  const [internalTab, setInternalTab] = useState<TabId>('info');
+  // Si le parent pilote l'onglet, on l'utilise ; sinon état interne.
+  const tab = activeTab ?? internalTab;
+  const setTab = (t: TabId) => {
+    setInternalTab(t);
+    onTabChange?.(t);
+  };
   const [selectedPhoto, setSelectedPhoto] = useState<number | null>(null);
 
   const perms = permissions || {
@@ -284,7 +299,11 @@ export default function CommerceTabsPublic({
 
         {/* Onglet Nous soutenir */}
         {tab === 'support' && (
-          <SupportSection options={commerce.support_options || []} />
+          <SupportSection
+            options={commerce.support_options || []}
+            onDonate={onDonate}
+            onVolunteer={onVolunteer}
+          />
         )}
 
         {/* Onglet Notre histoire */}
