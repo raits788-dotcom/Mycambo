@@ -2,11 +2,24 @@
 
 import { useState } from 'react';
 import Image from 'next/image';
-import { Info, Image as ImageIcon, Gift, Star, Lock, BarChart3, X, Target, Clock, Users, HandHeart } from 'lucide-react';
+import { Info, Image as ImageIcon, Gift, Star, Lock, BarChart3, X, Target, Clock, Users, HandHeart, Briefcase } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import ReviewsSection from '@/components/avis/ReviewsSection';
 import ProjectsSection from '@/components/association/ProjectsSection';
 import SupportSection from '@/components/association/SupportSection';
+
+// Message affiché quand un onglet existe mais n'a pas encore de contenu.
+// L'onglet reste visible pour que le visiteur sache qu'il existe ; une info
+// saisie côté partenaire apparaît alors automatiquement ici.
+function EmptyState({ icon, title, sub }: { icon: React.ReactNode; title: string; sub?: string }) {
+  return (
+    <div className="text-center py-12 text-gris-doux">
+      <div className="opacity-40 flex justify-center mb-3">{icon}</div>
+      <p className="text-sm text-gris-texte">{title}</p>
+      {sub && <p className="text-xs text-gris-doux mt-1">{sub}</p>}
+    </div>
+  );
+}
 const SERVICE_LABELS: Record<string, string> = {
   menu: 'Menu',
   reservations: 'Réservations',
@@ -20,7 +33,16 @@ const SERVICE_LABELS: Record<string, string> = {
   products: 'Produits',
 };
 
-type TabId = 'info' | 'photos' | 'services' | 'projects' | 'support' | 'history' | 'team' | 'impact' | 'reviews';
+type TabId = 'info' | 'photos' | 'services' | 'projects' | 'support' | 'history' | 'team' | 'impact' | 'jobs' | 'reviews';
+
+export interface PublicJob {
+  id: string;
+  title: string;
+  contract_type?: string | null;
+  location?: string | null;
+  salary?: string | null;
+  description?: string | null;
+}
 
 interface Commerce {
   slug: string;
@@ -50,6 +72,10 @@ interface Props {
   onTabChange?: (t: TabId) => void;
   onDonate?: () => void;
   onVolunteer?: () => void;
+  // Offres d'emploi + candidature (si la formule les autorise).
+  jobs?: PublicJob[];
+  canReceiveApplications?: boolean;
+  onApply?: (job: PublicJob) => void;
 }
 
 export default function CommerceTabsPublic({
@@ -61,6 +87,9 @@ export default function CommerceTabsPublic({
   onTabChange,
   onDonate,
   onVolunteer,
+  jobs = [],
+  canReceiveApplications = false,
+  onApply,
 }: Props) {
   const [internalTab, setInternalTab] = useState<TabId>('info');
   // Si le parent pilote l'onglet, on l'utilise ; sinon état interne.
@@ -78,6 +107,14 @@ export default function CommerceTabsPublic({
     maxPhotos: 999,
   };
 
+  // Un onglet "Emploi" est proposé dès que la formule autorise les
+  // candidatures (même sans offre en cours : message d'attente).
+  const showJobsTab = canReceiveApplications;
+
+  // Règle d'affichage : un onglet de contenu reste TOUJOURS visible pour la
+  // catégorie à laquelle il appartient, même vide (il affiche alors un message
+  // d'attente). Il n'est masqué que s'il n'a aucun sens pour la catégorie
+  // (ex. "Nous soutenir" / "Nos projets" hors association).
   const tabs: { id: TabId; label: string; icon: any; locked?: boolean; reason?: string }[] = [
     { id: 'info', label: 'À propos', icon: Info },
     {
@@ -87,30 +124,23 @@ export default function CommerceTabsPublic({
       locked: !perms.canShowPhotos,
       reason: 'Photos non disponibles pour cet établissement',
     },
-    // Commerces : onglet "Services". Associations : remplacé par "Nous soutenir".
+    // Commerces : onglet "Services".
     ...(!isAssociation
       ? [{ id: 'services' as TabId, label: 'Services', icon: Gift }]
       : []),
-    // Onglet "Nous soutenir" (associations) : si des options sont activées.
-    ...(isAssociation &&
-    (commerce.support_options || []).some((o: any) => o.enabled)
-      ? [{ id: 'support' as TabId, label: 'Nous soutenir', icon: HandHeart }]
-      : []),
-    // Onglet "Nos projets" dédié (associations uniquement).
+    // --- Onglets propres aux associations : toujours présents (même vides) ---
     ...(isAssociation
-      ? [{ id: 'projects' as TabId, label: 'Nos projets', icon: Target }]
+      ? [
+          { id: 'support' as TabId, label: 'Nous soutenir', icon: HandHeart },
+          { id: 'projects' as TabId, label: 'Nos projets', icon: Target },
+          { id: 'history' as TabId, label: 'Notre histoire', icon: Clock },
+          { id: 'team' as TabId, label: 'Notre équipe', icon: Users },
+          { id: 'impact' as TabId, label: 'Notre impact', icon: BarChart3 },
+        ]
       : []),
-    // Onglet "Notre histoire" : visible si une frise est renseignée.
-    ...(commerce.history && commerce.history.length > 0
-      ? [{ id: 'history' as TabId, label: 'Notre histoire', icon: Clock }]
-      : []),
-    // Onglet "Notre équipe" : visible si des membres publics sont renseignés.
-    ...(commerce.public_team && commerce.public_team.length > 0
-      ? [{ id: 'team' as TabId, label: 'Notre équipe', icon: Users }]
-      : []),
-    // Onglet "Notre impact" : visible si l'association a renseigné des chiffres.
-    ...(commerce.impact && commerce.impact.length > 0
-      ? [{ id: 'impact' as TabId, label: 'Notre impact', icon: BarChart3 }]
+    // Emploi : commun, visible si la formule autorise les candidatures.
+    ...(showJobsTab
+      ? [{ id: 'jobs' as TabId, label: 'Emploi', icon: Briefcase }]
       : []),
     { id: 'reviews', label: 'Avis', icon: Star },
   ];
@@ -276,11 +306,11 @@ export default function CommerceTabsPublic({
                   ))}
               </div>
             ) : (
-              <div className="text-center py-8 text-sm text-gris-texte">
-                {isAssociation
-                  ? 'Aucune action renseignée pour le moment.'
-                  : 'Aucun service renseigné pour le moment.'}
-              </div>
+              <EmptyState
+                icon={<Gift size={34} />}
+                title="Aucun service n'est encore renseigné."
+                sub="Cette section sera complétée prochainement."
+              />
             )}
           </>
         )}
@@ -296,15 +326,30 @@ export default function CommerceTabsPublic({
 
         {/* Onglet Nous soutenir */}
         {tab === 'support' && (
-          <SupportSection
-            options={commerce.support_options || []}
-            onDonate={onDonate}
-            onVolunteer={onVolunteer}
-          />
+          (commerce.support_options || []).some((o: any) => o.enabled) ? (
+            <SupportSection
+              options={commerce.support_options || []}
+              onDonate={onDonate}
+              onVolunteer={onVolunteer}
+            />
+          ) : (
+            <EmptyState
+              icon={<HandHeart size={34} />}
+              title="Aucune façon de soutenir n'est encore proposée."
+              sub="Cette section sera complétée prochainement."
+            />
+          )
         )}
 
         {/* Onglet Notre histoire */}
         {tab === 'history' && (
+          !commerce.history || commerce.history.length === 0 ? (
+            <EmptyState
+              icon={<Clock size={34} />}
+              title="L'association n'a pas encore partagé son histoire."
+              sub="Cette section sera complétée prochainement."
+            />
+          ) : (
           <div className="relative">
             {(commerce.history || []).map((h: any, i: number) => (
               <div key={i} className="flex gap-4 pb-6 relative">
@@ -321,10 +366,18 @@ export default function CommerceTabsPublic({
               </div>
             ))}
           </div>
+          )
         )}
 
         {/* Onglet Notre équipe */}
         {tab === 'team' && (
+          !commerce.public_team || commerce.public_team.length === 0 ? (
+            <EmptyState
+              icon={<Users size={34} />}
+              title="L'équipe n'est pas encore présentée."
+              sub="Cette section sera complétée prochainement."
+            />
+          ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-5">
             {(commerce.public_team || []).map((m: any, i: number) => (
               <div key={i} className="text-center">
@@ -344,6 +397,7 @@ export default function CommerceTabsPublic({
               </div>
             ))}
           </div>
+          )
         )}
 
         {/* Onglet Notre impact */}
@@ -366,11 +420,55 @@ export default function CommerceTabsPublic({
                 ))}
               </div>
             ) : (
-              <div className="text-center py-8 text-sm text-gris-texte">
-                Aucun chiffre d&apos;impact renseigné pour le moment.
-              </div>
+              <EmptyState
+                icon={<BarChart3 size={34} />}
+                title="Aucun chiffre d'impact n'est encore renseigné."
+                sub="Cette section sera complétée prochainement."
+              />
             )}
           </>
+        )}
+
+        {/* Onglet Emploi */}
+        {tab === 'jobs' && (
+          jobs.length === 0 ? (
+            <EmptyState
+              icon={<Briefcase size={34} />}
+              title="Aucune offre d'emploi pour le moment."
+              sub="Revenez bientôt, de nouvelles offres peuvent être publiées."
+            />
+          ) : (
+            <div className="space-y-3">
+              {jobs.map((j) => (
+                <div
+                  key={j.id}
+                  className="border border-gris-ligne rounded-xl p-4 flex items-start justify-between gap-4"
+                >
+                  <div className="min-w-0">
+                    <div className="font-bold text-marine">{j.title}</div>
+                    <div className="flex flex-wrap gap-2 mt-1 text-xs text-gris-doux">
+                      {j.contract_type && (
+                        <span className="bg-gris-fond px-2 py-0.5 rounded">{j.contract_type}</span>
+                      )}
+                      {j.location && <span>📍 {j.location}</span>}
+                      {j.salary && <span>💰 {j.salary}</span>}
+                    </div>
+                    {j.description && (
+                      <p className="text-sm text-gris-texte mt-2">{j.description}</p>
+                    )}
+                  </div>
+                  {onApply && (
+                    <button
+                      onClick={() => onApply(j)}
+                      className="shrink-0 bg-marine text-white font-bold text-sm px-4 py-2 rounded-full hover:bg-marine-dark transition-colors"
+                    >
+                      Postuler
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )
         )}
 
         {/* Onglet Avis */}

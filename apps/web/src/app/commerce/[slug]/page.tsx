@@ -272,37 +272,8 @@ export default function CommercePage() {
             )}
 
             {/* Recrutement (si la formule permet les candidatures et qu'il y a des offres) */}
-            {permissions.canReceiveApplications && jobs.length > 0 && (
-              <div className="mb-6 space-y-3">
-                <h2 className="text-lg font-extrabold text-marine flex items-center gap-2">
-                  💼 Cet établissement recrute
-                </h2>
-                {jobs.map((j) => (
-                  <div
-                    key={j.id}
-                    className="border border-gris-ligne rounded-xl p-4 flex items-start justify-between gap-4"
-                  >
-                    <div>
-                      <div className="font-bold text-marine">{j.title}</div>
-                      <div className="flex flex-wrap gap-2 mt-1 text-xs text-gris-doux">
-                        {j.contract_type && <span className="bg-gris-fond px-2 py-0.5 rounded">{j.contract_type}</span>}
-                        {j.location && <span>📍 {j.location}</span>}
-                        {j.salary && <span>💰 {j.salary}</span>}
-                      </div>
-                      {j.description && (
-                        <p className="text-sm text-gris-texte mt-2">{j.description}</p>
-                      )}
-                    </div>
-                    <button
-                      onClick={() => setApplyTo(j)}
-                      className="shrink-0 bg-marine text-white font-bold text-sm px-4 py-2 rounded-full hover:bg-marine-dark transition-colors"
-                    >
-                      Postuler
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
+            {/* Les offres d'emploi sont désormais présentées dans l'onglet
+                "Emploi" de CommerceTabsPublic (avec message d'attente si vide). */}
 
             <CommerceTabsPublic
               commerce={{
@@ -316,6 +287,9 @@ export default function CommercePage() {
               onTabChange={setActiveTab}
               onDonate={() => openSupport('donate')}
               onVolunteer={() => openSupport('volunteer')}
+              jobs={jobs}
+              canReceiveApplications={permissions.canReceiveApplications}
+              onApply={(j) => setApplyTo(j as JobOffer)}
             />
           </div>
 
