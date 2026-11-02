@@ -153,7 +153,12 @@ export default function CommercePage() {
   const isAssociation = commerce.type === 'association';
   // `permissions` vient de la base (state), avec fallback en dur au premier rendu.
 
-  const visiblePhotos = permissions.canShowPhotos ? commerce.gallery : [];
+  // La galerie publique respecte la limite `maxPhotos` de la formule
+  // (0 ou non défini = pas de limite effective → on garde tout).
+  const photoLimit = permissions.maxPhotos ?? 0;
+  const visiblePhotos = permissions.canShowPhotos
+    ? (photoLimit > 0 ? (commerce.gallery || []).slice(0, photoLimit) : (commerce.gallery || []))
+    : [];
   const heroImage = permissions.canShowPhotos && commerce.image
     ? commerce.image
     : 'https://images.unsplash.com/photo-1497486751825-1233686d5d80?q=85&w=1600&auto=format&fit=crop';
