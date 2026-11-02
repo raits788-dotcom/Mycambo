@@ -235,21 +235,46 @@ export default function PlansPage() {
                         : `${v?.max_businesses ?? plan.max_businesses} établissement${(v?.max_businesses ?? plan.max_businesses) > 1 ? 's' : ''}`}
                     </div>
 
-                    <ul className="space-y-1.5 mb-5 min-h-[100px]">
-                      {(plan.features_details || []).length === 0 ? (
-                        <li className="text-xs text-gris-doux italic">Aucune fonctionnalité</li>
-                      ) : plan.features_details.slice(0, 5).map((f: any) => (
-                        <li key={f.id} className="flex items-start gap-2 text-xs text-gris-texte">
-                          <Check size={12} className="text-green-600 flex-shrink-0 mt-0.5" />
-                          {f.label}
-                        </li>
-                      ))}
-                      {(plan.features_details || []).length > 5 && (
-                        <li className="text-xs text-gris-doux italic pl-5">
-                          +{plan.features_details.length - 5} autres
-                        </li>
-                      )}
-                    </ul>
+                    {(() => {
+                      // Options réellement activées pour cette formule, lues depuis
+                      // ses permissions (source de vérité) + le catalogue d'options.
+                      const perms = (v?.permissions || plan.permissions || {}) as Record<string, any>;
+                      const activeOpts = options
+                        .filter((o) => {
+                          const val = perms[o.permission_key];
+                          if (o.control_type === 'toggle') return val === true;
+                          if (o.control_type === 'number') return Number(val) > 0;
+                          if (o.control_type === 'select') return val && val !== 'none';
+                          return false;
+                        })
+                        .map((o) => {
+                          const val = perms[o.permission_key];
+                          let suffix = '';
+                          if (o.control_type === 'number') suffix = ` (${val}${o.unit ? ' ' + o.unit : ''})`;
+                          else if (o.control_type === 'select') {
+                            const choice = o.options.find((c) => c.value === val);
+                            suffix = choice ? ` — ${choice.label}` : '';
+                          }
+                          return { id: o.id, label: o.label + suffix, emoji: o.emoji };
+                        });
+                      return (
+                        <ul className="space-y-1.5 mb-5 min-h-[100px]">
+                          {activeOpts.length === 0 ? (
+                            <li className="text-xs text-gris-doux italic">Aucune option activée</li>
+                          ) : activeOpts.slice(0, 6).map((o) => (
+                            <li key={o.id} className="flex items-start gap-2 text-xs text-gris-texte">
+                              <Check size={12} className="text-green-600 flex-shrink-0 mt-0.5" />
+                              <span>{o.emoji ? o.emoji + ' ' : ''}{o.label}</span>
+                            </li>
+                          ))}
+                          {activeOpts.length > 6 && (
+                            <li className="text-xs text-gris-doux italic pl-5">
+                              +{activeOpts.length - 6} autres
+                            </li>
+                          )}
+                        </ul>
+                      );
+                    })()}
 
                     <div className="flex items-center gap-2 pt-4 border-t border-gris-ligne">
                       <button
