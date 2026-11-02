@@ -166,6 +166,50 @@ serve(async (req) => {
         return json({ ok: true }, 200);
       }
 
+      // -------- UPLOAD PHOTO --------
+      // Reçoit un fichier encodé en base64 et l'upload dans le bucket avec le
+      // service_role (contourne la RLS storage bloquante en impersonation).
+      // payload : { business_id?, folder?, filename, content_type, data_base64 }
+      case "photo_upload": {
+        const bizId = p.business_id || (await mainBusinessId());
+        if (!bizId) return json({ error: "FICHE_INTROUVABLE" }, 404);
+        // Vérifie que le business appartient bien au tenant du token.
+        const { data: biz } = await admin
+          .from("businesses")
+          .select("id")
+          .eq("id", bizId)
+          .eq("tenant_id", tenantId)
+          .maybeSingle();
+        if (!biz) return json({ error: "HORS_TENANT" }, 404);
+
+        const b64 = String(p.data_base64 || "");
+        if (!b64) return json({ error: "FICHIER_MANQUANT" }, 400);
+        // base64 -> Uint8Array
+        const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+        if (bytes.byteLength > 5 * 1024 * 1024) {
+          return json({ error: "FICHIER_TROP_GROS" }, 400);
+        }
+        const ext = String(p.filename || "photo.jpg").split(".").pop() || "jpg";
+        const folder = String(p.folder || "misc");
+        const path = `${bizId}/${folder}/${Date.now()}-${Math.random()
+          .toString(36)
+          .substring(2, 8)}.${ext}`;
+
+        const { error: upErr } = await admin.storage
+          .from("business-photos")
+          .upload(path, bytes, {
+            cacheControl: "3600",
+            upsert: false,
+            contentType: String(p.content_type || "image/jpeg"),
+          });
+        if (upErr) return json({ error: upErr.message }, 500);
+
+        const { data: pub } = admin.storage
+          .from("business-photos")
+          .getPublicUrl(path);
+        return json({ ok: true, url: pub.publicUrl }, 200);
+      }
+
       // -------- ÉQUIPE --------
       case "team_list": {
         const { data: members } = await admin

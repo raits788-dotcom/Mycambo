@@ -6,6 +6,21 @@
 // l'appelant affiche un message clair.
 // ============================================================================
 import { createBrowserClient } from '@supabase/ssr';
+import { isImpersonatingNow, impersonateAction } from '@/lib/impersonate-action';
+
+// Convertit un File en base64 (sans le préfixe data:).
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const res = String(reader.result || '');
+      const comma = res.indexOf(',');
+      resolve(comma >= 0 ? res.slice(comma + 1) : res);
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
 
 export async function uploadPhoto(
   businessId: string,
@@ -15,6 +30,21 @@ export async function uploadPhoto(
   if (file.size > 5 * 1024 * 1024) {
     throw new Error('La photo ne doit pas dépasser 5 Mo.');
   }
+
+  // En impersonation (superadmin), la RLS du storage bloque l'upload direct :
+  // on passe par l'Edge Function (service_role).
+  if (isImpersonatingNow()) {
+    const data_base64 = await fileToBase64(file);
+    const out = await impersonateAction('photo_upload', {
+      business_id: businessId,
+      folder,
+      filename: file.name,
+      content_type: file.type || 'image/jpeg',
+      data_base64,
+    });
+    return out.url as string;
+  }
+
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!

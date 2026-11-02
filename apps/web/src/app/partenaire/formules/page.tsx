@@ -150,11 +150,7 @@ export default function FormulesPubliquesPage() {
                   </ul>
 
                   <Link
-                    href={
-                      isFree
-                        ? `/inscription?plan=${plan.id}`
-                        : `/inscription?plan=${plan.id}`
-                    }
+                    href={`/partenaire/demande?plan=${plan.id}`}
                     className={
                       'block text-center text-sm font-bold py-3 rounded-full transition-colors ' +
                       (isPopular
@@ -180,7 +176,7 @@ export default function FormulesPubliquesPage() {
             -10% sur votre prochaine facture dès 3 filleuls, jusqu&apos;à 1 an offert avec le badge Ambassadeur Gold.
           </p>
           <Link
-            href="/inscription"
+            href="/partenaire/demande"
             className="inline-block bg-white text-purple-700 font-bold text-sm px-6 py-2.5 rounded-full hover:bg-white/90"
           >
             Créer un compte

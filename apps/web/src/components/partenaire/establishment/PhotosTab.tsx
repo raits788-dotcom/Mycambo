@@ -9,6 +9,7 @@ import Link from 'next/link';
 import type { StoredEstablishment } from '@/lib/establishment-storage';
 import { updateEstablishment } from '@/lib/establishment-storage';
 import { getPlanPermissionsFromDB } from '@/lib/plan-permissions';
+import { uploadPhoto } from '@/lib/upload-photo';
 
 interface PhotosTabProps {
   establishment: StoredEstablishment;
@@ -58,28 +59,14 @@ export default function PhotosTab({ establishment, onUpdate }: PhotosTabProps) {
   const remaining = Math.max(0, limit - photos.length);
 
   const uploadFile = async (file: File): Promise<string | null> => {
-    const supabase = createBrowserClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    );
-
-    const ext = file.name.split('.').pop() || 'jpg';
-    const filename = `${establishment.id}/${Date.now()}-${Math.random().toString(36).substring(2, 8)}.${ext}`;
-
-    const { error: uploadErr } = await supabase.storage
-      .from('business-photos')
-      .upload(filename, file, { cacheControl: '3600', upsert: false });
-
-    if (uploadErr) {
-      console.error('upload error:', uploadErr);
+    // Passe par le helper commun : il route via l'Edge Function en
+    // impersonation (sinon upload direct, couvert par la RLS).
+    try {
+      return await uploadPhoto(establishment.id, file, 'gallery');
+    } catch (e) {
+      console.error('upload error:', e);
       return null;
     }
-
-    const { data: { publicUrl } } = supabase.storage
-      .from('business-photos')
-      .getPublicUrl(filename);
-
-    return publicUrl;
   };
 
   const handleAdd = async (file: File) => {
