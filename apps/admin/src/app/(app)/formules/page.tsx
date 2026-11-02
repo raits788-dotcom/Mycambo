@@ -3,15 +3,17 @@
 import { useState, useEffect } from 'react';
 import {
   Package, Check, Loader2, Plus, Edit3, Trash2, ListChecks, Power,
-  Building2, Heart,
+  Building2, Heart, SlidersHorizontal, Lock,
 } from 'lucide-react';
 import {
   getPlansByAudience, deletePlan, updatePlan,
   getPlanFeatures, createPlanFeature, updatePlanFeature, deletePlanFeature,
+  getPlanOptionCatalog, deletePlanOption, type PlanOption,
 } from '@/lib/services';
 import PlanVersionModal from '@/components/PlanVersionModal';
+import PlanOptionModal from '@/components/PlanOptionModal';
 
-type TabId = 'plans' | 'features';
+type TabId = 'plans' | 'features' | 'options';
 type Audience = 'business' | 'association';
 
 export default function PlansPage() {
@@ -24,16 +26,32 @@ export default function PlansPage() {
   const [editingPlan, setEditingPlan] = useState<any>(null);
   const [showFeatureModal, setShowFeatureModal] = useState(false);
   const [editingFeature, setEditingFeature] = useState<any>(null);
+  const [options, setOptions] = useState<PlanOption[]>([]);
+  const [showOptionModal, setShowOptionModal] = useState(false);
+  const [editingOption, setEditingOption] = useState<PlanOption | null>(null);
 
   const reload = async () => {
     setLoading(true);
-    const [p, f] = await Promise.all([
+    const [p, f, o] = await Promise.all([
       getPlansByAudience(audience),
       getPlanFeatures(),
+      getPlanOptionCatalog(),
     ]);
     setPlans(p);
     setFeatures(f);
+    setOptions(o);
     setLoading(false);
+  };
+
+  const handleDeleteOption = async (opt: PlanOption) => {
+    if (opt.is_system) return;
+    if (!confirm(`Supprimer l'option "${opt.label}" du catalogue ?`)) return;
+    try {
+      await deletePlanOption(opt.id);
+      await reload();
+    } catch (err) {
+      alert('Erreur : ' + (err as Error).message);
+    }
   };
 
   useEffect(() => { reload(); }, [audience]);
@@ -102,6 +120,15 @@ export default function PlansPage() {
           }
         >
           <ListChecks size={14} /> Catalogue fonctionnalités
+        </button>
+        <button
+          onClick={() => setTab('options')}
+          className={
+            'flex items-center gap-2 px-4 py-2.5 text-sm font-bold border-b-2 ' +
+            (tab === 'options' ? 'border-marine text-marine' : 'border-transparent text-gris-texte')
+          }
+        >
+          <SlidersHorizontal size={14} /> Options réglables
         </button>
       </div>
 
@@ -340,6 +367,84 @@ export default function PlansPage() {
         </>
       )}
 
+      {/* Onglet Options réglables */}
+      {tab === 'options' && (
+        <>
+          <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
+            <p className="text-sm text-gris-texte max-w-xl">
+              Les options que l&apos;on peut activer et régler dans chaque formule.
+              Ajoutez-en de nouvelles ici : elles apparaîtront automatiquement dans
+              l&apos;éditeur de formule.
+            </p>
+            <button
+              onClick={() => { setEditingOption(null); setShowOptionModal(true); }}
+              className="flex items-center gap-2 bg-marine text-white font-bold text-sm px-4 py-2.5 rounded-full hover:bg-marine-dark"
+            >
+              <Plus size={14} /> Ajouter une option
+            </button>
+          </div>
+
+          <div className="bg-white rounded-xl border border-gris-ligne overflow-hidden">
+            {loading ? (
+              <div className="p-12 text-center"><Loader2 size={22} className="animate-spin text-marine mx-auto" /></div>
+            ) : (
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-[10px] uppercase tracking-wider text-gris-doux bg-gris-fond">
+                    <th className="px-4 py-3">Option</th>
+                    <th className="px-4 py-3">Groupe</th>
+                    <th className="px-4 py-3">Type</th>
+                    <th className="px-4 py-3">Clé permission</th>
+                    <th className="px-4 py-3 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gris-ligne">
+                  {options.map((o) => (
+                    <tr key={o.id}>
+                      <td className="px-4 py-3">
+                        <div className="font-bold text-marine">{o.emoji} {o.label}</div>
+                        {o.description && <div className="text-xs text-gris-doux">{o.description}</div>}
+                      </td>
+                      <td className="px-4 py-3 text-gris-texte">{o.group_label}</td>
+                      <td className="px-4 py-3">
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-gris-fond text-gris-texte">
+                          {o.control_type === 'toggle' ? 'oui/non' : o.control_type === 'number' ? 'nombre' : 'menu'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 font-mono text-xs text-gris-texte">{o.permission_key}</td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center justify-end gap-1">
+                          <button
+                            onClick={() => { setEditingOption(o); setShowOptionModal(true); }}
+                            className="w-8 h-8 rounded-lg flex items-center justify-center text-marine hover:bg-marine/10"
+                            title="Modifier"
+                          >
+                            <Edit3 size={14} />
+                          </button>
+                          {o.is_system ? (
+                            <span className="w-8 h-8 rounded-lg flex items-center justify-center text-gris-doux" title="Option système (non supprimable)">
+                              <Lock size={13} />
+                            </span>
+                          ) : (
+                            <button
+                              onClick={() => handleDeleteOption(o)}
+                              className="w-8 h-8 rounded-lg flex items-center justify-center text-red-500 hover:bg-red-100"
+                              title="Supprimer"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </>
+      )}
+
       {showCreate && (
         <PlanVersionModal
           audience={audience}
@@ -360,6 +465,14 @@ export default function PlansPage() {
         <FeatureEditModal
           feature={editingFeature}
           onClose={() => { setShowFeatureModal(false); setEditingFeature(null); }}
+          onSaved={reload}
+        />
+      )}
+
+      {showOptionModal && (
+        <PlanOptionModal
+          option={editingOption}
+          onClose={() => { setShowOptionModal(false); setEditingOption(null); }}
           onSaved={reload}
         />
       )}

@@ -20,6 +20,9 @@ export interface PlanPermissions {
   canReceiveReservations: boolean;  // réservation hôtel / restaurant
   canPublishOffers: boolean;        // offres du moment visibles
   canReceiveApplications: boolean;  // candidatures emploi / bénévolat
+  // Options additionnelles pilotées par le catalogue (0028).
+  canShowVideo?: boolean;           // vidéo de présentation (lien YouTube/Vimeo)
+  statsLevel?: 'none' | 'basic' | 'detailed'; // niveau de statistiques
 }
 
 // Valeurs d'interaction par défaut selon qu'une formule est "active" ou "bridée".
@@ -125,14 +128,23 @@ export function getPlanPermissions(planSlug: string | null | undefined): PlanPer
 import { createBrowserClient } from '@supabase/ssr';
 
 // Cache mémoire léger pour éviter de requêter à chaque fiche.
+// TTL court : les changements de formule (console superadmin) apparaissent
+// sans hard-refresh au bout de ce délai.
 let _cache: Record<string, PlanPermissions> | null = null;
+let _cacheAt = 0;
+const CACHE_TTL_MS = 60_000; // 1 minute
 
 export async function getPlanPermissionsFromDB(
   planSlug: string | null | undefined
 ): Promise<PlanPermissions> {
   const slug = (planSlug || 'decouverte') as PlanSlug;
 
+  if (_cache && Date.now() - _cacheAt > CACHE_TTL_MS) {
+    _cache = null; // expiré
+  }
+
   if (!_cache) {
+    _cacheAt = Date.now();
     try {
       const sb = createBrowserClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
