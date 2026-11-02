@@ -556,29 +556,134 @@ export async function createPlanWithVersion(payload: {
   return plan.id;
 }
 
+// ============================================================================
+// CATALOGUE D'OPTIONS DE FORMULE (éditable superadmin)
+// ============================================================================
+export type PlanOption = {
+  id: string;
+  code: string;
+  label: string;
+  description: string | null;
+  emoji: string | null;
+  group_label: string;
+  permission_key: string;
+  control_type: 'toggle' | 'number' | 'select';
+  unit: string | null;
+  options: { value: string; label: string }[];
+  default_value: any;
+  min_value: number | null;
+  max_value: number | null;
+  linked_toggle: string | null;
+  is_system: boolean;
+  is_active: boolean;
+  position: number;
+};
+
+export async function getPlanOptionCatalog(): Promise<PlanOption[]> {
+  const supabase = getSupabase();
+  const { data, error } = await supabase
+    .from('plan_option_catalog')
+    .select('*')
+    .eq('is_active', true)
+    .order('position', { ascending: true });
+  if (error) { console.error('getPlanOptionCatalog:', error); return []; }
+  return (data || []) as PlanOption[];
+}
+
+export async function createPlanOption(payload: {
+  code: string; label: string; description?: string; emoji?: string;
+  group_label: string; permission_key: string;
+  control_type: 'toggle' | 'number' | 'select';
+  unit?: string; options?: { value: string; label: string }[];
+  default_value?: any; min_value?: number | null; max_value?: number | null;
+  linked_toggle?: string | null; position?: number;
+}) {
+  const supabase = getSupabase();
+  const { data, error } = await supabase.from('plan_option_catalog').insert({
+    code: payload.code,
+    label: payload.label,
+    description: payload.description || null,
+    emoji: payload.emoji || null,
+    group_label: payload.group_label,
+    permission_key: payload.permission_key,
+    control_type: payload.control_type,
+    unit: payload.unit || null,
+    options: payload.options || [],
+    default_value: payload.default_value ?? null,
+    min_value: payload.min_value ?? null,
+    max_value: payload.max_value ?? null,
+    linked_toggle: payload.linked_toggle || null,
+    is_system: false,
+    position: payload.position ?? 90,
+  }).select().single();
+  if (error) throw error;
+  return data;
+}
+
+export async function updatePlanOption(id: string, payload: Partial<{
+  label: string; description: string; emoji: string; group_label: string;
+  unit: string; options: { value: string; label: string }[]; default_value: any;
+  min_value: number | null; max_value: number | null; is_active: boolean;
+  position: number;
+}>) {
+  const supabase = getSupabase();
+  const { error } = await supabase.from('plan_option_catalog').update(payload).eq('id', id);
+  if (error) throw error;
+}
+
+export async function deletePlanOption(id: string) {
+  const supabase = getSupabase();
+  // Les options système ne sont pas supprimables (protégées côté UI aussi).
+  const { error } = await supabase
+    .from('plan_option_catalog')
+    .delete()
+    .eq('id', id)
+    .eq('is_system', false);
+  if (error) throw error;
+}
+
 // Publie une nouvelle version de formule via la fonction SQL migrée
 // publish_plan_version : archive l'ancienne "current", crée la nouvelle.
 // Les abonnements en cours gardent leur version (plan_version_id figé).
+// Les permissions sont désormais CALCULÉES par la modale (à partir du
+// catalogue d'options) et transmises explicitement — plus de recopie figée.
 export async function createNewPlanVersion(payload: {
   plan_id: string; price_monthly: number; price_yearly: number | null;
-  max_businesses: number; trial_days: number; feature_ids: string[];
+  max_businesses: number; trial_days: number;
+  permissions: Record<string, unknown>; features: unknown[];
   notes?: string;
 }) {
   const supabase = getSupabase();
-  // Récupérer les permissions actuelles de la formule pour les transmettre
-  const { data: plan } = await supabase
-    .from('plans')
-    .select('permissions, features')
-    .eq('id', payload.plan_id)
-    .maybeSingle();
-
   const { data, error } = await supabase.rpc('publish_plan_version', {
     p_plan_id: payload.plan_id,
     p_price_monthly: payload.price_monthly,
     p_price_yearly: payload.price_yearly,
     p_max_businesses: payload.max_businesses,
-    p_permissions: plan?.permissions ?? {},
-    p_features: plan?.features ?? [],
+    p_permissions: payload.permissions,
+    p_features: payload.features,
+  });
+  if (error) throw error;
+  if (data && (data as any).ok === false) throw new Error((data as any).error);
+  return (data as any)?.version_id as string;
+}
+
+// update_current_plan_version : corrige la version COURANTE en place (bouton
+// "Modifier"), avec option de propager aux abonnements qui la partagent.
+export async function updateCurrentPlanVersion(payload: {
+  plan_id: string; price_monthly: number; price_yearly: number | null;
+  max_businesses: number;
+  permissions: Record<string, unknown>; features: unknown[];
+  apply_existing: boolean;
+}) {
+  const supabase = getSupabase();
+  const { data, error } = await supabase.rpc('update_current_plan_version', {
+    p_plan_id: payload.plan_id,
+    p_price_monthly: payload.price_monthly,
+    p_price_yearly: payload.price_yearly,
+    p_max_businesses: payload.max_businesses,
+    p_permissions: payload.permissions,
+    p_features: payload.features,
+    p_apply_existing: payload.apply_existing,
   });
   if (error) throw error;
   if (data && (data as any).ok === false) throw new Error((data as any).error);
