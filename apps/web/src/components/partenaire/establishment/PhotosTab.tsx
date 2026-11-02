@@ -8,6 +8,7 @@ import { createBrowserClient } from '@supabase/ssr';
 import Link from 'next/link';
 import type { StoredEstablishment } from '@/lib/establishment-storage';
 import { updateEstablishment } from '@/lib/establishment-storage';
+import { getPlanPermissionsFromDB } from '@/lib/plan-permissions';
 
 interface PhotosTabProps {
   establishment: StoredEstablishment;
@@ -43,7 +44,10 @@ export default function PhotosTab({ establishment, onUpdate }: PhotosTabProps) {
       if (plan) {
         setPlanSlug(plan.slug);
         setPlanName(plan.name);
-        setMaxPhotos(plan.slug === 'decouverte' ? 0 : plan.slug === 'essentiel' ? 20 : 999);
+        // Lit la vraie limite depuis les permissions de la formule (base),
+        // au lieu de valeurs en dur. 0 = verrouillé (Découverte).
+        const perms = await getPlanPermissionsFromDB(plan.slug);
+        setMaxPhotos(perms.maxPhotos ?? 0);
       }
       setLoadingPlan(false);
     })();

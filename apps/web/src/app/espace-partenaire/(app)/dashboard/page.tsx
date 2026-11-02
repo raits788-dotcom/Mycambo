@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Eye, Star, Inbox, ArrowRight, Loader2, Bell } from 'lucide-react';
 import { getImpersonatedTenant } from '@/lib/impersonation';
 import { PlanUpgradeBanner } from '@/components/partenaire/PlanUpgradeBanner';
+import { getPlanPermissionsFromDB } from '@/lib/plan-permissions';
 
 export default function PartnerDashboardPage() {
   const [tenant, setTenant] = useState<any>(null);
@@ -65,10 +66,9 @@ export default function PartnerDashboardPage() {
         if (plan) {
           setPlanName(plan.name);
           setMaxEstablishments(plan.max_businesses);
-          // Photos max selon formule
-          if (plan.slug === 'decouverte') setMaxPhotos(0);
-          else if (plan.slug === 'essentiel') setMaxPhotos(20);
-          else setMaxPhotos(999);
+          // Photos max : vraie limite depuis les permissions de la formule (base).
+          const perms = await getPlanPermissionsFromDB(plan.slug);
+          setMaxPhotos(perms.maxPhotos ?? 0);
         }
       }
       
