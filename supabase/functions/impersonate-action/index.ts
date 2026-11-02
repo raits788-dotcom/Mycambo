@@ -82,6 +82,24 @@ serve(async (req) => {
       return data?.id ?? null;
     }
 
+    // Un projet appartient au tenant courant si son business appartient au
+    // tenant — indépendamment du tenant_id (parfois NULL sur les imports).
+    async function projectBelongsToTenant(projectId: string): Promise<boolean> {
+      const { data: proj } = await admin
+        .from("association_projects")
+        .select("business_id")
+        .eq("id", projectId)
+        .maybeSingle();
+      if (!proj?.business_id) return false;
+      const { data: biz } = await admin
+        .from("businesses")
+        .select("id")
+        .eq("id", proj.business_id)
+        .eq("tenant_id", tenantId)
+        .maybeSingle();
+      return !!biz;
+    }
+
     switch (op) {
       // -------- PARRAINAGE --------
       case "referral_get": {
@@ -121,22 +139,29 @@ serve(async (req) => {
         return json({ ok: true }, 200);
       }
       case "project_update": {
-        const { data, error } = await admin
+        // Vérifie l'appartenance via le business du tenant (robuste même si
+        // le projet a tenant_id NULL — cas des imports SQL).
+        if (!(await projectBelongsToTenant(p.id))) {
+          return json({ error: "HORS_TENANT" }, 404);
+        }
+        const fields = { ...(p.fields || {}) };
+        // On en profite pour recoller le tenant_id s'il manquait.
+        fields.tenant_id = tenantId;
+        const { error } = await admin
           .from("association_projects")
-          .update(p.fields || {})
-          .eq("id", p.id)
-          .eq("tenant_id", tenantId)
-          .select("id");
+          .update(fields)
+          .eq("id", p.id);
         if (error) return json({ error: error.message }, 500);
-        if (!data || data.length === 0) return json({ error: "HORS_TENANT" }, 404);
         return json({ ok: true }, 200);
       }
       case "project_delete": {
+        if (!(await projectBelongsToTenant(p.id))) {
+          return json({ error: "HORS_TENANT" }, 404);
+        }
         const { error } = await admin
           .from("association_projects")
           .delete()
-          .eq("id", p.id)
-          .eq("tenant_id", tenantId);
+          .eq("id", p.id);
         if (error) return json({ error: error.message }, 500);
         return json({ ok: true }, 200);
       }
