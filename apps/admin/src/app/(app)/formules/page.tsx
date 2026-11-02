@@ -256,7 +256,7 @@ export default function PlansPage() {
                         onClick={() => setEditingPlan(plan)}
                         className="flex-1 text-xs font-bold py-2 rounded-lg bg-marine text-white hover:bg-marine-dark flex items-center justify-center gap-1"
                       >
-                        <Edit3 size={12} /> Nouvelle version
+                        <Edit3 size={12} /> Modifier
                       </button>
                       <button
                         onClick={() => handleTogglePlan(plan)}

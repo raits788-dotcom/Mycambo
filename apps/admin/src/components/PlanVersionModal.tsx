@@ -14,9 +14,12 @@ import {
 // valeurs réglées pour chaque option du catalogue.
 function buildPermissions(
   catalog: PlanOption[],
-  values: Record<string, any>
+  values: Record<string, any>,
+  base: Record<string, any> = {}
 ): Record<string, unknown> {
-  const perms: Record<string, unknown> = {};
+  // On part des permissions existantes pour ne JAMAIS perdre une clé qui ne
+  // serait pas (encore) dans le catalogue, puis on écrase celles réglées ici.
+  const perms: Record<string, unknown> = { ...base };
   for (const opt of catalog) {
     const v = values[opt.code];
     perms[opt.permission_key] = v;
@@ -89,7 +92,7 @@ export default function PlanVersionModal({
     setSaving(true);
     setError('');
     try {
-      const permissions = buildPermissions(catalog, values);
+      const permissions = buildPermissions(catalog, values, currentPerms);
       if (!isEdit) {
         const newPlanId = await createPlanWithVersion({
           name: form.name,
