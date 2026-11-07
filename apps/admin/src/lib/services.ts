@@ -99,6 +99,28 @@ export async function getPlans() {
 // ============================================================================
 // SUBSCRIPTIONS
 // ============================================================================
+// Envoie manuellement les emails de relance de renouvellement (bouton admin).
+// mode:"manual" force l'envoi même si le flag renewal_emails_enabled est off.
+export async function sendRenewalReminders(): Promise<{ sent: number; candidates: number; errors?: string[] }> {
+  const supabase = getSupabase();
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) throw new Error('NOT_AUTHENTICATED');
+  const res = await fetch(
+    `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/send-renewal-reminders`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${session.access_token}`,
+      },
+      body: JSON.stringify({ mode: 'manual' }),
+    }
+  );
+  const out = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(out?.error || 'Échec envoi relances');
+  return { sent: out.sent || 0, candidates: out.candidates || 0, errors: out.errors };
+}
+
 export async function getSubscriptions() {
   const supabase = getSupabase();
   const { data, error } = await supabase

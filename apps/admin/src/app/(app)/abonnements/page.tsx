@@ -6,7 +6,8 @@ import {
   TrendingUp, TrendingDown, CreditCard, Users, Download, Eye,
   CalendarPlus, XCircle, RefreshCw, Building2, AlertCircle, Loader2,
 } from 'lucide-react';
-import { getSubscriptions } from '@/lib/services';
+import { getSubscriptions, sendRenewalReminders } from '@/lib/services';
+import { Mail } from 'lucide-react';
 
 const STATUS_STYLES: Record<string, string> = {
   active: 'bg-green-100 text-green-700',
@@ -27,6 +28,21 @@ export default function SubscriptionsPage() {
   const [subs, setSubs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [sendingReminders, setSendingReminders] = useState(false);
+
+  const handleSendReminders = async () => {
+    if (!confirm('Envoyer les emails de relance de renouvellement aux abonnements qui expirent sous 30 jours ?')) return;
+    setSendingReminders(true);
+    try {
+      const r = await sendRenewalReminders();
+      alert(`Relances envoyées : ${r.sent} / ${r.candidates} abonnement(s) concerné(s).`
+        + (r.errors && r.errors.length ? `\n\nErreurs :\n${r.errors.join('\n')}` : ''));
+    } catch (e) {
+      alert('Erreur : ' + (e as Error).message);
+    } finally {
+      setSendingReminders(false);
+    }
+  };
 
   useEffect(() => {
     (async () => {
@@ -52,10 +68,21 @@ export default function SubscriptionsPage() {
           <h1 className="text-2xl md:text-3xl font-extrabold text-marine mb-1">Abonnements</h1>
           <p className="text-sm text-gris-texte">Suivi du MRR, des paiements et du CA récurrent.</p>
         </div>
-        <button className="flex items-center gap-2 border border-gris-ligne text-marine font-bold text-sm px-4 py-2.5 rounded-full hover:border-marine">
-          <Download size={14} />
-          Exporter CSV
-        </button>
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={handleSendReminders}
+            disabled={sendingReminders}
+            className="flex items-center gap-2 border border-gris-ligne text-marine font-bold text-sm px-4 py-2.5 rounded-full hover:border-marine disabled:opacity-50"
+            title="Envoie un email de relance (FR/EN/KH) aux abonnements expirant sous 30 jours"
+          >
+            {sendingReminders ? <Loader2 size={14} className="animate-spin" /> : <Mail size={14} />}
+            Envoyer les relances
+          </button>
+          <button className="flex items-center gap-2 border border-gris-ligne text-marine font-bold text-sm px-4 py-2.5 rounded-full hover:border-marine">
+            <Download size={14} />
+            Exporter CSV
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
