@@ -53,8 +53,10 @@ export default function EstablishmentsPage() {
   useEffect(() => { reload(); }, []);
 
   const handleStatusChange = async (id: string, newStatus: 'approved' | 'suspended') => {
-    const action = newStatus === 'approved' ? 'approuver' : 'suspendre';
-    if (!confirm(`Confirmer : ${action} cet établissement ?`)) return;
+    const action = newStatus === 'approved'
+      ? 'publier cette fiche (elle deviendra visible sur le site public)'
+      : 'suspendre cette fiche (elle ne sera plus visible)';
+    if (!confirm(`Confirmer : ${action} ?`)) return;
     setProcessing(id);
     try {
       await updateBusinessStatus(id, newStatus);
@@ -67,7 +69,7 @@ export default function EstablishmentsPage() {
   };
 
   const handleApproveAll = async () => {
-    if (!confirm('Approuver TOUS les établissements en attente ? Ils seront publiés sur le site.')) return;
+    if (!confirm('Publier TOUS les établissements en attente ? Ils deviendront visibles sur le site public.')) return;
     setProcessing('__all__');
     try {
       const n = await approveAllPending();
@@ -144,8 +146,8 @@ export default function EstablishmentsPage() {
             className="bg-green-600 text-white font-bold text-sm px-5 py-2.5 rounded-full hover:bg-green-700 disabled:opacity-50"
           >
             {processing === '__all__'
-              ? 'Validation…'
-              : 'Tout approuver (' + counts.pending + ')'}
+              ? 'Publication…'
+              : 'Tout publier (' + counts.pending + ')'}
           </button>
         )}
       </div>
@@ -251,7 +253,7 @@ export default function EstablishmentsPage() {
                           onClick={() => handleStatusChange(est.id, 'approved')}
                           disabled={processing === est.id}
                           className="w-8 h-8 rounded-lg flex items-center justify-center text-green-600 hover:bg-green-100 disabled:opacity-50"
-                          title="Approuver"
+                          title="Publier la fiche"
                         >
                           {processing === est.id ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
                         </button>

@@ -192,7 +192,7 @@ export default function TenantDetailPage({
   };
 
   const handleApprove = async () => {
-    if (!confirm(`Approuver le tenant "${tenant.name}" ?`)) return;
+    if (!confirm(`Activer le compte partenaire "${tenant.name}" ? Il pourra se connecter et gérer ses fiches (non publiées tant qu'elles ne sont pas validées).`)) return;
     setApproving(true);
     try {
       await approveTenant(tenant.id);
@@ -345,7 +345,7 @@ export default function TenantDetailPage({
                 className="flex items-center gap-2 bg-green-600 text-white font-bold text-sm px-4 py-2.5 rounded-full hover:bg-green-700 disabled:opacity-50"
               >
                 <CheckCircle2 size={14} />
-                {approving ? 'Approbation...' : 'Approuver'}
+                {approving ? 'Activation...' : 'Activer le compte'}
               </button>
             )}
 
