@@ -18,6 +18,7 @@ const SECTOR_ICON: Record<string, string> = {
   hotel: 'Hotel',
   restaurant: 'UtensilsCrossed',
   association: 'HeartHandshake',
+  'autres-commerces': 'Store',
   activite: 'Compass',
   shopping: 'ShoppingBag',
   boutique: 'ShoppingBag',
@@ -393,6 +394,7 @@ function NavItemLink({ item, pathname }: { item: any; pathname: string }) {
     if (item.href === '/rubrique/hotel' && pathname.startsWith('/rubrique/hotel')) return true;
     if (item.href === '/rubrique/restaurant' && pathname.startsWith('/rubrique/restaurant')) return true;
     if (item.href === '/rubrique/association' && pathname.startsWith('/rubrique/association')) return true;
+    if (item.href === '/rubrique/autres-commerces' && pathname.startsWith('/rubrique/autres-commerces')) return true;
     if (item.href === '/rubrique/activite' && pathname.startsWith('/rubrique/activite')) return true;
     if (item.href === '/rubrique/shopping' && pathname.startsWith('/rubrique/shopping')) return true;
     if (item.href === '/rubrique/transport' && pathname.startsWith('/rubrique/transport')) return true;

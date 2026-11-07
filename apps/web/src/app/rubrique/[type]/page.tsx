@@ -4,6 +4,8 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import FeaturedCarousel from '@/components/rubrique/FeaturedCarousel';
 import EtablissementGrid from '@/components/rubrique/EtablissementGrid';
+import CategorySubNav from '@/components/rubrique/CategorySubNav';
+import { getCategoryWithChildren } from '@/lib/categories';
 
 const SECTEURS: Record<
   string,
@@ -70,6 +72,24 @@ const SECTEURS: Record<
       'https://images.unsplash.com/photo-1528181304800-259b08848526?q=85&w=2400&auto=format&fit=crop',
     intro: 'Tuk-tuk, location, transferts et transports.',
   },
+  'autres-commerces': {
+    label: 'Autres commerces',
+    singular: 'commerce',
+    icon: '🏬',
+    color: 'bg-ic-violet',
+    image:
+      'https://images.unsplash.com/photo-1519074002996-a69e7ac46a42?q=85&w=2400&auto=format&fit=crop',
+    intro: 'Cafés, boutiques, spas, loisirs, immobilier, transport et plus.',
+  },
+};
+
+// Image/couleur de hero par défaut si la catégorie n'a pas d'entrée dans SECTEURS
+// (nouvelles sous-catégories créées en console). Le reste (label, intro) vient
+// de la base de données.
+const DEFAULT_HERO = {
+  color: 'bg-marine',
+  image:
+    'https://images.unsplash.com/photo-1519074002996-a69e7ac46a42?q=85&w=2400&auto=format&fit=crop',
 };
 
 type Props = {
@@ -79,6 +99,8 @@ type Props = {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { type } = await params;
+  const data = await getCategoryWithChildren(type);
+  if (data) return { title: data.category.name };
   const secteur = SECTEURS[type];
   if (!secteur) return { title: 'Rubrique introuvable' };
   return { title: secteur.label, description: secteur.intro };
@@ -87,16 +109,50 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function RubriquePage({ params, searchParams }: Props) {
   const { type } = await params;
   const { cat } = await searchParams;
+
+  // Catégorie + enfants depuis la base (source de vérité).
+  const data = await getCategoryWithChildren(type);
+  // Fallback visuel : images/couleurs de hero (ou défaut générique).
   const secteur = SECTEURS[type];
-  if (!secteur) notFound();
+
+  // Introuvable nulle part -> 404.
+  if (!data && !secteur) notFound();
+
+  // Libellés : la base prime, sinon SECTEURS.
+  const label = data?.category.name || secteur?.label || type;
+  const intro =
+    secteur?.intro ||
+    (data && data.children.length > 0
+      ? `Explorez nos ${label.toLowerCase()} par catégorie.`
+      : `Découvrez nos ${label.toLowerCase()}.`);
+  const heroImage = secteur?.image || DEFAULT_HERO.image;
+
+  // Rubrique parente = a des enfants. On affiche la sous-barre + on agrège.
+  const children = data?.children || [];
+  const isParent = children.length > 0;
+  const childSlugs = children.map((c) => c.slug);
+
+  // Sous-catégorie sélectionnée via ?cat= (doit appartenir au parent).
+  const selectedChild =
+    cat && childSlugs.includes(cat) ? cat : undefined;
+
+  // Slugs effectivement filtrés :
+  //  - sous-catégorie choisie -> uniquement elle
+  //  - parent sans sélection  -> tous les enfants
+  //  - feuille simple         -> le type lui-même (via typeSlug)
+  const effectiveChildSlugs = selectedChild
+    ? [selectedChild]
+    : isParent
+    ? childSlugs
+    : undefined;
 
   return (
     <>
       {/* ===== HERO ===== */}
       <section className="relative text-white overflow-hidden">
         <Image
-          src={secteur.image}
-          alt={secteur.label}
+          src={heroImage}
+          alt={label}
           fill
           priority
           className="object-cover object-center"
@@ -110,7 +166,7 @@ export default async function RubriquePage({ params, searchParams }: Props) {
               <div className="flex items-center gap-3 mb-4">
                 <span className="h-px w-8 bg-white/40" />
                 <span className="text-[11px] uppercase tracking-[0.3em] text-white/75 font-bold">
-                  {secteur.label}
+                  {label}
                 </span>
               </div>
 
@@ -118,12 +174,12 @@ export default async function RubriquePage({ params, searchParams }: Props) {
                 Les meilleurs
                 <br />
                 <span className="text-ic-or">
-                  {secteur.label.toLowerCase()}.
+                  {label.toLowerCase()}.
                 </span>
               </h1>
 
               <p className="text-sm text-white/85 leading-relaxed mb-6 max-w-sm">
-                {secteur.intro}
+                {intro}
               </p>
 
               <div className="flex flex-wrap gap-3 mb-6">
@@ -146,16 +202,27 @@ export default async function RubriquePage({ params, searchParams }: Props) {
             </div>
 
             <div className="min-w-0">
-              <FeaturedCarousel type={type} />
+              <FeaturedCarousel type={type} childSlugs={effectiveChildSlugs} />
             </div>
           </div>
         </div>
       </section>
 
+      {/* ===== SOUS-BARRE DES SOUS-CATÉGORIES (rubrique parente) ===== */}
+      {isParent && (
+        <CategorySubNav
+          parentSlug={type}
+          children={children.map((c) => ({ slug: c.slug, name: c.name, icon: c.icon }))}
+        />
+      )}
+
       {/* ===== GRILLE D'ÉTABLISSEMENTS (avec filtres intégrés) ===== */}
       <section id="resultats" className="bg-gris-fond py-8">
         <div className="max-w-wrap mx-auto px-4 md:px-8 lg:px-12 xl:px-20">
-          <EtablissementGrid typeSlug={type} />
+          <EtablissementGrid
+            typeSlug={isParent ? undefined : type}
+            childSlugs={effectiveChildSlugs}
+          />
         </div>
       </section>
     </>

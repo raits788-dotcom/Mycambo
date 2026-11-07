@@ -9,10 +9,13 @@ import { getLabelCatalog } from '@/lib/levels';
 
 interface Props {
   typeSlug?: string;
+  // Si fourni, la rubrique est une catégorie PARENTE : on affiche les
+  // établissements de toutes ces sous-catégories (au lieu du seul typeSlug).
+  childSlugs?: string[];
   initialData?: any[];
 }
 
-export default function EtablissementGrid({ typeSlug, initialData }: Props) {
+export default function EtablissementGrid({ typeSlug, childSlugs, initialData }: Props) {
   const [businesses, setBusinesses] = useState<any[]>([]);
   const [labelCatalog, setLabelCatalog] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -37,7 +40,10 @@ export default function EtablissementGrid({ typeSlug, initialData }: Props) {
         .order('is_featured', { ascending: false })
         .order('created_at', { ascending: false });
 
-      if (typeSlug) {
+      if (childSlugs && childSlugs.length > 0) {
+        // Rubrique parente : établissements de toutes les sous-catégories.
+        query = query.in('categories.slug', childSlugs);
+      } else if (typeSlug) {
         query = query.eq('categories.slug', typeSlug);
       }
 
@@ -83,7 +89,7 @@ export default function EtablissementGrid({ typeSlug, initialData }: Props) {
 
       setLoading(false);
     })();
-  }, [typeSlug]);
+  }, [typeSlug, childSlugs?.join(',')]);
 
   // Villes disponibles
   const cities = useMemo(() => {

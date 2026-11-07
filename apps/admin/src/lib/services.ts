@@ -159,10 +159,11 @@ export async function getPayments() {
 // ============================================================================
 export async function getCategories() {
   const supabase = getSupabase();
+  // Console admin : on affiche TOUTES les catégories (actives et inactives)
+  // pour pouvoir les gérer/réactiver. Le filtre is_active se fait côté public.
   const { data, error } = await supabase
     .from('categories')
     .select('*')
-    .eq('is_active', true)
     .order('position', { ascending: true });
   if (error) {
     console.error('getCategories error:', error);

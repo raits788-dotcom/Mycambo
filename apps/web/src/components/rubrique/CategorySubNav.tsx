@@ -1,0 +1,70 @@
+'use client';
+
+import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
+import { cn } from '@/lib/utils';
+
+export type SubCat = {
+  slug: string;
+  name: string;
+  icon?: string | null;
+};
+
+interface Props {
+  // Slug de la rubrique parente (ex. 'autres-commerces').
+  parentSlug: string;
+  // Sous-catégories à afficher dans la sous-barre.
+  children: SubCat[];
+}
+
+/**
+ * Sous-barre scrollable des sous-catégories d'une rubrique parente.
+ * Même principe que DiscoverSubNav : défile au doigt sur mobile, pas de
+ * menu au survol. La sous-catégorie active est pilotée par ?cat=<slug>.
+ */
+export default function CategorySubNav({ parentSlug, children }: Props) {
+  const searchParams = useSearchParams();
+  const active = searchParams.get('cat') || '';
+
+  if (!children || children.length === 0) return null;
+
+  return (
+    <div className="sticky top-[72px] md:top-[112px] z-30 bg-gris-fond border-b border-gris-ligne">
+      <div className="max-w-wrap mx-auto px-4 md:px-6">
+        <div className="flex items-center gap-1 md:gap-2 overflow-x-auto scrollbar-hide">
+          {/* Onglet "Toutes" */}
+          <Link
+            href={`/rubrique/${parentSlug}`}
+            className={cn(
+              'flex-shrink-0 px-4 py-3.5 text-sm font-bold border-b-2 transition-colors whitespace-nowrap',
+              active === ''
+                ? 'text-ic-or border-ic-or'
+                : 'text-gris-texte border-transparent hover:text-marine hover:border-marine/30'
+            )}
+          >
+            Toutes
+          </Link>
+
+          {children.map((c) => {
+            const isActive = active === c.slug;
+            return (
+              <Link
+                key={c.slug}
+                href={`/rubrique/${parentSlug}?cat=${c.slug}`}
+                className={cn(
+                  'flex-shrink-0 px-4 py-3.5 text-sm font-bold border-b-2 transition-colors whitespace-nowrap flex items-center gap-1.5',
+                  isActive
+                    ? 'text-ic-or border-ic-or'
+                    : 'text-gris-texte border-transparent hover:text-marine hover:border-marine/30'
+                )}
+              >
+                {c.icon && <span>{c.icon}</span>}
+                {c.name}
+              </Link>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
