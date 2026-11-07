@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Eye, Star, Inbox, ArrowRight, Loader2, Bell } from 'lucide-react';
 import { getImpersonatedTenant } from '@/lib/impersonation';
 import { PlanUpgradeBanner } from '@/components/partenaire/PlanUpgradeBanner';
+import CompletionReminder from '@/components/partenaire/CompletionReminder';
 import { getPlanPermissionsFromDB } from '@/lib/plan-permissions';
 
 export default function PartnerDashboardPage() {
@@ -103,6 +104,8 @@ export default function PartnerDashboardPage() {
           Voici l&apos;activité de vos établissements.
         </p>
       </div>
+
+      <CompletionReminder />
 
       <PlanUpgradeBanner
         planName={planName}

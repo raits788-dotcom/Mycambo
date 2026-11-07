@@ -14,14 +14,21 @@ import {
 } from '@/lib/establishment-storage';
 import EstablishmentTabs from '@/components/partenaire/establishment/EstablishmentTabs';
 import DeleteEstablishmentModal from '@/components/partenaire/establishment/DeleteEstablishmentModal';
+import CompletionGuide from '@/components/partenaire/establishment/CompletionGuide';
+import { createBrowserClient } from '@supabase/ssr';
+import { getPlanPermissionsFromDB, getPlanPermissions, type PlanPermissions } from '@/lib/plan-permissions';
+import { useRouter } from 'next/navigation';
 
 export default function GererEtablissementPage() {
   const params = useParams();
+  const router = useRouter();
   const slug = params?.slug as string;
 
   const [establishment, setEstablishment] = useState<StoredEstablishment | null>(null);
   const [loading, setLoading] = useState(true);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [perms, setPerms] = useState<PlanPermissions>(() => getPlanPermissions('decouverte'));
+  const [tabsKey, setTabsKey] = useState(0); // remonte les onglets quand le guide navigue
 
   const reload = async () => {
     if (!slug) return;
@@ -34,6 +41,40 @@ export default function GererEtablissementPage() {
   useEffect(() => {
     reload();
   }, [slug]);
+
+  // Charge les permissions de la formule de l'établissement (pour le guide).
+  useEffect(() => {
+    if (!establishment?.id) return;
+    (async () => {
+      try {
+        const sb = createBrowserClient(
+          process.env.NEXT_PUBLIC_SUPABASE_URL!,
+          process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+        );
+        const { data } = await sb
+          .from('subscriptions')
+          .select('plans(slug)')
+          .eq('business_id', establishment.id)
+          .maybeSingle();
+        const planSlug = (data?.plans as any)?.slug || 'decouverte';
+        setPerms(await getPlanPermissionsFromDB(planSlug));
+      } catch {
+        /* garde le défaut */
+      }
+    })();
+  }, [establishment?.id]);
+
+  // Le guide demande à ouvrir un onglet : on écrit la clé lue par
+  // EstablishmentTabs puis on le remonte pour qu'il s'ouvre dessus.
+  const goToTab = (tab: string) => {
+    if (!establishment?.id) return;
+    try {
+      sessionStorage.setItem(`mycambo_esttab_${establishment.id}`, tab);
+    } catch { /* ignore */ }
+    setTabsKey((k) => k + 1);
+    // remonte en haut des onglets
+    if (typeof window !== 'undefined') window.scrollTo({ top: 400, behavior: 'smooth' });
+  };
 
   if (loading) {
     return (
@@ -146,8 +187,16 @@ export default function GererEtablissementPage() {
         </div>
       </div>
 
+      {/* Guide de complétude (se réduit à 100%) */}
+      <CompletionGuide
+        establishment={establishment}
+        permissions={perms}
+        onGoToTab={goToTab}
+        onUpgrade={() => goToTab('subscription')}
+      />
+
       {/* Tabs */}
-      <EstablishmentTabs establishment={establishment} onUpdate={reload} />
+      <EstablishmentTabs key={tabsKey} establishment={establishment} onUpdate={reload} />
 
       {showDeleteModal && (
         <DeleteEstablishmentModal
