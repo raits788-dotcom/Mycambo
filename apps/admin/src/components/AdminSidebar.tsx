@@ -31,7 +31,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@my-cambo/utils';
 import { getCurrentAdmin, getInitials } from '@/lib/auth';
-import { getPendingCount } from '@/lib/services';
+import { getPendingCount, getUnreadNotificationCount } from '@/lib/services';
 
 interface NavItem {
   id: string;
@@ -100,6 +100,7 @@ export default function AdminSidebar() {
   const [userEmail, setUserEmail] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [pendingCount, setPendingCount] = useState(0);
+  const [notifCount, setNotifCount] = useState(0);
 
   useEffect(() => {
     (async () => {
@@ -109,6 +110,7 @@ export default function AdminSidebar() {
 
       const count = await getPendingCount();
       setPendingCount(count);
+      setNotifCount(await getUnreadNotificationCount());
     })();
   }, [pathname]);
 
@@ -168,7 +170,11 @@ export default function AdminSidebar() {
                   pathname === item.href ||
                   pathname.startsWith(item.href.split('?')[0] + '/');
 
-                const showBadge = item.id === 'verifications' && pendingCount > 0;
+                const badgeValue =
+                  item.id === 'verifications' ? pendingCount
+                  : item.id === 'notifications' ? notifCount
+                  : 0;
+                const showBadge = badgeValue > 0;
 
                 return (
                   <Link
@@ -185,7 +191,7 @@ export default function AdminSidebar() {
                     <span className="truncate flex-1">{item.label}</span>
                     {showBadge && (
                       <span className="bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
-                        {pendingCount}
+                        {badgeValue}
                       </span>
                     )}
                   </Link>
