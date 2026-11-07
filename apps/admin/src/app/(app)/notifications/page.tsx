@@ -74,9 +74,21 @@ export default function NotificationsPage() {
     setNotifications((prev) => prev.filter((n) => n.id !== id));
   };
 
+  // Destination par défaut selon le type, quand la notification n'a pas de
+  // lien explicite. Chaque type mène à la page où l'admin peut agir.
+  const TYPE_LINKS: Record<string, string> = {
+    partner_request: '/demandes',
+    verification: '/verifications',
+    modification: '/modifications',
+    review: '/etablissements',
+    subscription: '/abonnements',
+    establishment_pending: '/etablissements',
+  };
+
   const handleClick = (n: any) => {
     if (!n.is_read) handleMarkAsRead(n.id);
-    if (n.link) window.location.href = n.link;
+    const target = n.link || TYPE_LINKS[n.type];
+    if (target) window.location.href = target;
   };
 
   const filtered = typeFilter === 'all'

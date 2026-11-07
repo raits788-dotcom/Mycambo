@@ -994,12 +994,16 @@ export async function toggleTenantLabel(
 // ============================================================================
 // FILE D'ATTENTE VÉRIFICATIONS
 // ============================================================================
+// Badge "Vérifications" : nombre de dossiers de vérification SOUMIS, en
+// attente de décision de l'admin (c'est ce qui demande une action).
+// (Avant : comptait à tort tous les tenants niveau "inscrit".)
 export async function getPendingCount() {
   const supabase = getSupabase();
   const { count } = await supabase
-    .from('tenants')
+    .from('tenant_verifications')
     .select('*', { count: 'exact', head: true })
-    .eq('verification_level', 'inscrit');
+    .eq('status', 'submitted')
+    .not('business_id', 'is', null);
   return count || 0;
 }
 
@@ -1491,6 +1495,17 @@ export async function rejectVerification(verifId: string, reason: string) {
 // ============================================================================
 // NOTIFICATIONS ADMIN
 // ============================================================================
+// Nombre de notifications superadmin non lues (badge du menu).
+export async function getUnreadNotificationCount() {
+  const supabase = getSupabase();
+  const { count } = await supabase
+    .from('notifications')
+    .select('*', { count: 'exact', head: true })
+    .eq('recipient_type', 'superadmin')
+    .eq('is_read', false);
+  return count || 0;
+}
+
 export async function getAdminNotifications(filter?: 'all' | 'unread') {
   const supabase = getSupabase();
   let query = supabase
