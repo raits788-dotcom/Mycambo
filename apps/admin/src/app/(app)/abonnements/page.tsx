@@ -6,8 +6,8 @@ import {
   TrendingUp, TrendingDown, CreditCard, Users, Download, Eye,
   CalendarPlus, XCircle, RefreshCw, Building2, AlertCircle, Loader2,
 } from 'lucide-react';
-import { getSubscriptions, sendRenewalReminders } from '@/lib/services';
-import { Mail } from 'lucide-react';
+import { getSubscriptions, sendRenewalReminders, processSubscriptions } from '@/lib/services';
+import { Mail, PlayCircle } from 'lucide-react';
 
 const STATUS_STYLES: Record<string, string> = {
   active: 'bg-green-100 text-green-700',
@@ -29,6 +29,27 @@ export default function SubscriptionsPage() {
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [sendingReminders, setSendingReminders] = useState(false);
+  const [processing, setProcessing] = useState(false);
+
+  const handleProcess = async () => {
+    if (!confirm(
+      'Traiter les abonnements maintenant ?\n\n'
+      + '• Les abonnements à moins de 30 jours de l\'échéance passent en "Expire bientôt" (+ relance in-app au partenaire).\n'
+      + '• Les abonnements échus sont expirés et repassent en formule Découverte (les associations ne sont pas rétrogradées).\n\n'
+      + 'Ceci est l\'équivalent manuel du traitement quotidien automatique.'
+    )) return;
+    setProcessing(true);
+    try {
+      const r = await processSubscriptions();
+      alert(`Traitement terminé.\n\n• ${r.expiring} abonnement(s) passé(s) en « Expire bientôt ».\n• ${r.expired} abonnement(s) expiré(s).`);
+      const data = await getSubscriptions();
+      setSubs(data);
+    } catch (e) {
+      alert('Erreur : ' + (e as Error).message);
+    } finally {
+      setProcessing(false);
+    }
+  };
 
   const handleSendReminders = async () => {
     if (!confirm('Envoyer les emails de relance de renouvellement aux abonnements qui expirent sous 30 jours ?')) return;
@@ -69,6 +90,15 @@ export default function SubscriptionsPage() {
           <p className="text-sm text-gris-texte">Suivi du MRR, des paiements et du CA récurrent.</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={handleProcess}
+            disabled={processing}
+            className="flex items-center gap-2 border border-gris-ligne text-marine font-bold text-sm px-4 py-2.5 rounded-full hover:border-marine disabled:opacity-50"
+            title="Expire les abonnements échus et marque ceux qui arrivent à échéance (équivalent du traitement quotidien automatique)"
+          >
+            {processing ? <Loader2 size={14} className="animate-spin" /> : <PlayCircle size={14} />}
+            Traiter les abonnements
+          </button>
           <button
             onClick={handleSendReminders}
             disabled={sendingReminders}

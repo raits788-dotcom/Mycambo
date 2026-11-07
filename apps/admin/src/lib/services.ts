@@ -121,6 +121,16 @@ export async function sendRenewalReminders(): Promise<{ sent: number; candidates
   return { sent: out.sent || 0, candidates: out.candidates || 0, errors: out.errors };
 }
 
+export async function processSubscriptions(): Promise<{ expiring: number; expired: number }> {
+  // Traitement manuel des abonnements (équivalent du cron quotidien) :
+  //  - passe en "expiring" ceux à moins de 30 jours + notification in-app au tenant
+  //  - expire les échus -> retour en formule Découverte (asso non rétrogradées)
+  const supabase = getSupabase();
+  const { data, error } = await supabase.rpc('process_subscriptions_daily');
+  if (error) throw new Error(error.message);
+  return { expiring: data?.expiring ?? 0, expired: data?.expired ?? 0 };
+}
+
 export async function getSubscriptions() {
   const supabase = getSupabase();
   const { data, error } = await supabase
