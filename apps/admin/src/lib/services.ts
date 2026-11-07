@@ -994,16 +994,25 @@ export async function toggleTenantLabel(
 // ============================================================================
 // FILE D'ATTENTE VÉRIFICATIONS
 // ============================================================================
-// Badge "Vérifications" : nombre de dossiers de vérification SOUMIS, en
-// attente de décision de l'admin (c'est ce qui demande une action).
-// (Avant : comptait à tort tous les tenants niveau "inscrit".)
+// Badge "Vérifications" : total de ce qui mérite l'attention de l'admin dans
+// l'écran Vérifications = dossiers SOUMIS (à valider) + établissements publiés
+// SANS dossier (à relancer). Permet de voir qu'il y a quelque chose sans
+// entrer dans l'écran. (Avant : comptait à tort les tenants niveau "inscrit".)
 export async function getPendingCount() {
+  const [submitted, pending] = await Promise.all([
+    getSubmittedVerifications(),
+    getPendingVerifications(),
+  ]);
+  return (submitted?.length || 0) + (pending?.length || 0);
+}
+
+// Badge "Demandes" : nombre de demandes partenaire en attente de décision.
+export async function getPendingRequestsCount() {
   const supabase = getSupabase();
   const { count } = await supabase
-    .from('tenant_verifications')
+    .from('partner_requests')
     .select('*', { count: 'exact', head: true })
-    .eq('status', 'submitted')
-    .not('business_id', 'is', null);
+    .eq('status', 'pending');
   return count || 0;
 }
 

@@ -31,7 +31,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@my-cambo/utils';
 import { getCurrentAdmin, getInitials } from '@/lib/auth';
-import { getPendingCount, getUnreadNotificationCount } from '@/lib/services';
+import { getPendingCount, getUnreadNotificationCount, getPendingRequestsCount } from '@/lib/services';
 
 interface NavItem {
   id: string;
@@ -101,6 +101,7 @@ export default function AdminSidebar() {
   const [loading, setLoading] = useState(true);
   const [pendingCount, setPendingCount] = useState(0);
   const [notifCount, setNotifCount] = useState(0);
+  const [requestsCount, setRequestsCount] = useState(0);
 
   useEffect(() => {
     (async () => {
@@ -111,6 +112,7 @@ export default function AdminSidebar() {
       const count = await getPendingCount();
       setPendingCount(count);
       setNotifCount(await getUnreadNotificationCount());
+      setRequestsCount(await getPendingRequestsCount());
     })();
   }, [pathname]);
 
@@ -173,6 +175,7 @@ export default function AdminSidebar() {
                 const badgeValue =
                   item.id === 'verifications' ? pendingCount
                   : item.id === 'notifications' ? notifCount
+                  : item.id === 'demandes' ? requestsCount
                   : 0;
                 const showBadge = badgeValue > 0;
 
