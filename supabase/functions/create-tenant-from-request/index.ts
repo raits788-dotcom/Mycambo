@@ -24,11 +24,21 @@ async function sha256(input: string): Promise<string> {
     .join("");
 }
 
-// Crée un lien magique (30 jours, usage unique) et renvoie l'URL en clair.
+// Token court (22 caractères URL-safe) : assez court pour que l'URL complète
+// tienne sur UNE ligne et ne soit pas coupée par l'encodage quoted-printable
+// des emails (qui brise les longues URLs). ~130 bits d'entropie, sûr.
+function shortToken(): string {
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  return btoa(String.fromCharCode(...bytes))
+    .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+// Crée un lien magique (30 jours, usage unique) et renvoie l'URL COURTE.
 async function createMagicLink(
   supabase: any, userId: string, email: string, siteUrl: string
 ): Promise<string> {
-  const rawToken = crypto.randomUUID() + crypto.randomUUID().replace(/-/g, "");
+  const rawToken = shortToken();
   const tokenHash = await sha256(rawToken);
   const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
   await supabase.from("magic_links").insert({
@@ -38,7 +48,8 @@ async function createMagicLink(
     purpose: "partner_activation",
     expires_at: expiresAt,
   });
-  return `${siteUrl}/espace-partenaire/activer?token=${rawToken}`;
+  // Route COURTE /a/<token> -> page d'activation. URL totale ~50 caractères.
+  return `${siteUrl}/a/${rawToken}`;
 }
 
 // Slugifie un nom (accents, espaces -> tirets).

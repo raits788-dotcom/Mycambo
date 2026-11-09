@@ -28,6 +28,14 @@ async function sha256(input: string): Promise<string> {
   return Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
+// Token court URL-safe (22 car.) pour que le lien tienne sur une ligne.
+function shortToken(): string {
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  return btoa(String.fromCharCode(...bytes))
+    .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
@@ -120,14 +128,14 @@ serve(async (req) => {
       const eligible = await findEligibleUser(email);
       if (!eligible) return json({ ok: false, error: "NOT_ELIGIBLE" });
 
-      const rawToken = crypto.randomUUID() + crypto.randomUUID().replace(/-/g, "");
+      const rawToken = shortToken();
       const tokenHash = await sha256(rawToken);
       const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
       await admin.from("magic_links").insert({
         user_id: eligible.userId, email, token_hash: tokenHash,
         purpose: "partner_activation", expires_at: expiresAt,
       });
-      const link = `${siteUrl}/espace-partenaire/activer?token=${rawToken}`;
+      const link = `${siteUrl}/a/${rawToken}`;
       await sendEmail(
         email,
         "myCAMBO — Votre nouveau lien d'accès",
