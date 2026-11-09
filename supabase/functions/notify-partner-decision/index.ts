@@ -20,34 +20,10 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-function approvedEmailHtml(
-  name: string, email: string, magicLink: string | null, tempPassword: string, portalUrl: string
-): string {
-  // Accès principal = lien magique (bouton). Le mot de passe temporaire n'est
-  // montré qu'en secours, si la génération du lien a échoué.
-  const accessBlock = magicLink
-    ? `
-      <p style="text-align:center;margin:22px 0;">
-        <a href="${magicLink}" style="background:#1B3A6B;color:#fff;text-decoration:none;font-weight:bold;padding:14px 30px;border-radius:24px;display:inline-block;font-size:15px;">
-          Activer mon accès
-        </a>
-      </p>
-      <p style="font-size:12px;color:#9AA4B4;text-align:center;margin:0 0 8px;">
-        Ce lien est valable 30 jours et utilisable une seule fois. Vous définirez votre mot de passe en cliquant.
-      </p>`
-    : `
-      <div style="background:#EEF3FB;border-left:4px solid #1B3A6B;border-radius:8px;padding:16px;margin:20px 0;">
-        <p style="margin:0 0 8px;font-size:14px;font-weight:bold;">Vos identifiants de connexion</p>
-        <p style="margin:0 0 4px;font-size:13px;color:#5A6578;">Email : <strong>${email}</strong></p>
-        <p style="margin:0;font-size:13px;color:#5A6578;">Mot de passe temporaire :
-          <strong style="font-family:monospace;background:#fff;padding:2px 8px;border-radius:4px;border:1px solid #E6E9EF;">${tempPassword}</strong>
-        </p>
-        <p style="margin:10px 0 0;font-size:12px;color:#9AA4B4;">À changer à la première connexion.</p>
-      </div>
-      <p style="text-align:center;margin:22px 0;">
-        <a href="${portalUrl}" style="background:#1B3A6B;color:#fff;text-decoration:none;font-weight:bold;padding:12px 26px;border-radius:24px;display:inline-block;">Me connecter</a>
-      </p>`;
-
+function approvedEmailHtml(name: string): string {
+  // L'email d'approbation n'embarque PAS de lien d'accès : certains clients
+  // mail (Outlook SafeLinks) réécrivent et cassent les liens. L'accès est
+  // envoyé séparément par l'équipe myCAMBO (email dédié « Activer mon accès »).
   return `
   <div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;max-width:620px;margin:0 auto;color:#1B3A6B;">
     <div style="background:#35A85B;padding:22px;border-radius:12px 12px 0 0;">
@@ -60,14 +36,21 @@ function approvedEmailHtml(
         <strong style="color:#35A85B;">approuvée</strong> !
       </p>
 
-      ${accessBlock}
-
       <div style="background:#EEF3FB;border-left:4px solid #1B3A6B;border-radius:8px;padding:16px;margin:20px 0;">
+        <p style="margin:0;font-size:14px;color:#1B3A6B;line-height:1.6;">
+          <strong>Votre accès arrive bientôt.</strong><br>
+          L'équipe myCAMBO va vous envoyer un second email avec votre lien
+          d'activation pour définir votre mot de passe et accéder à votre
+          espace partenaire.
+        </p>
+      </div>
+
+      <div style="background:#F5F7FA;border-radius:8px;padding:16px;margin:20px 0;">
         <p style="margin:0 0 8px;font-size:14px;font-weight:bold;">Prochaines étapes :</p>
         <ol style="margin:0;padding-left:18px;font-size:13px;color:#1B3A6B;line-height:1.8;">
-          <li>Activez votre accès et définissez votre mot de passe</li>
-          <li>Choisissez une formule d'abonnement</li>
-          <li>Complétez vos établissements</li>
+          <li>Vous recevrez votre lien d'accès par email</li>
+          <li>Vous définirez votre mot de passe</li>
+          <li>Vous choisirez une formule et compléterez vos établissements</li>
         </ol>
       </div>
 
@@ -132,7 +115,7 @@ serve(async (req) => {
 
     if (decision === "approved") {
       subject = "myCAMBO — Votre demande de partenariat est approuvée 🎉";
-      html = approvedEmailHtml(name, reqRow.email, magic_link || null, temp_password || "—", portalUrl);
+      html = approvedEmailHtml(name);
     } else {
       subject = "myCAMBO — Suite de votre demande de partenariat";
       html = rejectedEmailHtml(name, reason || reqRow.rejection_reason || "");
