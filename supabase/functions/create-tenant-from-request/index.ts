@@ -66,8 +66,30 @@ serve(async (req) => {
     const existing = existingUsers?.users?.find((u) => u.email === request.email);
 
     if (existing) {
+      // L'utilisateur existe déjà : on régénère un mot de passe temporaire
+      // et on force son changement. Ainsi un partenaire approuvé a TOUJOURS
+      // un accès, qu'il soit nouveau ou déjà présent (évite le blocage
+      // « compte existe mais pas de mot de passe »).
       userId = existing.id;
-      tempPassword = "(existant — mot de passe inchangé)";
+      tempPassword = generateTempPassword();
+      const { error: updErr } = await supabase.auth.admin.updateUserById(userId, {
+        password: tempPassword,
+        email_confirm: true,
+        user_metadata: {
+          ...(existing.user_metadata || {}),
+          must_change_password: true,
+          from_partner_request: request_id,
+        },
+      });
+      if (updErr) {
+        return new Response(JSON.stringify({
+          error: "USER_UPDATE_FAILED",
+          details: updErr.message,
+        }), {
+          status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      isNewUser = false;
     } else {
       // Crée un utilisateur avec mot de passe temporaire
       tempPassword = generateTempPassword();
@@ -266,7 +288,9 @@ serve(async (req) => {
       tenant_slug: tenantSlug,
       user_id: userId,
       user_email: request.email,
-      temp_password: isNewUser ? tempPassword : null,
+      // Toujours renvoyé : un mot de passe temporaire est (re)généré dans
+      // tous les cas, donc l'email de bienvenue peut toujours l'afficher.
+      temp_password: tempPassword,
       is_new_user: isNewUser,
       plan: defaultSlug,
       establishments_created: createdEstablishments,
