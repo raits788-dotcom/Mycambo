@@ -301,10 +301,11 @@ export default function EstablishmentsPage() {
                         <button
                           onClick={() => handleStatusChange(est.id, 'approved')}
                           disabled={processing === est.id}
-                          className="w-8 h-8 rounded-lg flex items-center justify-center text-green-600 hover:bg-green-100 disabled:opacity-50"
-                          title="Publier la fiche"
+                          className="inline-flex items-center gap-1.5 bg-green-600 text-white font-bold text-xs px-3 h-8 rounded-lg hover:bg-green-700 disabled:opacity-50"
+                          title="Publier cette fiche sur le site public"
                         >
                           {processing === est.id ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
+                          Publier
                         </button>
                       )}
                       {est.status === 'approved' && (

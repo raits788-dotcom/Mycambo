@@ -349,6 +349,20 @@ export default function TenantDetailPage({
                   Inscrit le {new Date(tenant.created_at).toLocaleDateString('fr-FR')}
                 </span>
               </div>
+
+              {/* Rappel : tant que le tenant n'est pas activé, son accès doit
+                  être envoyé manuellement via « Renvoyer l'accès ». */}
+              {tenant.status === 'pending' && (
+                <div className="mt-3 flex items-start gap-2 bg-orange-50 border border-orange-200 rounded-lg px-3 py-2 max-w-xl">
+                  <Mail size={14} className="text-orange-600 flex-shrink-0 mt-0.5" />
+                  <p className="text-[11px] text-orange-800 leading-relaxed">
+                    <strong>Accès à envoyer au partenaire.</strong> L&apos;email
+                    d&apos;approbation ne contient pas de lien d&apos;activation.
+                    Cliquez sur <strong>« Renvoyer l&apos;accès »</strong> pour
+                    lui transmettre son lien de connexion.
+                  </p>
+                </div>
+              )}
             </div>
           </div>
           <div className="flex gap-2 flex-wrap">
