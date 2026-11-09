@@ -148,6 +148,15 @@ export default async function RubriquePage({ params, searchParams }: Props) {
 
   return (
     <>
+      {/* ===== SOUS-BARRE DES SOUS-CATÉGORIES (rubrique parente) ===== */}
+      {/* Placée AVANT le hero pour coller sous la nav, comme la sous-barre Découvrir. */}
+      {isParent && (
+        <CategorySubNav
+          parentSlug={type}
+          children={children.map((c) => ({ slug: c.slug, name: c.name, icon: c.icon }))}
+        />
+      )}
+
       {/* ===== HERO ===== */}
       <section className="relative text-white overflow-hidden">
         <Image
@@ -207,14 +216,6 @@ export default async function RubriquePage({ params, searchParams }: Props) {
           </div>
         </div>
       </section>
-
-      {/* ===== SOUS-BARRE DES SOUS-CATÉGORIES (rubrique parente) ===== */}
-      {isParent && (
-        <CategorySubNav
-          parentSlug={type}
-          children={children.map((c) => ({ slug: c.slug, name: c.name, icon: c.icon }))}
-        />
-      )}
 
       {/* ===== GRILLE D'ÉTABLISSEMENTS (avec filtres intégrés) ===== */}
       <section id="resultats" className="bg-gris-fond py-8">
