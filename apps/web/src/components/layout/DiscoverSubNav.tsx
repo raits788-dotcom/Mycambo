@@ -9,7 +9,10 @@ export default function DiscoverSubNav() {
   const pathname = usePathname();
 
   return (
-    <div className="sticky top-[72px] md:top-[112px] z-30 bg-gris-fond border-b border-gris-ligne">
+    <div
+      className="sticky z-30 bg-gris-fond border-b border-gris-ligne"
+      style={{ top: 'var(--header-h, 72px)' }}
+    >
       <div className="max-w-wrap mx-auto px-4 md:px-6">
         <div className="flex items-center gap-1 md:gap-2 overflow-x-auto scrollbar-hide">
           {DISCOVER_SUBNAV.map((item) => {

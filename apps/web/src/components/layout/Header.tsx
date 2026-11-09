@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import {
   Search, User, ChevronDown, Star, LogOut, Heart,
@@ -40,6 +40,26 @@ export default function Header() {
   const [mounted, setMounted] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
+  const headerRef = useRef<HTMLElement>(null);
+
+  // Mesure la hauteur réelle du header (logo + barre nav) et l'expose en
+  // variable CSS --header-h. Les sous-barres sticky s'y calent exactement,
+  // quelle que soit la taille d'écran -> plus de chevauchement au scroll.
+  useEffect(() => {
+    const el = headerRef.current;
+    if (!el) return;
+    const setVar = () => {
+      document.documentElement.style.setProperty('--header-h', `${el.offsetHeight}px`);
+    };
+    setVar();
+    const ro = new ResizeObserver(setVar);
+    ro.observe(el);
+    window.addEventListener('resize', setVar);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener('resize', setVar);
+    };
+  }, [mounted, user]);
 
   // ▼▼▼ DÉTECTION PAGES ANONYMES ▼▼▼
   const isAuthPage =
@@ -142,7 +162,7 @@ export default function Header() {
 
   return (
     <>
-      <header className="sticky top-0 z-50 bg-white border-b border-gris-ligne">
+      <header ref={headerRef} className="sticky top-0 z-50 bg-white border-b border-gris-ligne">
         <div className="max-w-wrap mx-auto px-4 md:px-8 lg:px-12 xl:px-20">
           <div className="flex items-center justify-between gap-4 py-3">
             <div className="flex items-center gap-3 md:gap-5 min-w-0">
