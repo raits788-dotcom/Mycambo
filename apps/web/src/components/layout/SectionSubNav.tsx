@@ -1,5 +1,6 @@
 'use client';
 
+import { Suspense } from 'react';
 import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { cn } from '@/lib/utils';
@@ -23,12 +24,29 @@ interface Props {
  * Sous-barre de section générique (Annuaire, Créateurs…), calée sous le header
  * via --header-h comme CategorySubNav / DiscoverSubNav. Scrollable au doigt,
  * adaptée au thème clair/sombre (tokens gris-fond / gris-ligne / marine / or).
+ *
+ * useSearchParams() impose un <Suspense> pour le prerender statique des pages
+ * (/annuaire, /influenceurs) : on isole la lecture des params dans un composant
+ * interne enveloppé de Suspense.
  */
-export default function SectionSubNav({ basePath, links, allLabel = 'Tout' }: Props) {
+export default function SectionSubNav(props: Props) {
+  return (
+    <Suspense fallback={<SubNavShell {...props} activeCat="" pathname="" />}>
+      <SectionSubNavInner {...props} />
+    </Suspense>
+  );
+}
+
+function SectionSubNavInner({ basePath, links, allLabel = 'Tout' }: Props) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const activeCat = searchParams.get('cat') || '';
+  return <SubNavShell basePath={basePath} links={links} allLabel={allLabel} activeCat={activeCat} pathname={pathname} />;
+}
 
+function SubNavShell({
+  basePath, links, allLabel = 'Tout', activeCat, pathname,
+}: Props & { activeCat: string; pathname: string }) {
   return (
     <div
       className="sticky z-30 bg-gris-fond border-b border-gris-ligne"
