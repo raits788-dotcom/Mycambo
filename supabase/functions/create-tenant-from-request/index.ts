@@ -180,16 +180,31 @@ serve(async (req) => {
     let createdEstablishments = 0;
 
     if (declared.length > 0) {
-      // Catégorie de la demande -> category_id
-      const { data: cat } = await supabase
+      // Fallback : catégorie au niveau demande (anciennes demandes sans
+      // category_id par établissement).
+      const { data: fallbackCat } = await supabase
         .from("categories")
         .select("id")
         .eq("slug", request.category)
         .maybeSingle();
 
-      // Photos éventuelles de la demande (extérieur / intérieur)
+      // Photos au niveau demande (fallback pour anciennes demandes).
       const reqPhotos = [request.photo_exterior_url, request.photo_interior_url]
         .filter((u: unknown): u is string => typeof u === "string" && u.length > 0);
+
+      // Résout un category_id à partir de ce que porte l'établissement :
+      //  - est.category_id direct (nouveau format)
+      //  - sinon est.category (slug) -> id
+      //  - sinon la catégorie de la demande (fallback)
+      async function resolveCategoryId(est: any): Promise<string | null> {
+        if (est?.category_id) return est.category_id;
+        if (est?.category) {
+          const { data: c } = await supabase
+            .from("categories").select("id").eq("slug", est.category).maybeSingle();
+          if (c?.id) return c.id;
+        }
+        return fallbackCat?.id ?? null;
+      }
 
       for (const est of declared) {
         const name = (est?.name || "").trim();
@@ -205,19 +220,25 @@ serve(async (req) => {
         if (already) continue;
 
         const estSlug = `${slugify(name)}-${Math.random().toString(36).substring(2, 8)}`;
+        const categoryId = await resolveCategoryId(est);
+
+        // Photos : par établissement si fournies, sinon celles de la demande.
+        const estPhotos = Array.isArray(est?.photos) && est.photos.length
+          ? est.photos.filter((u: unknown): u is string => typeof u === "string" && u.length > 0)
+          : reqPhotos;
 
         const { error: estErr } = await supabase.from("businesses").insert({
           tenant_id: tenantId,
           name,
           slug: estSlug,
-          category_id: cat?.id ?? null,
-          description: request.message || null,
+          category_id: categoryId,
+          description: est?.description || request.message || null,
           address: est?.address || null,
           city: est?.city || request.city || null,
-          phone: request.phone || request.legal_representative_phone || null,
-          email: request.email || null,
-          website: request.website_url || null,
-          photos: reqPhotos,
+          phone: est?.phone || request.phone || request.legal_representative_phone || null,
+          email: est?.email || request.email || null,
+          website: est?.website_url || request.website_url || null,
+          photos: estPhotos,
           status: "pending",
         });
         if (!estErr) createdEstablishments++;

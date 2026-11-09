@@ -343,8 +343,23 @@ export default function PartnerRequestsPage() {
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="text-sm font-bold text-marine">{est.name}</div>
-                          {est.address && <div className="text-xs text-gris-texte">{est.address}</div>}
+                          {(est.family_slug || est.category) && (
+                            <div className="text-[11px] text-gris-texte mt-0.5">
+                              <span className="inline-block bg-marine/10 text-marine font-bold px-2 py-0.5 rounded-full">
+                                {est.family_slug ? est.family_slug : '—'}
+                                {est.category ? ` › ${est.category}` : ''}
+                              </span>
+                            </div>
+                          )}
+                          {est.address && <div className="text-xs text-gris-texte mt-0.5">{est.address}</div>}
                           {est.city && <div className="text-xs text-gris-texte">{est.city}</div>}
+                          {(est.website_url || est.facebook_url || est.google_maps_url) && (
+                            <div className="flex gap-2 mt-1 text-[10px] text-marine">
+                              {est.website_url && <a href={est.website_url} target="_blank" rel="noopener noreferrer" className="hover:underline">Site</a>}
+                              {est.facebook_url && <a href={est.facebook_url} target="_blank" rel="noopener noreferrer" className="hover:underline">Facebook</a>}
+                              {est.google_maps_url && <a href={est.google_maps_url} target="_blank" rel="noopener noreferrer" className="hover:underline">Maps</a>}
+                            </div>
+                          )}
                         </div>
                       </div>
                     ))}

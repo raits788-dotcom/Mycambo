@@ -10,8 +10,21 @@ import Step3Photos from './components/Step3Photos';
 import Step4Motivation from './components/Step4Motivation';
 import Step5Verification from './components/Step5Verification';
 
+// Un établissement déclaré dans la demande (étape 2).
+export interface DemandeEstablishment {
+  name: string;
+  family_slug: string;    // famille (catégorie racine) choisie
+  category_id: string;    // sous-catégorie choisie (id en base)
+  category: string;       // libellé sous-catégorie (compat + Edge fallback slug)
+  city: string;
+  address: string;
+  website_url: string;
+  facebook_url: string;
+  google_maps_url: string;
+}
+
 export interface WizardData {
-  // Étape 1
+  // Étape 1 — LE DEMANDEUR (futur admin du tenant)
   structure_type: string;
   registration_authority: string;
   legal_name: string;
@@ -20,14 +33,9 @@ export interface WizardData {
   legal_representative_phone: string;
   email: string;
   phone: string;
-  category: string;
-  city: string;
-  website_url: string;
-  facebook_url: string;
-  google_maps_url: string;
 
-  // Étape 2
-  establishments: { name: string; address: string; city: string }[];
+  // Étape 2 — SES ÉTABLISSEMENTS (catégorie par établissement)
+  establishments: DemandeEstablishment[];
 
   // Étape 3
   photo_exterior_url: string;
@@ -43,6 +51,11 @@ export interface WizardData {
   email_verified: boolean;
 }
 
+const EMPTY_ESTABLISHMENT: DemandeEstablishment = {
+  name: '', family_slug: '', category_id: '', category: '',
+  city: '', address: '', website_url: '', facebook_url: '', google_maps_url: '',
+};
+
 const INITIAL_DATA: WizardData = {
   structure_type: '',
   registration_authority: '',
@@ -52,12 +65,7 @@ const INITIAL_DATA: WizardData = {
   legal_representative_phone: '',
   email: '',
   phone: '',
-  category: '',
-  city: '',
-  website_url: '',
-  facebook_url: '',
-  google_maps_url: '',
-  establishments: [{ name: '', address: '', city: '' }],
+  establishments: [{ ...EMPTY_ESTABLISHMENT }],
   photo_exterior_url: '',
   photo_interior_url: '',
   photo_representative_id_url: '',
@@ -89,13 +97,14 @@ export default function PartnerRequestWizard() {
         (!requiresReg || data.registration_number) &&
         data.legal_representative_name &&
         data.legal_representative_phone &&
-        data.email &&
-        data.category &&
-        data.city
+        data.email
       );
     }
     if (step === 2) {
-      return data.establishments.every((e) => e.name && e.city);
+      // Chaque établissement : nom + famille + sous-catégorie + ville.
+      return data.establishments.every(
+        (e) => e.name && e.family_slug && e.category_id && e.city
+      );
     }
     if (step === 3) {
       return !!(data.photo_exterior_url && data.photo_interior_url);
@@ -133,24 +142,30 @@ export default function PartnerRequestWizard() {
         process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
       );
 
+      // Les champs demande (p_category/p_city/réseaux) reflètent le 1er
+      // établissement pour compat avec la RPC existante ; le détail par
+      // établissement vit dans le jsonb p_establishments (famille,
+      // category_id, ville, adresse, réseaux) et sert à l'Edge Function.
+      const first = data.establishments[0] || ({} as DemandeEstablishment);
+
       const { data: requestId, error } = await supabase.rpc('submit_partner_request', {
         p_company_name: data.legal_name,
         p_email: data.email,
         p_phone: data.phone || data.legal_representative_phone,
-        p_city: data.city,
-        p_category: data.category,
+        p_city: first.city || null,
+        p_category: first.category || null,
         p_structure_type: data.structure_type,
         p_registration_authority: data.registration_authority || null,
         p_legal_name: data.legal_name,
         p_registration_number: data.registration_number || null,
         p_legal_representative_name: data.legal_representative_name,
         p_legal_representative_phone: data.legal_representative_phone,
-        p_establishment_type: data.category,
+        p_establishment_type: first.category || null,
         p_establishment_count: data.establishments.length,
         p_establishments: data.establishments,
-        p_website_url: data.website_url || null,
-        p_facebook_url: data.facebook_url || null,
-        p_google_maps_url: data.google_maps_url || null,
+        p_website_url: first.website_url || null,
+        p_facebook_url: first.facebook_url || null,
+        p_google_maps_url: first.google_maps_url || null,
         p_photo_exterior_url: data.photo_exterior_url,
         p_photo_interior_url: data.photo_interior_url,
         p_photo_representative_id_url: data.photo_representative_id_url || null,
