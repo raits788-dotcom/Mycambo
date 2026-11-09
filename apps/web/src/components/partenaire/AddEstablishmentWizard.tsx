@@ -76,7 +76,7 @@ export default function AddEstablishmentWizard() {
 
       await addEstablishment(tenant.id, {
         name: data.name,
-        category_id: undefined,
+        category_id: data.categoryId || undefined,
         description: data.shortDescription || data.longDescription,
         address: data.address,
         city: data.city,

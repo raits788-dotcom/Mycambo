@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Search, Filter, Eye, CheckCircle2, XCircle, Star, Store, Loader2 } from 'lucide-react';
-import { getBusinesses, updateBusinessStatus, toggleFeatured, startImpersonation, approveAllPending } from '@/lib/services';
+import { Search, Filter, Eye, CheckCircle2, XCircle, Star, Store, Loader2, Tag, X } from 'lucide-react';
+import { getBusinesses, updateBusinessStatus, toggleFeatured, startImpersonation, approveAllPending, getCategoryTree, updateBusinessCategory } from '@/lib/services';
 
 const STATUS_STYLES: Record<string, string> = {
   approved: 'bg-green-100 text-green-700',
@@ -42,6 +42,12 @@ export default function EstablishmentsPage() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | string>('all');
   const [processing, setProcessing] = useState<string | null>(null);
+  // Reclassement de catégorie
+  const [tree, setTree] = useState<any[]>([]);
+  const [catModal, setCatModal] = useState<any | null>(null); // établissement en cours
+  const [catFamily, setCatFamily] = useState<string>('');     // id racine choisie
+  const [catChild, setCatChild] = useState<string>('');       // id sous-cat choisie
+  const [savingCat, setSavingCat] = useState(false);
 
   const reload = async () => {
     setLoading(true);
@@ -50,7 +56,41 @@ export default function EstablishmentsPage() {
     setLoading(false);
   };
 
-  useEffect(() => { reload(); }, []);
+  useEffect(() => { reload(); getCategoryTree().then(setTree); }, []);
+
+  const openCatModal = (est: any) => {
+    setCatModal(est);
+    // pré-sélectionne la famille/sous-cat actuelle si connue
+    const currentSlug = est.categories?.slug;
+    let family = '';
+    let child = '';
+    for (const root of tree) {
+      if (root.slug === currentSlug) { family = root.id; break; }
+      const c = root.children.find((k: any) => k.slug === currentSlug);
+      if (c) { family = root.id; child = c.id; break; }
+    }
+    setCatFamily(family);
+    setCatChild(child);
+  };
+
+  const saveCat = async () => {
+    if (!catModal) return;
+    // On enregistre la sous-catégorie si choisie, sinon la famille (racine).
+    const targetId = catChild || catFamily;
+    if (!targetId) { alert('Choisissez au moins une famille.'); return; }
+    setSavingCat(true);
+    try {
+      await updateBusinessCategory(catModal.id, targetId);
+      setCatModal(null);
+      await reload();
+    } catch (e) {
+      alert('Erreur : ' + (e as Error).message);
+    } finally {
+      setSavingCat(false);
+    }
+  };
+
+  const familyChildren = tree.find((r) => r.id === catFamily)?.children || [];
 
   const handleStatusChange = async (id: string, newStatus: 'approved' | 'suspended') => {
     const action = newStatus === 'approved'
@@ -216,7 +256,16 @@ export default function EstablishmentsPage() {
                       <div className="font-bold text-marine truncate max-w-[200px]">{est.name}</div>
                     </div>
                   </td>
-                  <td className="px-3 py-4 text-gris-texte">{est.categories?.name || '—'}</td>
+                  <td className="px-3 py-4">
+                    <button
+                      onClick={() => openCatModal(est)}
+                      className="inline-flex items-center gap-1.5 text-gris-texte hover:text-marine group"
+                      title="Reclasser cet établissement"
+                    >
+                      {est.categories?.name || '—'}
+                      <Tag size={12} className="opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </button>
+                  </td>
                   <td className="px-3 py-4">
                     <span className={'inline-flex px-2 py-0.5 rounded-full text-[11px] font-bold ' + (PLAN_COLORS[est.plans?.name || ''] || 'bg-gris-fond text-gris-texte')}>
                       {est.plans?.name || 'Découverte'}
@@ -286,6 +335,62 @@ export default function EstablishmentsPage() {
           </table>
         )}
       </div>
+
+      {/* ===== MODAL RECLASSEMENT CATÉGORIE ===== */}
+      {catModal && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={() => setCatModal(null)}>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-5">
+              <h3 className="text-lg font-extrabold text-marine">Reclasser l&apos;établissement</h3>
+              <button onClick={() => setCatModal(null)} className="w-8 h-8 rounded-lg hover:bg-gris-fond flex items-center justify-center"><X size={16} /></button>
+            </div>
+            <p className="text-sm text-gris-texte mb-4 font-bold">{catModal.name}</p>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-gris-texte uppercase mb-1">Famille</label>
+                <select
+                  value={catFamily}
+                  onChange={(e) => { setCatFamily(e.target.value); setCatChild(''); }}
+                  className="w-full px-3 py-2.5 text-sm rounded-lg border border-gris-ligne bg-white focus:border-marine focus:outline-none"
+                >
+                  <option value="">— Choisir une famille —</option>
+                  {tree.map((r) => (
+                    <option key={r.id} value={r.id}>{r.icon ? r.icon + ' ' : ''}{r.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              {familyChildren.length > 0 && (
+                <div>
+                  <label className="block text-xs font-bold text-gris-texte uppercase mb-1">Sous-catégorie</label>
+                  <select
+                    value={catChild}
+                    onChange={(e) => setCatChild(e.target.value)}
+                    className="w-full px-3 py-2.5 text-sm rounded-lg border border-gris-ligne bg-white focus:border-marine focus:outline-none"
+                  >
+                    <option value="">— Sans sous-catégorie (famille seule) —</option>
+                    {familyChildren.map((c: any) => (
+                      <option key={c.id} value={c.id}>{c.icon ? c.icon + ' ' : ''}{c.name}</option>
+                    ))}
+                  </select>
+                  <p className="text-[10px] text-gris-doux mt-1">
+                    Sans sous-catégorie, l&apos;établissement reste visible dans « Toutes » de la famille.
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <div className="flex gap-3 pt-5">
+              <button onClick={() => setCatModal(null)} className="flex-1 border border-gris-ligne text-marine font-bold py-2.5 rounded-full hover:border-marine">Annuler</button>
+              <button onClick={saveCat} disabled={savingCat} className="flex-1 bg-marine text-white font-bold py-2.5 rounded-full hover:bg-marine-dark disabled:opacity-50 flex items-center justify-center gap-2">
+                {savingCat && <Loader2 size={14} className="animate-spin" />}
+                Enregistrer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

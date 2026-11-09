@@ -1,10 +1,12 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import {
-  ESTABLISHMENT_TYPES,
+  TYPE_TO_ROOT_SLUG,
   type EstablishmentType,
   type WizardData,
 } from '@/lib/establishment-wizard';
+import { getCategoryWithChildren, type CategoryNode } from '@/lib/categories';
 
 interface WizardStep2InfosProps {
   data: WizardData;
@@ -15,9 +17,18 @@ export default function WizardStep2Infos({
   data,
   onChange,
 }: WizardStep2InfosProps) {
-  const categories = data.type
-    ? ESTABLISHMENT_TYPES[data.type as EstablishmentType].categories
-    : [];
+  // Sous-catégories de la famille choisie à l'étape 1, chargées depuis la base.
+  const [subcats, setSubcats] = useState<CategoryNode[]>([]);
+  const [loadingCats, setLoadingCats] = useState(false);
+
+  useEffect(() => {
+    if (!data.type) { setSubcats([]); return; }
+    const rootSlug = TYPE_TO_ROOT_SLUG[data.type as EstablishmentType];
+    setLoadingCats(true);
+    getCategoryWithChildren(rootSlug)
+      .then((res) => setSubcats(res?.children || []))
+      .finally(() => setLoadingCats(false));
+  }, [data.type]);
 
   return (
     <div>
@@ -48,17 +59,28 @@ export default function WizardStep2Infos({
               Catégorie *
             </label>
             <select
-              value={data.category}
-              onChange={(e) => onChange({ category: e.target.value })}
-              className="w-full border border-gris-ligne rounded-lg px-4 py-3 text-sm focus:border-marine focus:outline-none transition-colors"
+              value={data.categoryId}
+              onChange={(e) => {
+                const id = e.target.value;
+                const picked = subcats.find((s) => s.id === id);
+                onChange({ categoryId: id, category: picked?.name || '' });
+              }}
+              disabled={loadingCats || subcats.length === 0}
+              className="w-full border border-gris-ligne rounded-lg px-4 py-3 text-sm focus:border-marine focus:outline-none transition-colors disabled:opacity-60"
             >
-              <option value="">— Choisir —</option>
-              {categories.map((cat) => (
-                <option key={cat} value={cat}>
-                  {cat}
+              <option value="">
+                {loadingCats ? 'Chargement…' : '— Choisir —'}
+              </option>
+              {subcats.map((cat) => (
+                <option key={cat.id} value={cat.id}>
+                  {cat.icon ? `${cat.icon} ` : ''}{cat.name}
                 </option>
               ))}
             </select>
+            <p className="text-[10px] text-gris-doux mt-1">
+              La catégorie précise votre classement dans l&apos;annuaire. Elle
+              peut être ajustée ensuite par l&apos;équipe myCAMBO.
+            </p>
           </div>
           <div>
             <label className="block text-xs font-bold text-black mb-1.5 uppercase tracking-wider">

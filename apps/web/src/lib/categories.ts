@@ -46,3 +46,28 @@ export async function getCategoryWithChildren(
 
   return { category: category as CategoryNode, children: (children || []) as CategoryNode[] };
 }
+
+export type CategoryFamily = CategoryNode & { children: CategoryNode[] };
+
+/**
+ * Arbre complet des catégories : familles (racines parent_id = null) avec
+ * leurs sous-catégories. Sert aux menus déroulants (wizard partenaire, édition,
+ * console admin). Accepte un client Supabase existant (côté client) sinon en
+ * crée un public.
+ */
+export async function getCategoryTree(client?: any): Promise<CategoryFamily[]> {
+  const supabase = client ?? publicClient();
+
+  const { data: all } = await supabase
+    .from('categories')
+    .select('id, name, slug, icon, color, position, parent_id')
+    .eq('is_active', true)
+    .order('position', { ascending: true });
+
+  const nodes = (all || []) as CategoryNode[];
+  const roots = nodes.filter((c) => !c.parent_id);
+  return roots.map((r) => ({
+    ...r,
+    children: nodes.filter((c) => c.parent_id === r.id),
+  }));
+}
