@@ -172,7 +172,7 @@ export default function Step1Company({ data, updateData }: Props) {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="md:col-span-2">
             <label className="block text-xs font-bold text-gris-texte uppercase mb-2">
-              Nom commercial / Raison sociale *
+              Raison sociale (entité juridique) *
             </label>
             <input
               type="text"
@@ -181,6 +181,11 @@ export default function Step1Company({ data, updateData }: Props) {
               placeholder="Ex : Bistro Khmer Co., Ltd"
               className="w-full px-4 py-2.5 text-sm rounded-lg border border-gris-ligne focus:border-marine focus:outline-none"
             />
+            <p className="text-[10px] text-gris-doux mt-1">
+              Le nom légal de votre structure (entreprise, association…).
+              Ce n&apos;est pas le nom public de votre établissement — vous le
+              renseignerez à l&apos;étape suivante.
+            </p>
           </div>
 
           {/* Champ N° enregistrement — affiché UNIQUEMENT si requis */}

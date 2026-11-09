@@ -23,6 +23,18 @@ export default function Step2Establishments({ data, updateData }: Props) {
 
   useEffect(() => { getCategoryTree().then(setTree); }, []);
 
+  // Pré-remplissage malin : si le 1er établissement n'a pas encore de nom,
+  // on reprend la raison sociale (modifiable). Pratique pour un indépendant
+  // mono-établissement, et évite l'impression de devoir tout retaper.
+  useEffect(() => {
+    if (data.legal_name && data.establishments.length === 1 && !data.establishments[0].name) {
+      const updated = [...data.establishments];
+      updated[0] = { ...updated[0], name: data.legal_name };
+      updateData({ establishments: updated });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const addEstablishment = () => {
     if (data.establishments.length >= MAX_ESTABLISHMENTS) return;
     updateData({ establishments: [...data.establishments, { ...EMPTY }] });
@@ -86,7 +98,7 @@ export default function Step2Establishments({ data, updateData }: Props) {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div className="md:col-span-2">
-                  <label className="block text-[10px] font-bold text-gris-texte uppercase mb-1">Nom *</label>
+                  <label className="block text-[10px] font-bold text-gris-texte uppercase mb-1">Nom public de l&apos;établissement *</label>
                   <input
                     type="text"
                     value={est.name}

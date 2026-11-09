@@ -188,14 +188,19 @@ export default function PartnerLoginPage() {
             </button>
           </form>
 
-          <div className="text-center text-xs text-gris-texte mt-6">
-            Pas encore de compte partenaire ?{' '}
-            <Link
-              href="/partenaire/demande"
-              className="text-marine font-bold hover:underline"
-            >
-              Faire une demande
-            </Link>
+          <div className="text-center text-xs text-gris-texte mt-6 space-y-2">
+            <p>
+              Demande approuvée mais pas d&apos;accès ?{' '}
+              <Link href="/espace-partenaire/acces" className="text-marine font-bold hover:underline">
+                Recevoir un lien
+              </Link>
+            </p>
+            <p>
+              Pas encore de compte partenaire ?{' '}
+              <Link href="/partenaire/demande" className="text-marine font-bold hover:underline">
+                Faire une demande
+              </Link>
+            </p>
           </div>
         </div>
 

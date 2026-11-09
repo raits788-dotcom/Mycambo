@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import {
   getTenant, getTenantBusinesses, getTenantPayments, getTenantSubscription,
-  startImpersonation, resetTenantAdminPassword,
+  startImpersonation, resetTenantAdminPassword, resendPartnerAccess,
   approveTenant, suspendTenant,
   changeVerificationLevel, getVerificationHistory,
   getLabelCatalog, getTenantLabels, toggleTenantLabel,
@@ -66,6 +66,7 @@ export default function TenantDetailPage({
   const [loading, setLoading] = useState(true);
   const [impersonating, setImpersonating] = useState(false);
   const [resetting, setResetting] = useState(false);
+  const [resendingAccess, setResendingAccess] = useState(false);
   const [approving, setApproving] = useState(false);
   const [suspending, setSuspending] = useState(false);
   const [labelCatalog, setLabelCatalog] = useState<any[]>([]);
@@ -214,6 +215,19 @@ export default function TenantDetailPage({
       alert('Erreur : ' + (err as Error).message);
     } finally {
       setSuspending(false);
+    }
+  };
+
+  const handleResendAccess = async () => {
+    if (!confirm('Envoyer un nouveau lien d\'accès (30 jours, usage unique) à ' + tenant.email + ' ?')) return;
+    setResendingAccess(true);
+    try {
+      const res = await resendPartnerAccess(tenant.id, tenant.email);
+      alert('✅ Lien d\'accès envoyé à ' + res.email);
+    } catch (err) {
+      alert('Erreur : ' + (err as Error).message);
+    } finally {
+      setResendingAccess(false);
     }
   };
 
@@ -387,6 +401,16 @@ export default function TenantDetailPage({
             >
               <KeyRound size={14} />
               {resetting ? 'Envoi...' : 'Reset MDP admin'}
+            </button>
+
+            <button
+              onClick={handleResendAccess}
+              disabled={resendingAccess}
+              className="flex items-center gap-2 border border-gris-ligne text-marine font-bold text-sm px-4 py-2.5 rounded-full hover:border-marine disabled:opacity-50"
+              title="Envoie un nouveau lien magique (30j, usage unique) au partenaire"
+            >
+              <Mail size={14} />
+              {resendingAccess ? 'Envoi...' : 'Renvoyer l\'accès'}
             </button>
 
             <button

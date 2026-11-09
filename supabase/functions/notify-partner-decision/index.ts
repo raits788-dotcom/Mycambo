@@ -20,7 +20,34 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-function approvedEmailHtml(name: string, email: string, tempPassword: string, portalUrl: string): string {
+function approvedEmailHtml(
+  name: string, email: string, magicLink: string | null, tempPassword: string, portalUrl: string
+): string {
+  // Accès principal = lien magique (bouton). Le mot de passe temporaire n'est
+  // montré qu'en secours, si la génération du lien a échoué.
+  const accessBlock = magicLink
+    ? `
+      <p style="text-align:center;margin:22px 0;">
+        <a href="${magicLink}" style="background:#1B3A6B;color:#fff;text-decoration:none;font-weight:bold;padding:14px 30px;border-radius:24px;display:inline-block;font-size:15px;">
+          Activer mon accès
+        </a>
+      </p>
+      <p style="font-size:12px;color:#9AA4B4;text-align:center;margin:0 0 8px;">
+        Ce lien est valable 30 jours et utilisable une seule fois. Vous définirez votre mot de passe en cliquant.
+      </p>`
+    : `
+      <div style="background:#EEF3FB;border-left:4px solid #1B3A6B;border-radius:8px;padding:16px;margin:20px 0;">
+        <p style="margin:0 0 8px;font-size:14px;font-weight:bold;">Vos identifiants de connexion</p>
+        <p style="margin:0 0 4px;font-size:13px;color:#5A6578;">Email : <strong>${email}</strong></p>
+        <p style="margin:0;font-size:13px;color:#5A6578;">Mot de passe temporaire :
+          <strong style="font-family:monospace;background:#fff;padding:2px 8px;border-radius:4px;border:1px solid #E6E9EF;">${tempPassword}</strong>
+        </p>
+        <p style="margin:10px 0 0;font-size:12px;color:#9AA4B4;">À changer à la première connexion.</p>
+      </div>
+      <p style="text-align:center;margin:22px 0;">
+        <a href="${portalUrl}" style="background:#1B3A6B;color:#fff;text-decoration:none;font-weight:bold;padding:12px 26px;border-radius:24px;display:inline-block;">Me connecter</a>
+      </p>`;
+
   return `
   <div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;max-width:620px;margin:0 auto;color:#1B3A6B;">
     <div style="background:#35A85B;padding:22px;border-radius:12px 12px 0 0;">
@@ -33,29 +60,12 @@ function approvedEmailHtml(name: string, email: string, tempPassword: string, po
         <strong style="color:#35A85B;">approuvée</strong> !
       </p>
 
-      <div style="background:#EEF3FB;border-left:4px solid #1B3A6B;border-radius:8px;padding:16px;margin:20px 0;">
-        <p style="margin:0 0 8px;font-size:14px;font-weight:bold;">Vos identifiants de connexion</p>
-        <p style="margin:0 0 4px;font-size:13px;color:#5A6578;">Email : <strong>${email}</strong></p>
-        <p style="margin:0;font-size:13px;color:#5A6578;">
-          Mot de passe temporaire :
-          <strong style="font-family:monospace;background:#fff;padding:2px 8px;border-radius:4px;border:1px solid #E6E9EF;">${tempPassword}</strong>
-        </p>
-        <p style="margin:10px 0 0;font-size:12px;color:#9AA4B4;">
-          Pour votre sécurité, vous devrez changer ce mot de passe à la première connexion.
-        </p>
-      </div>
-
-      <p style="text-align:center;margin:22px 0;">
-        <a href="${portalUrl}" style="background:#1B3A6B;color:#fff;text-decoration:none;font-weight:bold;padding:12px 26px;border-radius:24px;display:inline-block;">
-          Me connecter à mon espace
-        </a>
-      </p>
+      ${accessBlock}
 
       <div style="background:#EEF3FB;border-left:4px solid #1B3A6B;border-radius:8px;padding:16px;margin:20px 0;">
         <p style="margin:0 0 8px;font-size:14px;font-weight:bold;">Prochaines étapes :</p>
         <ol style="margin:0;padding-left:18px;font-size:13px;color:#1B3A6B;line-height:1.8;">
-          <li>Connectez-vous à votre espace partenaire</li>
-          <li>Changez votre mot de passe temporaire</li>
+          <li>Activez votre accès et définissez votre mot de passe</li>
           <li>Choisissez une formule d'abonnement</li>
           <li>Complétez vos établissements</li>
         </ol>
@@ -97,7 +107,7 @@ serve(async (req) => {
     );
 
     const body = await req.json();
-    const { request_id, decision, temp_password, reason } = body;
+    const { request_id, decision, magic_link, temp_password, reason } = body;
 
     // Récupère la demande pour le nom + l'email.
     const { data: reqRow, error } = await admin
@@ -122,7 +132,7 @@ serve(async (req) => {
 
     if (decision === "approved") {
       subject = "myCAMBO — Votre demande de partenariat est approuvée 🎉";
-      html = approvedEmailHtml(name, reqRow.email, temp_password || "—", portalUrl);
+      html = approvedEmailHtml(name, reqRow.email, magic_link || null, temp_password || "—", portalUrl);
     } else {
       subject = "myCAMBO — Suite de votre demande de partenariat";
       html = rejectedEmailHtml(name, reason || reqRow.rejection_reason || "");

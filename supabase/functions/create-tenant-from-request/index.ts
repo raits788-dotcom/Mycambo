@@ -6,7 +6,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Génère un mot de passe temporaire fort
+// Génère un mot de passe temporaire fort (fallback interne).
 function generateTempPassword(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
   let pwd = "";
@@ -14,6 +14,31 @@ function generateTempPassword(): string {
     pwd += chars.charAt(Math.floor(Math.random() * chars.length));
   }
   return pwd;
+}
+
+async function sha256(input: string): Promise<string> {
+  const data = new TextEncoder().encode(input);
+  const digest = await crypto.subtle.digest("SHA-256", data);
+  return Array.from(new Uint8Array(digest))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+// Crée un lien magique (30 jours, usage unique) et renvoie l'URL en clair.
+async function createMagicLink(
+  supabase: any, userId: string, email: string, siteUrl: string
+): Promise<string> {
+  const rawToken = crypto.randomUUID() + crypto.randomUUID().replace(/-/g, "");
+  const tokenHash = await sha256(rawToken);
+  const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+  await supabase.from("magic_links").insert({
+    user_id: userId,
+    email,
+    token_hash: tokenHash,
+    purpose: "partner_activation",
+    expires_at: expiresAt,
+  });
+  return `${siteUrl}/espace-partenaire/activer?token=${rawToken}`;
 }
 
 // Slugifie un nom (accents, espaces -> tirets).
@@ -297,14 +322,24 @@ serve(async (req) => {
       },
     });
 
+    // ─── 7. Lien magique d'accès (30 jours, usage unique) ────────────────
+    const siteUrl = Deno.env.get("SITE_URL") || "https://dev.mycambo.net";
+    let magicLink: string | null = null;
+    try {
+      magicLink = await createMagicLink(supabase, userId, request.email, siteUrl);
+    } catch (_e) {
+      magicLink = null; // on garde temp_password en secours
+    }
+
     return new Response(JSON.stringify({
       success: true,
       tenant_id: tenantId,
       tenant_slug: tenantSlug,
       user_id: userId,
       user_email: request.email,
-      // Toujours renvoyé : un mot de passe temporaire est (re)généré dans
-      // tous les cas, donc l'email de bienvenue peut toujours l'afficher.
+      // Lien magique = moyen d'accès principal ; temp_password reste en
+      // secours si la génération du lien a échoué.
+      magic_link: magicLink,
       temp_password: tempPassword,
       is_new_user: isNewUser,
       plan: defaultSlug,
