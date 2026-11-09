@@ -68,11 +68,8 @@ export const HUBS: NavItem[] = [
     icon: 'Tag',
     href: '/annonces',
     active: true,
-    // Sous-menu au survol (desktop)
-    submenu: [
-      { label: 'Toutes les annonces', href: '/annonces' },
-      { label: 'Emploi', href: '/emploi' },
-    ],
+    // Pas de dropdown au survol : la sous-barre AnnoncesSubNav (comme
+    // Découvrir) gère déjà « Toutes les annonces » et « Emploi ».
   },
   {
     id: 'createurs',
