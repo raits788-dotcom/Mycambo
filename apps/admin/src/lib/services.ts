@@ -349,6 +349,28 @@ export async function resetTenantAdminPassword(tenantId: string) {
   return data as { success: boolean; email: string };
 }
 
+// Renvoie un nouveau lien magique d'accès (30j, usage unique) au partenaire.
+export async function resendPartnerAccess(tenantId: string, email: string) {
+  const supabase = getSupabase();
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) throw new Error('NOT_AUTHENTICATED');
+
+  const res = await fetch(
+    `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/resend-partner-access`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session.access_token}`,
+      },
+      body: JSON.stringify({ tenant_id: tenantId, email }),
+    }
+  );
+  const data = await res.json();
+  if (!res.ok || !data.ok) throw new Error(data.error || 'RESEND_FAILED');
+  return data as { ok: boolean; email: string };
+}
+
 // ============================================================================
 // TENANTS CRUD
 // ============================================================================
@@ -1237,6 +1259,7 @@ export async function approvePartnerRequest(requestId: string) {
       body: JSON.stringify({
         request_id: requestId,
         decision: 'approved',
+        magic_link: tenantData.magic_link || null,
         temp_password: tenantData.temp_password || null,
         is_new_user: tenantData.is_new_user || false,
       }),
