@@ -59,6 +59,19 @@ export const ESTABLISHMENT_TYPES: Record<
   },
 };
 
+// Mapping type du wizard -> slug de la catégorie RACINE en base.
+// Les types activite/boutique/transport/autre sont désormais regroupés sous
+// « Autres commerces » : la sous-catégorie précise est choisie à l'étape 2.
+export const TYPE_TO_ROOT_SLUG: Record<EstablishmentType, string> = {
+  association: 'association',
+  hotel: 'hotel',
+  restaurant: 'restaurant',
+  activite: 'autres-commerces',
+  boutique: 'autres-commerces',
+  transport: 'autres-commerces',
+  autre: 'autres-commerces',
+};
+
 // ===== Photos typées =====
 export type PhotoSlot = {
   id: string;
@@ -107,7 +120,8 @@ export type WizardData = {
 
   // Étape 2
   name: string;
-  category: string;
+  category: string;       // libellé affiché de la sous-catégorie (compat)
+  categoryId: string;     // id de la sous-catégorie choisie (table categories)
   shortDescription: string;
   longDescription: string;
   foundedYear: string;
@@ -143,6 +157,7 @@ export type UploadedFile = {
 
 export const WIZARD_INITIAL_DATA: WizardData = {
   type: '',
+  categoryId: '',
   name: '',
   category: '',
   shortDescription: '',
@@ -182,7 +197,7 @@ export function validateStep(
 
   if (step === 2) {
     if (!data.name.trim()) errors.push('Le nom est obligatoire.');
-    if (!data.category) errors.push('La catégorie est obligatoire.');
+    if (!data.categoryId) errors.push('La catégorie est obligatoire.');
     if (!data.shortDescription.trim())
       errors.push('La description courte est obligatoire.');
   }

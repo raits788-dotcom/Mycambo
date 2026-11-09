@@ -67,7 +67,7 @@ export async function getBusinesses() {
   const supabase = getSupabase();
   const { data, error } = await supabase
     .from('businesses')
-    .select('*, categories(name, color), tenants(name), plans(name)')
+    .select('*, categories(name, slug, color), tenants(name), plans(name)')
     .order('created_at', { ascending: false });
   if (error) { console.error('getBusinesses error:', error); return []; }
   return data || [];
@@ -1832,6 +1832,37 @@ export async function updateBusinessStatus(businessId: string, status: 'approved
     entity_type: 'business',
     entity_id: businessId,
   });
+}
+
+// Reclasse un établissement dans une (sous-)catégorie. Superadmin.
+export async function updateBusinessCategory(businessId: string, categoryId: string) {
+  const supabase = getSupabase();
+  const { error } = await supabase
+    .from('businesses')
+    .update({ category_id: categoryId })
+    .eq('id', businessId);
+  if (error) throw error;
+
+  await supabase.from('audit_logs').insert({
+    actor_type: 'superadmin',
+    action: 'business.recategorize',
+    entity_type: 'business',
+    entity_id: businessId,
+    changes: { category_id: categoryId },
+  });
+}
+
+// Arbre des catégories (familles racines + enfants), pour les sélecteurs.
+export async function getCategoryTree() {
+  const supabase = getSupabase();
+  const { data } = await supabase
+    .from('categories')
+    .select('id, name, slug, icon, parent_id, position, is_active')
+    .eq('is_active', true)
+    .order('position', { ascending: true });
+  const nodes = data || [];
+  const roots = nodes.filter((c: any) => !c.parent_id);
+  return roots.map((r: any) => ({ ...r, children: nodes.filter((c: any) => c.parent_id === r.id) }));
 }
 
 export async function toggleFeatured(businessId: string) {
