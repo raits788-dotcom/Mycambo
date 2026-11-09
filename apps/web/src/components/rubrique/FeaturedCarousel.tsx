@@ -10,11 +10,13 @@ import { cn } from '@/lib/utils';
 
 interface FeaturedCarouselProps {
   type: string;
+  // Si fourni, rubrique parente : coups de cœur de toutes ces sous-catégories.
+  childSlugs?: string[];
 }
 
 const ROTATION_MS = 5000;
 
-export default function FeaturedCarousel({ type }: FeaturedCarouselProps) {
+export default function FeaturedCarousel({ type, childSlugs }: FeaturedCarouselProps) {
   const [items, setItems] = useState<any[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -26,7 +28,7 @@ export default function FeaturedCarousel({ type }: FeaturedCarouselProps) {
         process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
       );
 
-      const { data: rows } = await supabase
+      let q = supabase
         .from('businesses')
         .select(`
           id, slug, name, city, photos, tenant_id,
@@ -34,8 +36,15 @@ export default function FeaturedCarousel({ type }: FeaturedCarouselProps) {
           tenants!inner(id, verification_level)
         `)
         .eq('status', 'approved')
-        .eq('is_featured', true)
-        .eq('categories.slug', type)
+        .eq('is_featured', true);
+
+      if (childSlugs && childSlugs.length > 0) {
+        q = q.in('categories.slug', childSlugs);
+      } else {
+        q = q.eq('categories.slug', type);
+      }
+
+      const { data: rows } = await q
         .order('featured_position', { ascending: true })
         .limit(6);
 
@@ -67,7 +76,7 @@ export default function FeaturedCarousel({ type }: FeaturedCarouselProps) {
       setItems(enriched);
       setLoading(false);
     })();
-  }, [type]);
+  }, [type, childSlugs?.join(',')]);
 
   useEffect(() => {
     if (items.length <= 1) return;

@@ -29,6 +29,7 @@ export default function CategoriesPage() {
     icon: '🏷️',
     color: '#1B3A6B',
     position: 99,
+    parent_id: '' as string,
   });
   const [error, setError] = useState('');
 
@@ -49,10 +50,11 @@ export default function CategoriesPage() {
         icon: category.icon,
         color: category.color,
         position: category.position,
+        parent_id: category.parent_id || '',
       });
     } else {
       setEditing(null);
-      setForm({ name: '', icon: '🏷️', color: '#1B3A6B', position: 99 });
+      setForm({ name: '', icon: '🏷️', color: '#1B3A6B', position: 99, parent_id: '' });
     }
     setError('');
     setShowModal(true);
@@ -63,10 +65,14 @@ export default function CategoriesPage() {
     setError('');
     setProcessing('save');
     try {
+      const payload = {
+        ...form,
+        parent_id: form.parent_id || null,
+      };
       if (editing) {
-        await updateCategory(editing.id, form);
+        await updateCategory(editing.id, payload);
       } else {
-        await createCategory(form);
+        await createCategory(payload);
       }
       setShowModal(false);
       await reload();
@@ -289,6 +295,31 @@ export default function CategoriesPage() {
                     Plus petit = affiché en premier
                   </p>
                 </div>
+              </div>
+
+              {/* Catégorie parente (regroupement, ex. « Autres commerces ») */}
+              <div>
+                <label className="block text-xs font-bold text-gris-texte uppercase mb-1">
+                  Catégorie parente
+                </label>
+                <select
+                  value={form.parent_id}
+                  onChange={(e) => setForm({ ...form, parent_id: e.target.value })}
+                  className="w-full px-3 py-2 text-sm rounded-lg border border-gris-ligne focus:border-marine focus:outline-none bg-white"
+                >
+                  <option value="">— Aucune (catégorie principale, dans la barre)</option>
+                  {categories
+                    .filter((c) => !c.parent_id && (!editing || c.id !== editing.id))
+                    .map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.icon} {c.name}
+                      </option>
+                    ))}
+                </select>
+                <p className="text-[10px] text-gris-doux mt-1">
+                  Vide = apparaît dans la barre de navigation. Sinon = sous-catégorie
+                  affichée dans la sous-barre du parent.
+                </p>
               </div>
 
               {error && (
