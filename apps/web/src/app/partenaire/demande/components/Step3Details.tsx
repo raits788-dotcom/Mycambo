@@ -1,0 +1,194 @@
+'use client';
+
+import { useState } from 'react';
+import { ChevronDown, ChevronRight, Sparkles, Phone, Clock, Settings } from 'lucide-react';
+import type { WizardData, DemandeEstablishment } from '../page';
+
+interface Props {
+  data: WizardData;
+  updateData: (updates: Partial<WizardData>) => void;
+}
+
+// Services proposés selon la famille (optionnels, cases à cocher).
+const SERVICES_BY_FAMILY: Record<string, string[]> = {
+  hotel: ['Wi-Fi', 'Parking', 'Piscine', 'Climatisation', 'Petit-déjeuner', 'Restaurant', 'Navette', 'Accès PMR'],
+  restaurant: ['Wi-Fi', 'Terrasse', 'Climatisation', 'Réservation', 'Végétarien', 'Livraison', 'À emporter', 'Accès PMR'],
+  association: ['Bénévolat', 'Dons', 'Visites', 'Partenariats'],
+  'autres-commerces': ['Wi-Fi', 'Parking', 'Climatisation', 'Réservation', 'Livraison', 'Accès PMR'],
+};
+const PRICE_RANGES = ['€', '€€', '€€€'];
+const LANGUAGES = ['Français', 'Anglais', 'Khmer', 'Chinois'];
+
+export default function Step3Details({ data, updateData }: Props) {
+  const [open, setOpen] = useState<number>(0);
+
+  const patch = (index: number, updates: Partial<DemandeEstablishment>) => {
+    const updated = [...data.establishments];
+    updated[index] = { ...updated[index], ...updates };
+    updateData({ establishments: updated });
+  };
+
+  const toggleInArray = (index: number, field: 'services' | 'languages', value: string) => {
+    const current = data.establishments[index][field] || [];
+    const next = current.includes(value)
+      ? current.filter((v) => v !== value)
+      : [...current, value];
+    patch(index, { [field]: next } as Partial<DemandeEstablishment>);
+  };
+
+  return (
+    <div className="space-y-5">
+      <div>
+        <h2 className="text-lg font-extrabold text-marine flex items-center gap-2 mb-1">
+          ✨ Détails de vos établissements
+        </h2>
+        <p className="text-xs text-gris-texte">
+          Ces informations <strong>remplissent directement votre fiche publique</strong> —
+          tout est optionnel, mais une fiche complète est bien plus visible.
+          Vous pourrez compléter ou modifier plus tard.
+        </p>
+      </div>
+
+      {data.establishments.map((est, index) => {
+        const isOpen = open === index;
+        const services = SERVICES_BY_FAMILY[est.family_slug] || SERVICES_BY_FAMILY['autres-commerces'];
+        return (
+          <div key={index} className="border border-gris-ligne rounded-lg overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setOpen(isOpen ? -1 : index)}
+              className="w-full flex items-center gap-2 px-4 py-3 bg-gris-fond text-left"
+            >
+              {isOpen ? <ChevronDown size={16} className="text-marine" /> : <ChevronRight size={16} className="text-gris-doux" />}
+              <span className="text-sm font-bold text-marine">{est.name || `Établissement #${index + 1}`}</span>
+              <span className="ml-auto text-[10px] text-gris-doux">{est.category || ''}</span>
+            </button>
+
+            {isOpen && (
+              <div className="p-4 space-y-5">
+                {/* Descriptif */}
+                <div>
+                  <div className="flex items-center gap-1.5 text-[11px] font-bold text-marine uppercase mb-2">
+                    <Sparkles size={12} /> Descriptif
+                  </div>
+                  <div className="space-y-2">
+                    <input
+                      type="text" value={est.tagline}
+                      onChange={(e) => patch(index, { tagline: e.target.value })}
+                      placeholder="Accroche : une phrase qui résume l'établissement"
+                      className="w-full px-3 py-2 text-sm rounded-lg border border-gris-ligne bg-white focus:border-marine focus:outline-none"
+                    />
+                    <textarea
+                      value={est.description}
+                      onChange={(e) => patch(index, { description: e.target.value })}
+                      placeholder="Présentation : ambiance, spécialités, histoire… (2-3 phrases)"
+                      rows={3}
+                      className="w-full px-3 py-2 text-sm rounded-lg border border-gris-ligne bg-white focus:border-marine focus:outline-none resize-none"
+                    />
+                  </div>
+                </div>
+
+                {/* Contact & horaires */}
+                <div>
+                  <div className="flex items-center gap-1.5 text-[11px] font-bold text-marine uppercase mb-2">
+                    <Phone size={12} /> Contact &amp; horaires
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                    <input
+                      type="tel" value={est.public_phone}
+                      onChange={(e) => patch(index, { public_phone: e.target.value })}
+                      placeholder="Téléphone public"
+                      className="w-full px-3 py-2 text-sm rounded-lg border border-gris-ligne bg-white focus:border-marine focus:outline-none"
+                    />
+                    <input
+                      type="email" value={est.public_email}
+                      onChange={(e) => patch(index, { public_email: e.target.value })}
+                      placeholder="Email public"
+                      className="w-full px-3 py-2 text-sm rounded-lg border border-gris-ligne bg-white focus:border-marine focus:outline-none"
+                    />
+                    <div className="md:col-span-2 relative">
+                      <Clock size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-gris-doux" />
+                      <input
+                        type="text" value={est.hours}
+                        onChange={(e) => patch(index, { hours: e.target.value })}
+                        placeholder="Horaires (ex. Lun-Sam 8h-18h, Dim fermé)"
+                        className="w-full pl-8 pr-3 py-2 text-sm rounded-lg border border-gris-ligne bg-white focus:border-marine focus:outline-none"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Services & équipements */}
+                <div>
+                  <div className="flex items-center gap-1.5 text-[11px] font-bold text-marine uppercase mb-2">
+                    <Settings size={12} /> Services &amp; équipements
+                  </div>
+                  <div className="flex flex-wrap gap-1.5 mb-3">
+                    {services.map((s) => {
+                      const on = (est.services || []).includes(s);
+                      return (
+                        <button
+                          key={s} type="button"
+                          onClick={() => toggleInArray(index, 'services', s)}
+                          className={'text-xs font-bold px-3 py-1.5 rounded-full border transition-colors ' +
+                            (on ? 'bg-marine text-white border-marine' : 'bg-white text-gris-texte border-gris-ligne hover:border-marine')}
+                        >
+                          {on ? '✓ ' : ''}{s}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[10px] font-bold text-gris-texte uppercase mb-1">Gamme de prix</label>
+                      <div className="flex gap-1.5">
+                        {PRICE_RANGES.map((p) => (
+                          <button
+                            key={p} type="button"
+                            onClick={() => patch(index, { price_range: est.price_range === p ? '' : p })}
+                            className={'text-sm font-bold px-4 py-1.5 rounded-lg border transition-colors ' +
+                              (est.price_range === p ? 'bg-marine text-white border-marine' : 'bg-white text-gris-texte border-gris-ligne hover:border-marine')}
+                          >
+                            {p}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-gris-texte uppercase mb-1">Langues parlées</label>
+                      <div className="flex flex-wrap gap-1.5">
+                        {LANGUAGES.map((l) => {
+                          const on = (est.languages || []).includes(l);
+                          return (
+                            <button
+                              key={l} type="button"
+                              onClick={() => toggleInArray(index, 'languages', l)}
+                              className={'text-xs font-bold px-2.5 py-1.5 rounded-full border transition-colors ' +
+                                (on ? 'bg-marine text-white border-marine' : 'bg-white text-gris-texte border-gris-ligne hover:border-marine')}
+                            >
+                              {on ? '✓ ' : ''}{l}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })}
+
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-start gap-2">
+        <span className="text-blue-600 text-lg">💡</span>
+        <p className="text-xs text-blue-800">
+          Tout est optionnel ici. Plus vous complétez, plus votre fiche est
+          attractive dès sa publication. Vous garderez la main pour tout
+          modifier depuis votre espace partenaire.
+        </p>
+      </div>
+    </div>
+  );
+}

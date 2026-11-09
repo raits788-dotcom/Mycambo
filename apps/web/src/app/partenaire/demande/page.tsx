@@ -6,12 +6,14 @@ import { createBrowserClient } from '@supabase/ssr';
 import WizardProgress from './components/WizardProgress';
 import Step1Company from './components/Step1Company';
 import Step2Establishments from './components/Step2Establishments';
+import Step3Details from './components/Step3Details';
 import Step3Photos from './components/Step3Photos';
 import Step4Motivation from './components/Step4Motivation';
 import Step5Verification from './components/Step5Verification';
 
-// Un établissement déclaré dans la demande (étape 2).
+// Un établissement déclaré dans la demande (étapes 2 + 3 Détails).
 export interface DemandeEstablishment {
+  // Identité (étape 2)
   name: string;
   family_slug: string;    // famille (catégorie racine) choisie
   category_id: string;    // sous-catégorie choisie (id en base)
@@ -21,6 +23,15 @@ export interface DemandeEstablishment {
   website_url: string;
   facebook_url: string;
   google_maps_url: string;
+  // Détails (étape 3) — alimentent directement la fiche publique. Optionnels.
+  tagline: string;        // accroche -> sous-titre de la fiche
+  description: string;    // présentation -> onglet Présentation
+  public_phone: string;   // téléphone public (≠ représentant)
+  public_email: string;   // email public
+  hours: string;          // horaires en texte libre (ex. "Lun-Sam 8h-18h")
+  services: string[];     // services cochés (wifi, parking…)
+  price_range: string;    // "€" | "€€" | "€€€"
+  languages: string[];    // FR / EN / KH / …
 }
 
 export interface WizardData {
@@ -54,6 +65,8 @@ export interface WizardData {
 const EMPTY_ESTABLISHMENT: DemandeEstablishment = {
   name: '', family_slug: '', category_id: '', category: '',
   city: '', address: '', website_url: '', facebook_url: '', google_maps_url: '',
+  tagline: '', description: '', public_phone: '', public_email: '',
+  hours: '', services: [], price_range: '', languages: [],
 };
 
 const INITIAL_DATA: WizardData = {
@@ -81,7 +94,7 @@ export default function PartnerRequestWizard() {
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
 
-  const TOTAL_STEPS = 5;
+  const TOTAL_STEPS = 6;
 
   const updateData = (updates: Partial<WizardData>) => {
     setData((prev) => ({ ...prev, ...updates }));
@@ -107,12 +120,16 @@ export default function PartnerRequestWizard() {
       );
     }
     if (step === 3) {
-      return !!(data.photo_exterior_url && data.photo_interior_url);
+      // Détails : tout optionnel -> toujours franchissable.
+      return true;
     }
     if (step === 4) {
-      return data.motivation.length >= 50;
+      return !!(data.photo_exterior_url && data.photo_interior_url);
     }
     if (step === 5) {
+      return data.motivation.length >= 50;
+    }
+    if (step === 6) {
       return data.accepts_terms && data.email_verified;
     }
     return false;
@@ -255,9 +272,10 @@ export default function PartnerRequestWizard() {
         <div className="bg-white rounded-2xl shadow-lg p-6 md:p-8">
           {step === 1 && <Step1Company data={data} updateData={updateData} />}
           {step === 2 && <Step2Establishments data={data} updateData={updateData} />}
-          {step === 3 && <Step3Photos data={data} updateData={updateData} />}
-          {step === 4 && <Step4Motivation data={data} updateData={updateData} />}
-          {step === 5 && <Step5Verification data={data} updateData={updateData} />}
+          {step === 3 && <Step3Details data={data} updateData={updateData} />}
+          {step === 4 && <Step3Photos data={data} updateData={updateData} />}
+          {step === 5 && <Step4Motivation data={data} updateData={updateData} />}
+          {step === 6 && <Step5Verification data={data} updateData={updateData} />}
         </div>
 
         {/* Navigation */}
