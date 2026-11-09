@@ -9,8 +9,9 @@ interface WizardProgressProps {
 }
 
 const STEP_LABELS = [
-  'Entreprise',
+  'Demandeur',
   'Établissements',
+  'Détails',
   'Photos',
   'Motivation',
   'Vérification',

@@ -249,17 +249,32 @@ serve(async (req) => {
           ? est.photos.filter((u: unknown): u is string => typeof u === "string" && u.length > 0)
           : reqPhotos;
 
+        // Champs détails (étape « Détails ») -> alimentent la fiche publique.
+        // services est un objet { "<label>": true } (format de la table businesses).
+        const servicesArr = Array.isArray(est?.services) ? est.services : [];
+        const servicesObj: Record<string, boolean> = {};
+        for (const s of servicesArr) if (typeof s === "string") servicesObj[s] = true;
+        const languages = Array.isArray(est?.languages) ? est.languages : [];
+
         const { error: estErr } = await supabase.from("businesses").insert({
           tenant_id: tenantId,
           name,
           slug: estSlug,
           category_id: categoryId,
-          description: est?.description || request.message || null,
+          // accroche -> description ; présentation -> long_description
+          description: est?.tagline || est?.description || request.message || null,
+          long_description: est?.description || null,
           address: est?.address || null,
           city: est?.city || request.city || null,
-          phone: est?.phone || request.phone || request.legal_representative_phone || null,
-          email: est?.email || request.email || null,
+          phone: est?.public_phone || est?.phone || request.phone || request.legal_representative_phone || null,
+          email: est?.public_email || est?.email || request.email || null,
           website: est?.website_url || request.website_url || null,
+          // hours est jsonb : une chaîne JSON scalaire est acceptée et
+          // formatHours() côté front sait l'afficher telle quelle.
+          hours: est?.hours ? est.hours : null,
+          services: Object.keys(servicesObj).length ? servicesObj : null,
+          price_range: est?.price_range || null,
+          languages: languages.length ? languages : null,
           photos: estPhotos,
           status: "pending",
         });

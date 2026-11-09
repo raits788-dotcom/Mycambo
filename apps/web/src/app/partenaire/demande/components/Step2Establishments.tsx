@@ -13,6 +13,8 @@ interface Props {
 const EMPTY: DemandeEstablishment = {
   name: '', family_slug: '', category_id: '', category: '',
   city: '', address: '', website_url: '', facebook_url: '', google_maps_url: '',
+  tagline: '', description: '', public_phone: '', public_email: '',
+  hours: '', services: [], price_range: '', languages: [],
 };
 
 export default function Step2Establishments({ data, updateData }: Props) {
