@@ -1,6 +1,15 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import type { Metadata } from 'next';
+import SectionSubNav from '@/components/layout/SectionSubNav';
+
+// Sous-barre de l'annuaire : raccourcis vers les grandes familles.
+const ANNUAIRE_LINKS = [
+  { label: 'Hôtels', href: '/rubrique/hotel', icon: '🏨' },
+  { label: 'Restaurants', href: '/rubrique/restaurant', icon: '🍜' },
+  { label: 'Associations', href: '/rubrique/association', icon: '🤝' },
+  { label: 'Autres commerces', href: '/rubrique/autres-commerces', icon: '🏬' },
+];
 
 export const metadata: Metadata = {
   title: 'Annuaire',
@@ -64,6 +73,8 @@ const CATEGORIES = [
 
 export default function AnnuairePage() {
   return (
+    <>
+    <SectionSubNav basePath="/annuaire" links={ANNUAIRE_LINKS} allLabel="Tout" />
     <section className="relative text-white overflow-hidden min-h-[calc(100vh-260px)]">
       <Image
         src="https://images.unsplash.com/photo-1565668314564-9d1bebb0a1db?q=85&w=2400&auto=format&fit=crop"
@@ -164,5 +175,6 @@ export default function AnnuairePage() {
         </div>
       </div>
     </section>
+    </>
   );
 }

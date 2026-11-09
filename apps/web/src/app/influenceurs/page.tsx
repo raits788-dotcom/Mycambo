@@ -1,6 +1,15 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import type { Metadata } from 'next';
+import SectionSubNav from '@/components/layout/SectionSubNav';
+
+// Sous-barre Créateurs : filtres par type de créateur (?cat=).
+const CREATEURS_LINKS = [
+  { label: 'Vidéastes', cat: 'video', icon: '🎬' },
+  { label: 'Photographes', cat: 'photo', icon: '📷' },
+  { label: 'Blogueurs', cat: 'blog', icon: '✍️' },
+  { label: 'Influenceurs', cat: 'influence', icon: '⭐' },
+];
 
 export const metadata: Metadata = {
   title: 'Créateurs',
@@ -49,6 +58,8 @@ const CREATEURS = [
 
 export default function InfluenceursPage() {
   return (
+    <>
+    <SectionSubNav basePath="/influenceurs" links={CREATEURS_LINKS} allLabel="Tous" />
     <section className="relative text-white overflow-hidden min-h-[calc(100vh-260px)]">
       <Image
         src="https://images.unsplash.com/photo-1528181304800-259b08848526?q=85&w=2400&auto=format&fit=crop"
@@ -133,5 +144,6 @@ export default function InfluenceursPage() {
         </div>
       </div>
     </section>
+    </>
   );
 }

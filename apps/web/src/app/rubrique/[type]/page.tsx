@@ -138,12 +138,15 @@ export default async function RubriquePage({ params, searchParams }: Props) {
 
   // Slugs effectivement filtrés :
   //  - sous-catégorie choisie -> uniquement elle
-  //  - parent sans sélection  -> tous les enfants
+  //  - parent sans sélection  -> le parent LUI-MÊME + tous ses enfants
+  //    (les établissements historiques sont rattachés à la racine tant
+  //    qu'ils ne sont pas reclassés dans une sous-catégorie : il faut donc
+  //    inclure le slug parent, sinon ils n'apparaissent plus)
   //  - feuille simple         -> le type lui-même (via typeSlug)
   const effectiveChildSlugs = selectedChild
     ? [selectedChild]
     : isParent
-    ? childSlugs
+    ? [type, ...childSlugs]
     : undefined;
 
   return (
