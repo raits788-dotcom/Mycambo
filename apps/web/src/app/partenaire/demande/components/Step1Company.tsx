@@ -1,8 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { Building2, Mail, Phone, MapPin, Globe, AlertCircle, CheckCircle2, Heart, Handshake, ShoppingBag, User, Landmark, GraduationCap } from 'lucide-react';
-import { createBrowserClient } from '@supabase/ssr';
+import { Building2, Mail, Phone, AlertCircle, CheckCircle2, Heart, Handshake, ShoppingBag, User, Landmark, GraduationCap } from 'lucide-react';
 import type { WizardData } from '../page';
 
 interface Props {
@@ -71,27 +69,8 @@ const STRUCTURE_TYPES = [
 ] as const;
 
 export default function Step1Company({ data, updateData }: Props) {
-  const [categories, setCategories] = useState<any[]>([]);
-  const [loadingCats, setLoadingCats] = useState(true);
-
   const selectedStructure = STRUCTURE_TYPES.find((s) => s.id === data.structure_type);
   const requiresRegistration = selectedStructure?.requiresRegistration ?? false;
-
-  useEffect(() => {
-    (async () => {
-      const supabase = createBrowserClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-      );
-      const { data: cats } = await supabase
-        .from('categories')
-        .select('*')
-        .eq('is_active', true)
-        .order('position');
-      setCategories(cats || []);
-      setLoadingCats(false);
-    })();
-  }, []);
 
   // ─── Sélection du type de structure ─────────────────────────────────────
   const handleStructureChange = (structureId: string) => {
@@ -298,34 +277,15 @@ export default function Step1Company({ data, updateData }: Props) {
 
           <div>
             <label className="block text-xs font-bold text-gris-texte uppercase mb-2">
-              Catégorie *
-            </label>
-            <select
-              value={data.category}
-              onChange={(e) => updateData({ category: e.target.value })}
-              disabled={loadingCats}
-              className="w-full px-4 py-2.5 text-sm rounded-lg border border-gris-ligne focus:border-marine focus:outline-none"
-            >
-              <option value="">— Choisir une catégorie —</option>
-              {categories.map((c) => (
-                <option key={c.id} value={c.slug}>
-                  {c.icon} {c.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-xs font-bold text-gris-texte uppercase mb-2">
-              Ville *
+              Téléphone (optionnel)
             </label>
             <div className="relative">
-              <MapPin size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gris-doux" />
+              <Phone size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gris-doux" />
               <input
-                type="text"
-                value={data.city}
-                onChange={(e) => updateData({ city: e.target.value })}
-                placeholder="Phnom Penh"
+                type="tel"
+                value={data.phone}
+                onChange={(e) => updateData({ phone: e.target.value })}
+                placeholder="Contact général"
                 className="w-full pl-9 pr-4 py-2.5 text-sm rounded-lg border border-gris-ligne focus:border-marine focus:outline-none"
               />
             </div>
@@ -333,52 +293,12 @@ export default function Step1Company({ data, updateData }: Props) {
         </div>
       </div>
 
-      {/* ═══════════════════════════════════════════════════════════
-          ÉTAPE 4 — Présence en ligne
-          ═══════════════════════════════════════════════════════════ */}
       <div className="pt-4 border-t border-gris-ligne">
-        <h3 className="font-bold text-marine text-sm mb-3 flex items-center gap-2">
-          <Globe size={14} /> Présence en ligne (optionnel)
-        </h3>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          <div>
-            <label className="block text-[10px] font-bold text-gris-texte uppercase mb-1">
-              Site web
-            </label>
-            <input
-              type="url"
-              value={data.website_url}
-              onChange={(e) => updateData({ website_url: e.target.value })}
-              placeholder="https://..."
-              className="w-full px-3 py-2 text-sm rounded-lg border border-gris-ligne focus:border-marine focus:outline-none"
-            />
-          </div>
-          <div>
-            <label className="block text-[10px] font-bold text-gris-texte uppercase mb-1">
-              Facebook
-            </label>
-            <input
-              type="url"
-              value={data.facebook_url}
-              onChange={(e) => updateData({ facebook_url: e.target.value })}
-              placeholder="https://facebook.com/..."
-              className="w-full px-3 py-2 text-sm rounded-lg border border-gris-ligne focus:border-marine focus:outline-none"
-            />
-          </div>
-          <div>
-            <label className="block text-[10px] font-bold text-gris-texte uppercase mb-1">
-              Google Maps
-            </label>
-            <input
-              type="url"
-              value={data.google_maps_url}
-              onChange={(e) => updateData({ google_maps_url: e.target.value })}
-              placeholder="https://maps.google.com/..."
-              className="w-full px-3 py-2 text-sm rounded-lg border border-gris-ligne focus:border-marine focus:outline-none"
-            />
-          </div>
-        </div>
+        <p className="text-xs text-gris-texte">
+          <b className="text-marine">Étape suivante :</b> vous décrirez
+          votre (ou vos) établissement(s) — catégorie, ville, adresse et
+          présence en ligne y seront renseignées pour chacun.
+        </p>
       </div>
     </div>
   );
