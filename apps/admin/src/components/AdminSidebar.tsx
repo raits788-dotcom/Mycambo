@@ -27,6 +27,7 @@ import {
   HardDrive,
   Loader2,
   Tag, // ← Ajouté pour les catégories
+  MapPin, // villes
   HeartHandshake, // ← Gérance myCAMBO (associations importées)
 } from 'lucide-react';
 import { cn } from '@my-cambo/utils';
@@ -80,7 +81,8 @@ const NAV_SECTIONS: NavSection[] = [
     items: [
       { id: 'cms-pages', label: 'Pages', icon: FileText, href: '/cms' },
       { id: 'cms-carrousel', label: 'Carrousel', icon: ImageIcon, href: '/cms?tab=carrousel' },
-      { id: 'categories', label: 'Catégories', icon: Tag, href: '/categories' }, // ← Nouvelle entrée
+      { id: 'categories', label: 'Catégories', icon: Tag, href: '/categories' },
+      { id: 'villes', label: 'Villes', icon: MapPin, href: '/villes' },
     ],
   },
   {

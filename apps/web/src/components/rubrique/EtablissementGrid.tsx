@@ -1,12 +1,24 @@
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
-import { Loader2, Search } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { createBrowserClient } from '@supabase/ssr';
 import EtablissementCard from './EtablissementCard';
-import FiltersBar, { type Filters } from './FiltersBar';
+import CommonFilterBar, { type CommonFilterValue, type FilterOption } from '@/components/shared/CommonFilterBar';
 import { getLabelCatalog } from '@/lib/levels';
 import { getCities, type City } from '@/lib/cities';
+import { getAmenitiesForCategory } from '@/lib/amenities';
+
+const EMPTY_FILTER: CommonFilterValue = {
+  q: '', city: '', level: '', labels: [], subcategory: '', amenities: [], priceRange: '',
+};
+const LEVELS = [
+  { id: '', label: 'Tous niveaux' },
+  { id: 'verifie', label: '🥉 Bronze' },
+  { id: 'premium', label: '🥈 Silver' },
+  { id: 'exception', label: '🥇 Gold' },
+  { id: 'legende', label: '💎 Platine' },
+];
 
 interface Props {
   typeSlug?: string;
@@ -20,15 +32,26 @@ export default function EtablissementGrid({ typeSlug, childSlugs, initialData }:
   const [businesses, setBusinesses] = useState<any[]>([]);
   const [labelCatalog, setLabelCatalog] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
-  const [filters, setFilters] = useState<Filters>({});
+  const [filter, setFilter] = useState<CommonFilterValue>(EMPTY_FILTER);
   const [cityList, setCityList] = useState<City[]>([]);
+  const [amenityOpts, setAmenityOpts] = useState<FilterOption[]>([]);
 
   // Villes officielles (table cities) au lieu de celles extraites des fiches.
   useEffect(() => { getCities().then(setCityList); }, []);
 
+  // Commodités de la famille (filtres spécifiques repliés).
+  useEffect(() => {
+    if (!typeSlug) return;
+    getAmenitiesForCategory(typeSlug).then((list) =>
+      setAmenityOpts(list.map((a) => ({ id: a.key, label: a.label })))
+    );
+  }, [typeSlug]);
+
   const norm = (s: string) =>
     s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim();
+
+  // Un resto/café propose un filtre de prix.
+  const showPrice = ['restaurant', 'cafe'].includes(typeSlug || '');
 
   useEffect(() => {
     (async () => {
@@ -40,7 +63,7 @@ export default function EtablissementGrid({ typeSlug, childSlugs, initialData }:
       let query = supabase
         .from('businesses')
         .select(`
-          id, slug, name, description, city, photos, tenant_id,
+          id, slug, name, description, city, photos, tenant_id, services, price_range,
           categories!inner(name, slug, icon, color),
           tenants!inner(id, name, verification_level)
         `)
@@ -88,6 +111,8 @@ export default function EtablissementGrid({ typeSlug, childSlugs, initialData }:
         categoryIcon: b.categories?.icon,
         level: b.tenants?.verification_level || 'inscrit',
         labels: labelsByTenant[b.tenant_id] || [],
+        services: b.services || {},        // jsonb { clé: true }
+        priceRange: b.price_range || '',
       }));
 
       setBusinesses(enriched);
@@ -119,37 +144,38 @@ export default function EtablissementGrid({ typeSlug, childSlugs, initialData }:
     return [...map.values()].sort((a, b) => a.name.localeCompare(b.name));
   }, [businesses]);
 
-  // Filtrage
+  // Filtrage (une seule valeur CommonFilterValue).
   const filtered = useMemo(() => {
     return businesses.filter((b) => {
-      if (search) {
-        const s = search.toLowerCase();
+      if (filter.q) {
+        const s = filter.q.toLowerCase();
         const matchSearch =
           b.name.toLowerCase().includes(s) ||
           (b.city || '').toLowerCase().includes(s) ||
           (b.description || '').toLowerCase().includes(s);
         if (!matchSearch) return false;
       }
-
-      if (filters.city) {
+      if (filter.city) {
         const bc = norm(b.city || '');
-        const fc = norm(filters.city);
+        const fc = norm(filter.city);
         if (!bc.includes(fc) && !fc.includes(bc)) return false;
       }
-      if (filters.level && b.level !== filters.level) return false;
-      if (filters.subcategory && b.categorySlug !== filters.subcategory) return false;
+      if (filter.level && b.level !== filter.level) return false;
+      if (filter.subcategory && b.categorySlug !== filter.subcategory) return false;
+      if (filter.priceRange && b.priceRange !== filter.priceRange) return false;
 
-      if (filters.labels && filters.labels.length > 0) {
-        const businessLabelCodes = b.labels.map((l: any) => l.code);
-        const hasAllLabels = filters.labels.every((code) =>
-          businessLabelCodes.includes(code)
-        );
-        if (!hasAllLabels) return false;
+      if (filter.labels.length > 0) {
+        const codes = b.labels.map((l: any) => l.code);
+        if (!filter.labels.every((code) => codes.includes(code))) return false;
       }
-
+      // Commodités : l'établissement doit avoir TOUTES les commodités cochées.
+      if (filter.amenities.length > 0) {
+        const svc = b.services || {};
+        if (!filter.amenities.every((k) => svc[k] === true)) return false;
+      }
       return true;
     });
-  }, [businesses, search, filters]);
+  }, [businesses, filter]);
 
   if (loading) {
     return (
@@ -162,29 +188,19 @@ export default function EtablissementGrid({ typeSlug, childSlugs, initialData }:
 
   return (
     <>
-      <div className="relative mb-4">
-        <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gris-doux" />
-        <input
-          type="text"
-          placeholder="Rechercher un établissement..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="w-full pl-10 pr-4 py-3 text-sm rounded-full border border-gris-ligne focus:border-marine focus:outline-none bg-white"
-        />
-      </div>
-
-      <FiltersBar
-        filters={filters}
-        onChange={setFilters}
+      <CommonFilterBar
+        value={filter}
+        onChange={setFilter}
+        resultCount={filtered.length}
         cities={cities}
-        labels={labelCatalog}
-        subcategories={subcategories}
+        levels={LEVELS}
+        labels={labelCatalog.map((l: any) => ({ id: l.code, label: l.name, icon: l.icon, color: l.color }))}
+        subcategories={subcategories.map((s) => ({ id: s.id, label: s.name, icon: s.icon, count: s.count }))}
+        amenities={amenityOpts}
+        showPrice={showPrice}
       />
 
-      <div className="mb-4 text-xs text-gris-texte">
-        {filtered.length} résultat{filtered.length > 1 ? 's' : ''}
-        {businesses.length !== filtered.length && ` sur ${businesses.length}`}
-      </div>
+      <div className="mb-4" />
 
       {filtered.length === 0 ? (
         <div className="bg-white rounded-xl border border-gris-ligne p-12 text-center">

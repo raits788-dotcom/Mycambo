@@ -298,10 +298,11 @@ export default function PartnerRequestsPage() {
             {/* Contenu scrollable */}
             <div className="p-6 space-y-6 overflow-y-auto flex-1">
 
-              {/* Score de complétude */}
+              {/* Score de complétude — mesure la DEMANDE (≠ complétude de la
+                   fiche publiée, visible côté partenaire). */}
               <div className="bg-gris-fond rounded-lg p-4">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-bold text-marine">Score de complétude</span>
+                  <span className="text-sm font-bold text-marine">Complétude du dossier de demande</span>
                   <span className={`text-xl font-extrabold ${getCompletenessColor(selected.completeness_score || 0)}`}>
                     {selected.completeness_score || 0}%
                   </span>
