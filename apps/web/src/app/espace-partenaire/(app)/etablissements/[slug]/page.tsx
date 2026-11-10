@@ -17,6 +17,7 @@ import DeleteEstablishmentModal from '@/components/partenaire/establishment/Dele
 import CompletionGuide from '@/components/partenaire/establishment/CompletionGuide';
 import { createBrowserClient } from '@supabase/ssr';
 import { getPlanPermissionsFromDB, getPlanPermissions, type PlanPermissions } from '@/lib/plan-permissions';
+import { getCategoryTree } from '@/lib/categories';
 import { useRouter } from 'next/navigation';
 
 export default function GererEtablissementPage() {
@@ -29,6 +30,8 @@ export default function GererEtablissementPage() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [perms, setPerms] = useState<PlanPermissions>(() => getPlanPermissions('decouverte'));
   const [tabsKey, setTabsKey] = useState(0); // remonte les onglets quand le guide navigue
+  // Chemin catégorie « Famille › Sous-catégorie » (ex. Autres commerces › Taxi).
+  const [catPath, setCatPath] = useState<{ family: string; sub: string } | null>(null);
 
   const reload = async () => {
     if (!slug) return;
@@ -41,6 +44,23 @@ export default function GererEtablissementPage() {
   useEffect(() => {
     reload();
   }, [slug]);
+
+  // Résout « Famille › Sous-catégorie » depuis le slug de catégorie.
+  useEffect(() => {
+    const catSlug = establishment?.categories?.slug;
+    if (!catSlug) { setCatPath(null); return; }
+    (async () => {
+      const tree = await getCategoryTree();
+      // La catégorie de l'établissement est soit une famille, soit une sous-cat.
+      for (const fam of tree) {
+        if (fam.slug === catSlug) { setCatPath({ family: fam.name, sub: '' }); return; }
+        const child = fam.children.find((c) => c.slug === catSlug);
+        if (child) { setCatPath({ family: fam.name, sub: child.name }); return; }
+      }
+      setCatPath({ family: establishment?.categories?.name || '', sub: '' });
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [establishment?.categories?.slug]);
 
   // Charge les permissions de la formule de l'établissement (pour le guide).
   useEffect(() => {
@@ -132,13 +152,33 @@ export default function GererEtablissementPage() {
               </span>
             </div>
             <div className="flex items-center gap-3 flex-wrap text-xs text-gris-texte">
-              {establishment.categories?.name && (
+              {catPath ? (
+                <span className="flex items-center gap-1.5">
+                  <span className="inline-flex px-2 py-0.5 rounded-full bg-marine/10 text-marine font-bold">
+                    {catPath.family}
+                  </span>
+                  {catPath.sub && (
+                    <>
+                      <span className="text-gris-doux">›</span>
+                      <span className="inline-flex px-2 py-0.5 rounded-full bg-ic-bleu/10 text-ic-bleu font-bold">
+                        {catPath.sub}
+                      </span>
+                    </>
+                  )}
+                </span>
+              ) : establishment.categories?.name ? (
                 <span>{establishment.categories.name}</span>
-              )}
+              ) : null}
               {establishment.city && (
                 <span className="flex items-center gap-1">
                   <MapPin size={11} />
                   {establishment.city}
+                </span>
+              )}
+              {establishment.created_at && (
+                <span className="flex items-center gap-1 text-gris-doux">
+                  📅 Sur myCAMBO depuis le{' '}
+                  {new Date(establishment.created_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}
                 </span>
               )}
             </div>
