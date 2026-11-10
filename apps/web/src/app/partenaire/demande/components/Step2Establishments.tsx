@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { Plus, Trash2, MapPin, Globe } from 'lucide-react';
 import type { WizardData, DemandeEstablishment } from '../page';
 import { getCategoryTree, type CategoryFamily } from '@/lib/categories';
+import { getCities, type City } from '@/lib/cities';
 import { useWizardLang } from '../WizardLangContext';
 
 interface Props {
@@ -22,8 +23,12 @@ export default function Step2Establishments({ data, updateData }: Props) {
   const { t } = useWizardLang();
   const MAX_ESTABLISHMENTS = 3;
   const [tree, setTree] = useState<CategoryFamily[]>([]);
+  const [cities, setCities] = useState<City[]>([]);
+  // Établissements dont la ville est en saisie libre ("Autre").
+  const [freeCity, setFreeCity] = useState<Record<number, boolean>>({});
 
   useEffect(() => { getCategoryTree().then(setTree); }, []);
+  useEffect(() => { getCities().then(setCities); }, []);
 
   // Pré-remplissage malin : si le 1er établissement n'a pas encore de nom,
   // on reprend la raison sociale (modifiable). Pratique pour un indépendant
@@ -139,16 +144,52 @@ export default function Step2Establishments({ data, updateData }: Props) {
 
                 <div>
                   <label className="block text-[10px] font-bold text-gris-texte uppercase mb-1">{t.s2_city_label}</label>
-                  <div className="relative">
-                    <MapPin size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-gris-doux" />
-                    <input
-                      type="text"
-                      value={est.city}
-                      onChange={(e) => patch(index, { city: e.target.value })}
-                      placeholder={t.s2_city_ph}
-                      className="w-full pl-8 pr-3 py-2 text-sm rounded-lg border border-gris-ligne bg-white focus:border-marine focus:outline-none"
-                    />
-                  </div>
+                  {(() => {
+                    // La ville est stockée en texte (est.city). On propose la liste
+                    // des villes connues + "Autre" pour une saisie libre. On est en
+                    // mode libre si l'utilisateur l'a choisi, ou si la ville déjà
+                    // saisie n'est pas dans la liste.
+                    const inList = cities.some((c) => c.name === est.city);
+                    const isFree = freeCity[index] || (!!est.city && !inList);
+                    const selectValue = isFree ? '__other__' : est.city;
+                    return (
+                      <div className="space-y-2">
+                        <div className="relative">
+                          <MapPin size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-gris-doux z-10" />
+                          <select
+                            value={selectValue}
+                            onChange={(e) => {
+                              const v = e.target.value;
+                              if (v === '__other__') {
+                                setFreeCity((p) => ({ ...p, [index]: true }));
+                                patch(index, { city: '' });
+                              } else {
+                                setFreeCity((p) => ({ ...p, [index]: false }));
+                                patch(index, { city: v });
+                              }
+                            }}
+                            className="w-full pl-8 pr-3 py-2 text-sm rounded-lg border border-gris-ligne bg-white focus:border-marine focus:outline-none"
+                          >
+                            <option value="">{t.s2_city_choose}</option>
+                            {cities.map((c) => (
+                              <option key={c.slug} value={c.name}>{c.name}</option>
+                            ))}
+                            <option value="__other__">{t.s2_city_other}</option>
+                          </select>
+                        </div>
+                        {isFree && (
+                          <input
+                            type="text"
+                            value={est.city}
+                            onChange={(e) => patch(index, { city: e.target.value })}
+                            placeholder={t.s2_city_other_ph}
+                            className="w-full px-3 py-2 text-sm rounded-lg border border-gris-ligne bg-white focus:border-marine focus:outline-none"
+                            autoFocus
+                          />
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
                 <div>
                   <label className="block text-[10px] font-bold text-gris-texte uppercase mb-1">{t.s2_address_label}</label>
