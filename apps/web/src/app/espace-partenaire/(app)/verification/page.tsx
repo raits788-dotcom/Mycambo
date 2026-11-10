@@ -8,6 +8,7 @@ import {
 import { useCurrentTenant } from '@/lib/use-current-tenant';
 import {
   getTenantVerification,
+  getApprovedRequestForTenant,
   uploadVerificationPhoto,
   submitTenantVerification,
   type TenantVerification,
@@ -42,22 +43,29 @@ export default function VerificationPage() {
     if (tenantLoading || !tenant) return;
     (async () => {
       const v = await getTenantVerification(tenant.id);
-      if (v) {
-        setVerification(v);
+      // Pré-remplissage depuis la demande approuvée (ce que le partenaire a
+      // déjà fourni) : utilisé pour initialiser, sans écraser une saisie
+      // existante de la vérification.
+      const prefill = await getApprovedRequestForTenant(tenant.email);
+      const pick = (vVal: string | null | undefined, pVal: string | null | undefined) =>
+        (vVal && vVal.length ? vVal : (pVal || '')) || '';
+
+      if (v || prefill) {
+        if (v) setVerification(v);
         setForm({
-          legal_name: v.legal_name || '',
-          registration_number: v.registration_number || '',
-          legal_representative_name: v.legal_representative_name || '',
-          legal_address: v.legal_address || '',
-          business_license_number: v.business_license_number || '',
-          tax_number: v.tax_number || '',
-          website_url: v.website_url || '',
-          facebook_url: v.facebook_url || '',
-          google_maps_url: v.google_maps_url || '',
-          photo_exterior_url: v.photo_exterior_url || '',
-          photo_interior_url: v.photo_interior_url || '',
-          photo_id_representative_url: v.photo_id_representative_url || '',
-          photo_business_license_url: v.photo_business_license_url || '',
+          legal_name: pick(v?.legal_name, prefill?.legal_name),
+          registration_number: pick(v?.registration_number, prefill?.registration_number),
+          legal_representative_name: pick(v?.legal_representative_name, prefill?.legal_representative_name),
+          legal_address: v?.legal_address || '',
+          business_license_number: v?.business_license_number || '',
+          tax_number: v?.tax_number || '',
+          website_url: v?.website_url || '',
+          facebook_url: v?.facebook_url || '',
+          google_maps_url: v?.google_maps_url || '',
+          photo_exterior_url: pick(v?.photo_exterior_url, prefill?.photo_exterior_url),
+          photo_interior_url: pick(v?.photo_interior_url, prefill?.photo_interior_url),
+          photo_id_representative_url: pick(v?.photo_id_representative_url, prefill?.photo_id_representative_url),
+          photo_business_license_url: v?.photo_business_license_url || '',
         });
       }
       setLoading(false);

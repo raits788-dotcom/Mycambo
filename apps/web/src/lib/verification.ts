@@ -49,6 +49,44 @@ export async function getTenantVerification(tenantId: string): Promise<TenantVer
   return data as TenantVerification | null;
 }
 
+// Pré-remplissage : récupère la demande partenaire APPROUVÉE du tenant pour
+// initialiser le formulaire de vérification (évite au partenaire de tout
+// ressaisir ce qu'il a déjà fourni à la demande).
+export interface RequestPrefill {
+  legal_name: string | null;
+  registration_number: string | null;
+  legal_representative_name: string | null;
+  legal_representative_phone: string | null;
+  photo_exterior_url: string | null;
+  photo_interior_url: string | null;
+  photo_id_representative_url: string | null;
+}
+
+export async function getApprovedRequestForTenant(
+  tenantEmail: string
+): Promise<RequestPrefill | null> {
+  if (!tenantEmail) return null;
+  const { data } = await supabase()
+    .from('partner_requests')
+    .select('legal_name, registration_number, legal_representative_name, legal_representative_phone, photo_exterior_url, photo_interior_url, photo_representative_id_url')
+    .eq('email', tenantEmail)
+    .eq('status', 'approved')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (!data) return null;
+  return {
+    legal_name: data.legal_name ?? null,
+    registration_number: data.registration_number ?? null,
+    legal_representative_name: data.legal_representative_name ?? null,
+    legal_representative_phone: data.legal_representative_phone ?? null,
+    photo_exterior_url: data.photo_exterior_url ?? null,
+    photo_interior_url: data.photo_interior_url ?? null,
+    // nom de colonne côté demande = photo_representative_id_url
+    photo_id_representative_url: data.photo_representative_id_url ?? null,
+  };
+}
+
 // ═══════════════════════════════════════════════════════════
 // UPLOAD PHOTO
 // ═══════════════════════════════════════════════════════════

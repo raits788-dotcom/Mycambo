@@ -80,51 +80,66 @@ export default function EstablishmentTabs({
 
   const asso = isAssociation(establishment);
 
+  // `show` = pertinent pour ce type d'établissement (sinon masqué).
+  // `lockedBy` = débloqué par une formule : l'onglet reste VISIBLE mais
+  // grisé + cadenas, pour inciter à monter en formule.
   const tabs = [
     { id: 'info' as TabId, label: 'Informations', icon: 'fa-pencil', show: true },
     { id: 'photos' as TabId, label: 'Photos', icon: 'fa-images', show: true },
-    // "Services" pour les commerces ; pour les associations, remplacé par
-    // "Nous soutenir" (source unique) ci-dessous.
     { id: 'services' as TabId, label: 'Services', icon: 'fa-gift', show: !asso },
     { id: 'support' as TabId, label: 'Nous soutenir', icon: 'fa-hand-holding-heart', show: asso },
     { id: 'projects' as TabId, label: 'Nos projets', icon: 'fa-bullseye', show: asso },
     { id: 'history' as TabId, label: 'Notre histoire', icon: 'fa-clock-rotate-left', show: asso },
     { id: 'team' as TabId, label: 'Notre équipe', icon: 'fa-users', show: asso },
     { id: 'impact' as TabId, label: 'Notre impact', icon: 'fa-chart-column', show: asso },
-    // Communs
-    { id: 'offers' as TabId, label: 'Offres', icon: 'fa-bullhorn', show: perms.canPublishOffers },
-    { id: 'reservations' as TabId, label: 'Réservations', icon: 'fa-calendar-check', show: perms.canReceiveReservations },
-    { id: 'jobs' as TabId, label: 'Emploi', icon: 'fa-briefcase', show: perms.canReceiveApplications },
+    // Communs — certains verrouillés par formule (restent visibles, cadenas).
+    { id: 'offers' as TabId, label: 'Offres', icon: 'fa-bullhorn', show: true, lockedBy: perms.canPublishOffers ? undefined : 'Essentiel' },
+    { id: 'reservations' as TabId, label: 'Réservations', icon: 'fa-calendar-check', show: true, lockedBy: perms.canReceiveReservations ? undefined : 'Pro' },
+    { id: 'jobs' as TabId, label: 'Emploi', icon: 'fa-briefcase', show: true, lockedBy: perms.canReceiveApplications ? undefined : 'Pro' },
     { id: 'stats' as TabId, label: 'Statistiques', icon: 'fa-chart-line', show: true },
     { id: 'reviews' as TabId, label: 'Avis', icon: 'fa-star', show: true },
     { id: 'requests' as TabId, label: 'Demandes', icon: 'fa-inbox', show: true },
     { id: 'subscription' as TabId, label: 'Abonnement', icon: 'fa-credit-card', show: true },
   ].filter((t) => t.show);
 
-  // Si l'onglet persisté n'est plus visible (ex. plus une asso), revenir à info.
+  // Si l'onglet persisté n'est plus visible, ou est verrouillé, revenir à info.
   useEffect(() => {
-    if (!tabs.some((t) => t.id === tab)) selectTab('info');
+    const cur = tabs.find((t) => t.id === tab);
+    if (!cur || (cur as any).lockedBy) selectTab('info');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [asso, perms]);
 
   return (
     <>
       <div className="flex items-center gap-1 border-b border-gris-ligne mb-6 overflow-x-auto">
-        {tabs.map((t) => (
-          <button
-            key={t.id}
-            onClick={() => selectTab(t.id)}
-            className={cn(
-              'px-4 py-3 text-sm font-bold whitespace-nowrap border-b-2 transition-colors flex items-center gap-2',
-              tab === t.id
-                ? 'text-marine border-marine'
-                : 'text-gris-texte border-transparent hover:text-marine hover:border-marine/30'
-            )}
-          >
-            <i className={`fas ${t.icon}`} />
-            {t.label}
-          </button>
-        ))}
+        {tabs.map((t) => {
+          const locked = (t as any).lockedBy as string | undefined;
+          return (
+            <button
+              key={t.id}
+              onClick={() => !locked && selectTab(t.id)}
+              disabled={!!locked}
+              title={locked ? `Formule ${locked} requise` : undefined}
+              className={cn(
+                'px-4 py-3 text-sm font-bold whitespace-nowrap border-b-2 transition-colors flex items-center gap-2',
+                locked
+                  ? 'text-gris-doux border-transparent cursor-not-allowed opacity-70'
+                  : tab === t.id
+                  ? 'text-marine border-marine'
+                  : 'text-gris-texte border-transparent hover:text-marine hover:border-marine/30'
+              )}
+            >
+              <i className={`fas ${t.icon}`} />
+              {t.label}
+              {locked && (
+                <span className="inline-flex items-center gap-1 ml-0.5">
+                  <i className="fas fa-lock text-[10px]" />
+                  <span className="text-[9px] font-extrabold px-1.5 py-0.5 rounded-full bg-gris-fond text-gris-doux">{locked}</span>
+                </span>
+              )}
+            </button>
+          );
+        })}
       </div>
 
       <div className="bg-white rounded-lg border border-gris-ligne p-6">
