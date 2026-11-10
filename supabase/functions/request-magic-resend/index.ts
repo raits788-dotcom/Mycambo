@@ -61,15 +61,31 @@ serve(async (req) => {
     });
   }
 
-  // Le compte Auth existe-t-il, et son tenant est-il non activé ?
+  // Éligible UNIQUEMENT si :
+  //   1. il existe une demande partenaire APPROUVÉE pour cet email,
+  //   2. un tenant existe pour cet email et n'est PAS encore activé,
+  //   3. le compte Auth existe.
+  // Sinon -> null (réponse neutre). Ferme la faille : un email quelconque
+  // (ex. créé par /inscription) ne peut plus obtenir de lien.
   async function findEligibleUser(email: string): Promise<{ userId: string } | null> {
+    // 1. demande approuvée ?
+    const { data: reqRow } = await admin
+      .from("partner_requests")
+      .select("id, status").eq("email", email).eq("status", "approved")
+      .maybeSingle();
+    if (!reqRow) return null;
+
+    // 2. tenant existant non activé ?
+    const { data: tenant } = await admin
+      .from("tenants").select("id, status").eq("email", email).maybeSingle();
+    if (!tenant) return null;
+    if (tenant.status === "active") return null; // déjà activé -> connexion normale
+
+    // 3. compte Auth existant ?
     const { data: users } = await admin.auth.admin.listUsers();
     const u = users?.users?.find((x) => x.email === email);
     if (!u) return null;
-    // tenant lié non encore actif
-    const { data: tenant } = await admin
-      .from("tenants").select("id, status").eq("email", email).maybeSingle();
-    if (tenant && tenant.status === "active") return null; // déjà activé -> connexion normale
+
     return { userId: u.id };
   }
 
