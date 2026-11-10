@@ -2,6 +2,7 @@
 
 import { Building2, Mail, Phone, AlertCircle, CheckCircle2, Heart, Handshake, ShoppingBag, User, Landmark, GraduationCap } from 'lucide-react';
 import type { WizardData } from '../page';
+import { useWizardLang } from '../WizardLangContext';
 
 interface Props {
   data: WizardData;
@@ -9,68 +10,24 @@ interface Props {
 }
 
 // ─── Types de structure ───────────────────────────────────────────────────
+// id + icône + logique de registration ; libellés/descriptions via i18n (t.s1_types).
 const STRUCTURE_TYPES = [
-  {
-    id: 'company',
-    label: 'Entreprise enregistrée',
-    icon: Building2,
-    description: 'Société avec enregistrement MoC',
-    requiresRegistration: true,
-    registrationAuthority: 'MoC (Ministère du Commerce)',
-  },
-  {
-    id: 'ngo',
-    label: 'ONG',
-    icon: Heart,
-    description: 'Organisation non gouvernementale',
-    requiresRegistration: true,
-    registrationAuthority: 'MoI (Ministère de l\'Intérieur)',
-  },
-  {
-    id: 'association',
-    label: 'Association',
-    icon: Handshake,
-    description: 'Association locale ou communautaire',
-    requiresRegistration: false,
-    registrationAuthority: null,
-  },
-  {
-    id: 'commercial',
-    label: 'Activité commerciale',
-    icon: ShoppingBag,
-    description: 'Petit commerce, boutique, restaurant familial',
-    requiresRegistration: false,
-    registrationAuthority: null,
-  },
-  {
-    id: 'individual',
-    label: 'Activité individuelle',
-    icon: User,
-    description: 'Freelance, artisan, guide',
-    requiresRegistration: false,
-    registrationAuthority: null,
-  },
-  {
-    id: 'public',
-    label: 'Établissement public',
-    icon: Landmark,
-    description: 'Administration, service public',
-    requiresRegistration: false,
-    registrationAuthority: null,
-  },
-  {
-    id: 'school',
-    label: 'Établissement scolaire',
-    icon: GraduationCap,
-    description: 'École, centre de formation',
-    requiresRegistration: false,
-    registrationAuthority: null,
-  },
+  { id: 'company', icon: Building2, requiresRegistration: true, registrationAuthority: 'MoC (Ministère du Commerce)' },
+  { id: 'ngo', icon: Heart, requiresRegistration: true, registrationAuthority: 'MoI (Ministère de l\'Intérieur)' },
+  { id: 'association', icon: Handshake, requiresRegistration: false, registrationAuthority: null },
+  { id: 'commercial', icon: ShoppingBag, requiresRegistration: false, registrationAuthority: null },
+  { id: 'individual', icon: User, requiresRegistration: false, registrationAuthority: null },
+  { id: 'public', icon: Landmark, requiresRegistration: false, registrationAuthority: null },
+  { id: 'school', icon: GraduationCap, requiresRegistration: false, registrationAuthority: null },
 ] as const;
 
 export default function Step1Company({ data, updateData }: Props) {
+  const { t } = useWizardLang();
   const selectedStructure = STRUCTURE_TYPES.find((s) => s.id === data.structure_type);
   const requiresRegistration = selectedStructure?.requiresRegistration ?? false;
+  const selectedTypeLabel = selectedStructure
+    ? t.s1_types[selectedStructure.id as keyof typeof t.s1_types].label
+    : '';
 
   // ─── Sélection du type de structure ─────────────────────────────────────
   const handleStructureChange = (structureId: string) => {
@@ -85,10 +42,10 @@ export default function Step1Company({ data, updateData }: Props) {
     <div className="space-y-6">
       <div>
         <h2 className="text-lg font-extrabold text-marine flex items-center gap-2 mb-1">
-          <Building2 size={18} /> Votre structure
+          <Building2 size={18} /> {t.s1_title}
         </h2>
         <p className="text-xs text-gris-texte">
-          Commençons par identifier votre type de structure.
+          {t.s1_subtitle}
         </p>
       </div>
 
@@ -97,12 +54,13 @@ export default function Step1Company({ data, updateData }: Props) {
           ═══════════════════════════════════════════════════════════ */}
       <div>
         <label className="block text-xs font-bold text-gris-texte uppercase mb-2">
-          Type de structure *
+          {t.s1_type_label}
         </label>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
           {STRUCTURE_TYPES.map((s) => {
             const Icon = s.icon;
             const isSelected = data.structure_type === s.id;
+            const typeT = t.s1_types[s.id as keyof typeof t.s1_types];
             return (
               <button
                 key={s.id}
@@ -126,11 +84,11 @@ export default function Step1Company({ data, updateData }: Props) {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5">
                     <span className={'font-bold text-sm ' + (isSelected ? 'text-marine' : 'text-gris-texte')}>
-                      {s.label}
+                      {typeT.label}
                     </span>
                     {isSelected && <CheckCircle2 size={12} className="text-marine" />}
                   </div>
-                  <div className="text-[10px] text-gris-doux mt-0.5">{s.description}</div>
+                  <div className="text-[10px] text-gris-doux mt-0.5">{typeT.description}</div>
                 </div>
               </button>
             );
@@ -152,13 +110,11 @@ export default function Step1Company({ data, updateData }: Props) {
           <div className="text-xs">
             {requiresRegistration ? (
               <span className="text-red-800">
-                <b>N° d&apos;enregistrement obligatoire.</b> En tant que {selectedStructure?.label.toLowerCase()},
-                vous devez fournir votre numéro délivré par {selectedStructure?.registrationAuthority}.
+                <b>{t.s1_reg_required_1}</b>{t.s1_reg_required_2(selectedTypeLabel.toLowerCase(), selectedStructure?.registrationAuthority || '')}
               </span>
             ) : (
               <span className="text-amber-800">
-                <b>Vérification renforcée.</b> Ce type de structure ne nécessite pas de N° d&apos;enregistrement.
-                Une <b>pièce d&apos;identité</b> et des <b>photos de l&apos;activité</b> seront demandées pour validation.
+                <b>{t.s1_reg_reinforced_1}</b> {t.s1_reg_reinforced_2}<b>{t.s1_reg_reinforced_id}</b>{t.s1_reg_reinforced_mid}<b>{t.s1_reg_reinforced_photos}</b>{t.s1_reg_reinforced_end}
               </span>
             )}
           </div>
@@ -172,19 +128,17 @@ export default function Step1Company({ data, updateData }: Props) {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="md:col-span-2">
             <label className="block text-xs font-bold text-gris-texte uppercase mb-2">
-              Raison sociale (entité juridique) *
+              {t.s1_legal_name_label}
             </label>
             <input
               type="text"
               value={data.legal_name}
               onChange={(e) => updateData({ legal_name: e.target.value })}
-              placeholder="Ex : Bistro Khmer Co., Ltd"
+              placeholder={t.s1_legal_name_ph}
               className="w-full px-4 py-2.5 text-sm rounded-lg border border-gris-ligne focus:border-marine focus:outline-none"
             />
             <p className="text-[10px] text-gris-doux mt-1">
-              Le nom légal de votre structure (entreprise, association…).
-              Ce n&apos;est pas le nom public de votre établissement — vous le
-              renseignerez à l&apos;étape suivante.
+              {t.s1_legal_name_help}
             </p>
           </div>
 
@@ -193,26 +147,26 @@ export default function Step1Company({ data, updateData }: Props) {
             <>
               <div>
                 <label className="block text-xs font-bold text-gris-texte uppercase mb-2">
-                  Autorité d&apos;enregistrement *
+                  {t.s1_authority_label}
                 </label>
                 <input
                   type="text"
                   value={data.registration_authority || ''}
                   onChange={(e) => updateData({ registration_authority: e.target.value })}
-                  placeholder="Ex : MoC"
+                  placeholder={t.s1_authority_ph}
                   className="w-full px-4 py-2.5 text-sm rounded-lg border border-gris-ligne focus:border-marine focus:outline-none"
                 />
               </div>
 
               <div>
                 <label className="block text-xs font-bold text-gris-texte uppercase mb-2">
-                  N° d&apos;enregistrement *
+                  {t.s1_reg_number_label}
                 </label>
                 <input
                   type="text"
                   value={data.registration_number}
                   onChange={(e) => updateData({ registration_number: e.target.value })}
-                  placeholder="MOC-2024-XXXX"
+                  placeholder={t.s1_reg_number_ph}
                   className="w-full px-4 py-2.5 text-sm rounded-lg border border-gris-ligne focus:border-marine focus:outline-none font-mono"
                 />
               </div>
@@ -223,13 +177,13 @@ export default function Step1Company({ data, updateData }: Props) {
           {!requiresRegistration && data.structure_type && (
             <div className="md:col-span-2">
               <label className="block text-xs font-bold text-gris-texte uppercase mb-2">
-                N° d&apos;enregistrement (optionnel)
+                {t.s1_reg_number_opt_label}
               </label>
               <input
                 type="text"
                 value={data.registration_number}
                 onChange={(e) => updateData({ registration_number: e.target.value })}
-                placeholder="Si vous en avez un, sinon laissez vide"
+                placeholder={t.s1_reg_number_opt_ph}
                 className="w-full px-4 py-2.5 text-sm rounded-lg border border-gris-ligne focus:border-marine focus:outline-none font-mono"
               />
             </div>
@@ -237,20 +191,20 @@ export default function Step1Company({ data, updateData }: Props) {
 
           <div>
             <label className="block text-xs font-bold text-gris-texte uppercase mb-2">
-              Représentant légal *
+              {t.s1_rep_label}
             </label>
             <input
               type="text"
               value={data.legal_representative_name}
               onChange={(e) => updateData({ legal_representative_name: e.target.value })}
-              placeholder="Nom complet"
+              placeholder={t.s1_rep_ph}
               className="w-full px-4 py-2.5 text-sm rounded-lg border border-gris-ligne focus:border-marine focus:outline-none"
             />
           </div>
 
           <div>
             <label className="block text-xs font-bold text-gris-texte uppercase mb-2">
-              Téléphone du représentant *
+              {t.s1_rep_phone_label}
             </label>
             <div className="relative">
               <Phone size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gris-doux" />
@@ -258,7 +212,7 @@ export default function Step1Company({ data, updateData }: Props) {
                 type="tel"
                 value={data.legal_representative_phone}
                 onChange={(e) => updateData({ legal_representative_phone: e.target.value })}
-                placeholder="+855 12 345 678"
+                placeholder={t.s1_rep_phone_ph}
                 className="w-full pl-9 pr-4 py-2.5 text-sm rounded-lg border border-gris-ligne focus:border-marine focus:outline-none"
               />
             </div>
@@ -266,7 +220,7 @@ export default function Step1Company({ data, updateData }: Props) {
 
           <div>
             <label className="block text-xs font-bold text-gris-texte uppercase mb-2">
-              Email *
+              {t.s1_email_label}
             </label>
             <div className="relative">
               <Mail size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gris-doux" />
@@ -274,7 +228,7 @@ export default function Step1Company({ data, updateData }: Props) {
                 type="email"
                 value={data.email}
                 onChange={(e) => updateData({ email: e.target.value })}
-                placeholder="contact@exemple.com"
+                placeholder={t.s1_email_ph}
                 className="w-full pl-9 pr-4 py-2.5 text-sm rounded-lg border border-gris-ligne focus:border-marine focus:outline-none"
               />
             </div>
@@ -282,7 +236,7 @@ export default function Step1Company({ data, updateData }: Props) {
 
           <div>
             <label className="block text-xs font-bold text-gris-texte uppercase mb-2">
-              Téléphone (optionnel)
+              {t.s1_phone_label}
             </label>
             <div className="relative">
               <Phone size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gris-doux" />
@@ -290,7 +244,7 @@ export default function Step1Company({ data, updateData }: Props) {
                 type="tel"
                 value={data.phone}
                 onChange={(e) => updateData({ phone: e.target.value })}
-                placeholder="Contact général"
+                placeholder={t.s1_phone_ph}
                 className="w-full pl-9 pr-4 py-2.5 text-sm rounded-lg border border-gris-ligne focus:border-marine focus:outline-none"
               />
             </div>
@@ -300,9 +254,7 @@ export default function Step1Company({ data, updateData }: Props) {
 
       <div className="pt-4 border-t border-gris-ligne">
         <p className="text-xs text-gris-texte">
-          <b className="text-marine">Étape suivante :</b> vous décrirez
-          votre (ou vos) établissement(s) — catégorie, ville, adresse et
-          présence en ligne y seront renseignées pour chacun.
+          <b className="text-marine">{t.s1_next_hint_label}</b>{t.s1_next_hint}
         </p>
       </div>
     </div>

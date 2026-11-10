@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { ChevronDown, ChevronRight, Sparkles, Phone, Clock, Settings } from 'lucide-react';
 import type { WizardData, DemandeEstablishment } from '../page';
+import { useWizardLang } from '../WizardLangContext';
 
 interface Props {
   data: WizardData;
@@ -20,6 +21,7 @@ const PRICE_RANGES = ['€', '€€', '€€€'];
 const LANGUAGES = ['Français', 'Anglais', 'Khmer', 'Chinois'];
 
 export default function Step3Details({ data, updateData }: Props) {
+  const { t } = useWizardLang();
   const [open, setOpen] = useState<number>(0);
 
   const patch = (index: number, updates: Partial<DemandeEstablishment>) => {
@@ -40,12 +42,10 @@ export default function Step3Details({ data, updateData }: Props) {
     <div className="space-y-5">
       <div>
         <h2 className="text-lg font-extrabold text-marine flex items-center gap-2 mb-1">
-          ✨ Détails de vos établissements
+          ✨ {t.s3_title}
         </h2>
         <p className="text-xs text-gris-texte">
-          Ces informations <strong>remplissent directement votre fiche publique</strong> —
-          tout est optionnel, mais une fiche complète est bien plus visible.
-          Vous pourrez compléter ou modifier plus tard.
+          {t.s3_subtitle_1}<strong>{t.s3_subtitle_bold}</strong>{t.s3_subtitle_2}
         </p>
       </div>
 
@@ -60,7 +60,7 @@ export default function Step3Details({ data, updateData }: Props) {
               className="w-full flex items-center gap-2 px-4 py-3 bg-gris-fond text-left"
             >
               {isOpen ? <ChevronDown size={16} className="text-marine" /> : <ChevronRight size={16} className="text-gris-doux" />}
-              <span className="text-sm font-bold text-marine">{est.name || `Établissement #${index + 1}`}</span>
+              <span className="text-sm font-bold text-marine">{est.name || t.s2_est_hash(index + 1)}</span>
               <span className="ml-auto text-[10px] text-gris-doux">{est.category || ''}</span>
             </button>
 
@@ -69,19 +69,19 @@ export default function Step3Details({ data, updateData }: Props) {
                 {/* Descriptif */}
                 <div>
                   <div className="flex items-center gap-1.5 text-[11px] font-bold text-marine uppercase mb-2">
-                    <Sparkles size={12} /> Descriptif
+                    <Sparkles size={12} /> {t.s3_descr}
                   </div>
                   <div className="space-y-2">
                     <input
                       type="text" value={est.tagline}
                       onChange={(e) => patch(index, { tagline: e.target.value })}
-                      placeholder="Accroche : une phrase qui résume l'établissement"
+                      placeholder={t.s3_tagline_ph}
                       className="w-full px-3 py-2 text-sm rounded-lg border border-gris-ligne bg-white focus:border-marine focus:outline-none"
                     />
                     <textarea
                       value={est.description}
                       onChange={(e) => patch(index, { description: e.target.value })}
-                      placeholder="Présentation : ambiance, spécialités, histoire… (2-3 phrases)"
+                      placeholder={t.s3_description_ph}
                       rows={3}
                       className="w-full px-3 py-2 text-sm rounded-lg border border-gris-ligne bg-white focus:border-marine focus:outline-none resize-none"
                     />
@@ -91,19 +91,19 @@ export default function Step3Details({ data, updateData }: Props) {
                 {/* Contact & horaires */}
                 <div>
                   <div className="flex items-center gap-1.5 text-[11px] font-bold text-marine uppercase mb-2">
-                    <Phone size={12} /> Contact &amp; horaires
+                    <Phone size={12} /> {t.s3_contact}
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                     <input
                       type="tel" value={est.public_phone}
                       onChange={(e) => patch(index, { public_phone: e.target.value })}
-                      placeholder="Téléphone public"
+                      placeholder={t.s3_public_phone_ph}
                       className="w-full px-3 py-2 text-sm rounded-lg border border-gris-ligne bg-white focus:border-marine focus:outline-none"
                     />
                     <input
                       type="email" value={est.public_email}
                       onChange={(e) => patch(index, { public_email: e.target.value })}
-                      placeholder="Email public"
+                      placeholder={t.s3_public_email_ph}
                       className="w-full px-3 py-2 text-sm rounded-lg border border-gris-ligne bg-white focus:border-marine focus:outline-none"
                     />
                     <div className="md:col-span-2 relative">
@@ -111,7 +111,7 @@ export default function Step3Details({ data, updateData }: Props) {
                       <input
                         type="text" value={est.hours}
                         onChange={(e) => patch(index, { hours: e.target.value })}
-                        placeholder="Horaires (ex. Lun-Sam 8h-18h, Dim fermé)"
+                        placeholder={t.s3_hours_ph}
                         className="w-full pl-8 pr-3 py-2 text-sm rounded-lg border border-gris-ligne bg-white focus:border-marine focus:outline-none"
                       />
                     </div>
@@ -121,7 +121,7 @@ export default function Step3Details({ data, updateData }: Props) {
                 {/* Services & équipements */}
                 <div>
                   <div className="flex items-center gap-1.5 text-[11px] font-bold text-marine uppercase mb-2">
-                    <Settings size={12} /> Services &amp; équipements
+                    <Settings size={12} /> {t.s3_services}
                   </div>
                   <div className="flex flex-wrap gap-1.5 mb-3">
                     {services.map((s) => {
@@ -133,7 +133,7 @@ export default function Step3Details({ data, updateData }: Props) {
                           className={'text-xs font-bold px-3 py-1.5 rounded-full border transition-colors ' +
                             (on ? 'bg-marine text-white border-marine' : 'bg-white text-gris-texte border-gris-ligne hover:border-marine')}
                         >
-                          {on ? '✓ ' : ''}{s}
+                          {on ? '✓ ' : ''}{t.s3_service_names[s] || s}
                         </button>
                       );
                     })}
@@ -141,7 +141,7 @@ export default function Step3Details({ data, updateData }: Props) {
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-[10px] font-bold text-gris-texte uppercase mb-1">Gamme de prix</label>
+                      <label className="block text-[10px] font-bold text-gris-texte uppercase mb-1">{t.s3_price_label}</label>
                       <div className="flex gap-1.5">
                         {PRICE_RANGES.map((p) => (
                           <button
@@ -156,7 +156,7 @@ export default function Step3Details({ data, updateData }: Props) {
                       </div>
                     </div>
                     <div>
-                      <label className="block text-[10px] font-bold text-gris-texte uppercase mb-1">Langues parlées</label>
+                      <label className="block text-[10px] font-bold text-gris-texte uppercase mb-1">{t.s3_languages_label}</label>
                       <div className="flex flex-wrap gap-1.5">
                         {LANGUAGES.map((l) => {
                           const on = (est.languages || []).includes(l);
@@ -167,7 +167,7 @@ export default function Step3Details({ data, updateData }: Props) {
                               className={'text-xs font-bold px-2.5 py-1.5 rounded-full border transition-colors ' +
                                 (on ? 'bg-marine text-white border-marine' : 'bg-white text-gris-texte border-gris-ligne hover:border-marine')}
                             >
-                              {on ? '✓ ' : ''}{l}
+                              {on ? '✓ ' : ''}{t.s3_language_names[l] || l}
                             </button>
                           );
                         })}
@@ -184,9 +184,7 @@ export default function Step3Details({ data, updateData }: Props) {
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-start gap-2">
         <span className="text-blue-600 text-lg">💡</span>
         <p className="text-xs text-blue-800">
-          Tout est optionnel ici. Plus vous complétez, plus votre fiche est
-          attractive dès sa publication. Vous garderez la main pour tout
-          modifier depuis votre espace partenaire.
+          {t.s3_tip}
         </p>
       </div>
     </div>

@@ -5,6 +5,8 @@ import { Upload, Loader2, Check, X, Info } from 'lucide-react';
 import { createBrowserClient } from '@supabase/ssr';
 import imageCompression from 'browser-image-compression';
 import type { WizardData } from '../page';
+import { useWizardLang } from '../WizardLangContext';
+import type { WizardDict } from '../i18n';
 
 interface Props {
   data: WizardData;
@@ -12,6 +14,7 @@ interface Props {
 }
 
 export default function Step3Photos({ data, updateData }: Props) {
+  const { t } = useWizardLang();
   const [uploading, setUploading] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [config, setConfig] = useState({
@@ -90,14 +93,14 @@ export default function Step3Photos({ data, updateData }: Props) {
 
     // Validation : taille max autorisée (5 MB)
     if (file.size > config.max_size_kb * 1024) {
-      setError(`Le fichier ne doit pas dépasser ${(config.max_size_kb / 1024).toFixed(0)} MB.`);
+      setError(t.s4_err_too_big((config.max_size_kb / 1024).toFixed(0)));
       return;
     }
 
     // Validation : format
     const ext = file.name.split('.').pop()?.toLowerCase() || '';
     if (!config.allowed_formats.includes(ext)) {
-      setError(`Format non autorisé. Formats acceptés : ${config.allowed_formats.join(', ').toUpperCase()}`);
+      setError(t.s4_err_format(config.allowed_formats.join(', ').toUpperCase()));
       return;
     }
 
@@ -155,10 +158,10 @@ export default function Step3Photos({ data, updateData }: Props) {
     <div className="space-y-6">
       <div>
         <h2 className="text-lg font-extrabold text-marine flex items-center gap-2 mb-1">
-          📸 Preuves visuelles
+          📸 {t.s4_title}
         </h2>
         <p className="text-xs text-gris-texte">
-          Les photos doivent être récentes (&lt; 6 mois), nettes, et montrer clairement l&apos;enseigne et l&apos;intérieur.
+          {t.s4_subtitle}
         </p>
       </div>
 
@@ -167,21 +170,22 @@ export default function Step3Photos({ data, updateData }: Props) {
         <Info size={14} className="text-blue-600 flex-shrink-0 mt-0.5" />
         <div className="text-xs text-blue-800 space-y-0.5">
           <div>
-            <b>Formats acceptés :</b> {config.allowed_formats.join(', ').toUpperCase()}
+            <b>{t.s4_formats_label}</b> {config.allowed_formats.join(', ').toUpperCase()}
           </div>
           <div>
-            <b>Taille max du fichier :</b> {(config.max_size_kb / 1024).toFixed(0)} MB
+            <b>{t.s4_maxsize_label}</b> {(config.max_size_kb / 1024).toFixed(0)} MB
           </div>
           <div className="text-blue-700">
-            ✨ <b>Compression automatique</b> : votre photo sera réduite à ~{config.target_size_kb} KB pour optimiser le chargement du site.
+            ✨ {t.s4_compress(config.target_size_kb)}
           </div>
         </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <PhotoSlot
-          label="📸 Photo extérieure *"
-          description="Façade visible avec enseigne"
+          t={t}
+          label={t.s4_exterior_label}
+          description={t.s4_exterior_desc}
           url={data.photo_exterior_url}
           uploading={uploading === 'exterior'}
           onUpload={(e) => handleUpload(e, 'exterior')}
@@ -189,8 +193,9 @@ export default function Step3Photos({ data, updateData }: Props) {
         />
 
         <PhotoSlot
-          label="📸 Photo intérieure *"
-          description="Intérieur de l'établissement"
+          t={t}
+          label={t.s4_interior_label}
+          description={t.s4_interior_desc}
           url={data.photo_interior_url}
           uploading={uploading === 'interior'}
           onUpload={(e) => handleUpload(e, 'interior')}
@@ -198,8 +203,9 @@ export default function Step3Photos({ data, updateData }: Props) {
         />
 
         <PhotoSlot
-          label="🪪 Pièce d'identité"
-          description="CIN ou Passeport du représentant (optionnel)"
+          t={t}
+          label={t.s4_id_label}
+          description={t.s4_id_desc}
           url={data.photo_representative_id_url}
           uploading={uploading === 'id'}
           onUpload={(e) => handleUpload(e, 'id')}
@@ -218,8 +224,9 @@ export default function Step3Photos({ data, updateData }: Props) {
 
 // ─── Sous-composant PhotoSlot ─────────────────────────────────────
 function PhotoSlot({
-  label, description, url, uploading, onUpload, onRemove,
+  t, label, description, url, uploading, onUpload, onRemove,
 }: {
+  t: WizardDict;
   label: string;
   description: string;
   url: string;
@@ -267,12 +274,12 @@ function PhotoSlot({
           {uploading ? (
             <>
               <Loader2 size={22} className="animate-spin mb-2" />
-              <span className="text-xs font-bold">Compression...</span>
+              <span className="text-xs font-bold">{t.s4_compressing}</span>
             </>
           ) : (
             <>
               <Upload size={22} className="mb-2" />
-              <span className="text-xs font-bold">Choisir un fichier</span>
+              <span className="text-xs font-bold">{t.s4_choose_file}</span>
             </>
           )}
         </label>
