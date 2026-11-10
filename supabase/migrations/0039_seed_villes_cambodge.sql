@@ -9,6 +9,18 @@
 -- + une option "Autre" (saisie libre) pour les villes/communes non listées.
 -- ============================================================================
 
+-- La table cities peut exister en prod dans une version plus ancienne, sans
+-- toutes les colonnes attendues. On les ajoute si elles manquent (idempotent).
+create table if not exists public.cities (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  slug text unique not null
+);
+alter table public.cities add column if not exists province  text;
+alter table public.cities add column if not exists position  int  not null default 0;
+alter table public.cities add column if not exists is_active boolean not null default true;
+alter table public.cities add column if not exists created_at timestamptz not null default now();
+
 -- RLS : lecture publique, écriture superadmin
 alter table public.cities enable row level security;
 drop policy if exists cities_read on public.cities;
