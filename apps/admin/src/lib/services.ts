@@ -300,6 +300,58 @@ export async function getCities() {
 }
 
 // ============================================================================
+// GESTION DES VILLES (admin) — CRUD complet sur la table cities
+// ============================================================================
+
+export async function getAllCitiesAdmin() {
+  const supabase = getSupabase();
+  const { data, error } = await supabase
+    .from('cities')
+    .select('*')
+    .order('position', { ascending: true });
+  if (error) { console.error('getAllCitiesAdmin:', error); return []; }
+  // Compte d'établissements par ville (sur le nom).
+  return Promise.all(
+    (data || []).map(async (city: any) => {
+      const { count } = await supabase
+        .from('businesses')
+        .select('*', { count: 'exact', head: true })
+        .eq('city', city.name);
+      return { ...city, count: count || 0 };
+    })
+  );
+}
+
+function slugifyCity(name: string): string {
+  return name.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+}
+
+export async function createCity(name: string, province: string) {
+  const supabase = getSupabase();
+  const slug = slugifyCity(name);
+  // Position = max + 1
+  const { data: last } = await supabase.from('cities').select('position').order('position', { ascending: false }).limit(1).maybeSingle();
+  const position = ((last?.position as number) || 0) + 1;
+  const { error } = await supabase.from('cities').insert({ name, slug, province: province || null, position, is_active: true });
+  if (error) throw error;
+}
+
+export async function updateCity(id: string, patch: { name?: string; province?: string; is_active?: boolean; position?: number }) {
+  const supabase = getSupabase();
+  const payload: any = { ...patch };
+  if (patch.name) payload.slug = slugifyCity(patch.name);
+  const { error } = await supabase.from('cities').update(payload).eq('id', id);
+  if (error) throw error;
+}
+
+export async function deleteCity(id: string) {
+  const supabase = getSupabase();
+  const { error } = await supabase.from('cities').delete().eq('id', id);
+  if (error) throw error;
+}
+
+// ============================================================================
 // IMPERSONATION
 // ============================================================================
 export async function startImpersonation(tenantId: string) {

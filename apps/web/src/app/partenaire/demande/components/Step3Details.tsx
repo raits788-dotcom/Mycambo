@@ -6,6 +6,8 @@ import type { WizardData, DemandeEstablishment } from '../page';
 import { useWizardLang } from '../WizardLangContext';
 import { getCategoryTree, type CategoryFamily } from '@/lib/categories';
 import { getAmenitiesForCategory, type Amenity } from '@/lib/amenities';
+import HoursEditor from '@/components/shared/HoursEditor';
+import { parseHours } from '@/lib/hours';
 
 interface Props {
   data: WizardData;
@@ -134,13 +136,13 @@ export default function Step3Details({ data, updateData }: Props) {
                       placeholder={t.s3_public_email_ph}
                       className="w-full px-3 py-2 text-sm rounded-lg border border-gris-ligne bg-white focus:border-marine focus:outline-none"
                     />
-                    <div className="md:col-span-2 relative">
-                      <Clock size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-gris-doux" />
-                      <input
-                        type="text" value={est.hours}
-                        onChange={(e) => patch(index, { hours: e.target.value })}
-                        placeholder={t.s3_hours_ph}
-                        className="w-full pl-8 pr-3 py-2 text-sm rounded-lg border border-gris-ligne bg-white focus:border-marine focus:outline-none"
+                    <div className="md:col-span-2">
+                      <div className="flex items-center gap-1.5 text-[11px] font-bold text-gris-texte mb-2">
+                        <Clock size={12} /> Horaires d&apos;ouverture
+                      </div>
+                      <HoursEditor
+                        value={parseHours(est.hours)}
+                        onChange={(h) => patch(index, { hours: h })}
                       />
                     </div>
                   </div>

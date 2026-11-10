@@ -30,7 +30,7 @@ export interface DemandeEstablishment {
   description: string;    // présentation -> onglet Présentation
   public_phone: string;   // téléphone public (≠ représentant)
   public_email: string;   // email public
-  hours: string;          // horaires en texte libre (ex. "Lun-Sam 8h-18h")
+  hours: string | import('@/lib/hours').StructuredHours;  // horaires structurés (ou libre, rétrocompat)
   services: string[];     // services cochés (wifi, parking…)
   price_range: string;    // "€" | "€€" | "€€€"
   languages: string[];    // FR / EN / KH / …

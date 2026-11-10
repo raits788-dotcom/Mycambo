@@ -22,7 +22,7 @@ import { incrementViews } from '@/lib/stats-tracker';
 import { getFamilyNavForCategory, type CategoryNode } from '@/lib/categories';
 import CategorySubNav from '@/components/rubrique/CategorySubNav';
 import { getActiveOffers, getJobOffers, type Offer, type JobOffer } from '@/lib/services';
-import { formatHours } from '@/lib/utils';
+import { displayHours } from '@/lib/hours';
 
 export default function CommercePage() {
   const params = useParams();
@@ -432,10 +432,10 @@ export default function CommercePage() {
                     <span>{commerce.website}</span>
                   </div>
                 )}
-                {formatHours(commerce.hours) && (
+                {displayHours(commerce.hours) && (
                   <div className="flex items-center gap-2.5">
                     <Clock size={15} className="text-gris-doux" />
-                    <span>{formatHours(commerce.hours)}</span>
+                    <span>{displayHours(commerce.hours)}</span>
                   </div>
                 )}
               </div>
