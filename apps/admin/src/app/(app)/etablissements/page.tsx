@@ -58,6 +58,18 @@ export default function EstablishmentsPage() {
 
   useEffect(() => { reload(); getCategoryTree().then(setTree); }, []);
 
+  // « Famille › Sous-catégorie » depuis le slug de catégorie de l'établissement.
+  const catLabel = (est: any): { family: string; sub: string } => {
+    const slug = est.categories?.slug;
+    if (!slug) return { family: est.categories?.name || '—', sub: '' };
+    for (const root of tree) {
+      if (root.slug === slug) return { family: root.name, sub: '' };
+      const c = root.children.find((k: any) => k.slug === slug);
+      if (c) return { family: root.name, sub: c.name };
+    }
+    return { family: est.categories?.name || '—', sub: '' };
+  };
+
   const openCatModal = (est: any) => {
     setCatModal(est);
     // pré-sélectionne la famille/sous-cat actuelle si connue
@@ -262,7 +274,20 @@ export default function EstablishmentsPage() {
                       className="inline-flex items-center gap-1.5 text-gris-texte hover:text-marine group"
                       title="Reclasser cet établissement"
                     >
-                      {est.categories?.name || '—'}
+                      {(() => {
+                        const { family, sub } = catLabel(est);
+                        return (
+                          <span className="inline-flex items-center gap-1 flex-wrap">
+                            <span className="font-semibold text-marine">{family}</span>
+                            {sub && (
+                              <>
+                                <span className="text-gris-doux">›</span>
+                                <span>{sub}</span>
+                              </>
+                            )}
+                          </span>
+                        );
+                      })()}
                       <Tag size={12} className="opacity-0 group-hover:opacity-100 transition-opacity" />
                     </button>
                   </td>
