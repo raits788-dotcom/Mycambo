@@ -1,28 +1,55 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ChevronDown, ChevronRight, Sparkles, Phone, Clock, Settings } from 'lucide-react';
 import type { WizardData, DemandeEstablishment } from '../page';
 import { useWizardLang } from '../WizardLangContext';
+import { getCategoryTree, type CategoryFamily } from '@/lib/categories';
+import { getAmenitiesForCategory, type Amenity } from '@/lib/amenities';
 
 interface Props {
   data: WizardData;
   updateData: (updates: Partial<WizardData>) => void;
 }
 
-// Services proposés selon la famille (optionnels, cases à cocher).
-const SERVICES_BY_FAMILY: Record<string, string[]> = {
-  hotel: ['Wi-Fi', 'Parking', 'Piscine', 'Climatisation', 'Petit-déjeuner', 'Restaurant', 'Navette', 'Accès PMR'],
-  restaurant: ['Wi-Fi', 'Terrasse', 'Climatisation', 'Réservation', 'Végétarien', 'Livraison', 'À emporter', 'Accès PMR'],
-  association: ['Bénévolat', 'Dons', 'Visites', 'Partenariats'],
-  'autres-commerces': ['Wi-Fi', 'Parking', 'Climatisation', 'Réservation', 'Livraison', 'Accès PMR'],
-};
 const PRICE_RANGES = ['€', '€€', '€€€'];
 const LANGUAGES = ['Français', 'Anglais', 'Khmer', 'Chinois'];
 
 export default function Step3Details({ data, updateData }: Props) {
   const { t } = useWizardLang();
   const [open, setOpen] = useState<number>(0);
+
+  // Table category_id -> slug (pour résoudre la sous-catégorie choisie).
+  const [idToSlug, setIdToSlug] = useState<Record<string, string>>({});
+  // Commodités chargées par slug de sous-catégorie (cache local).
+  const [amenitiesBySlug, setAmenitiesBySlug] = useState<Record<string, Amenity[]>>({});
+
+  // Charge l'arbre des catégories une fois pour la table id->slug.
+  useEffect(() => {
+    (async () => {
+      const tree: CategoryFamily[] = await getCategoryTree();
+      const map: Record<string, string> = {};
+      for (const fam of tree) {
+        map[fam.id] = fam.slug;
+        for (const child of fam.children) map[child.id] = child.slug;
+      }
+      setIdToSlug(map);
+    })();
+  }, []);
+
+  // Charge les commodités pour chaque sous-catégorie sélectionnée.
+  useEffect(() => {
+    (async () => {
+      for (const est of data.establishments) {
+        const slug = est.category_id ? idToSlug[est.category_id] : '';
+        if (slug && !amenitiesBySlug[slug]) {
+          const list = await getAmenitiesForCategory(slug);
+          setAmenitiesBySlug((prev) => ({ ...prev, [slug]: list }));
+        }
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data.establishments, idToSlug]);
 
   const patch = (index: number, updates: Partial<DemandeEstablishment>) => {
     const updated = [...data.establishments];
@@ -51,7 +78,8 @@ export default function Step3Details({ data, updateData }: Props) {
 
       {data.establishments.map((est, index) => {
         const isOpen = open === index;
-        const services = SERVICES_BY_FAMILY[est.family_slug] || SERVICES_BY_FAMILY['autres-commerces'];
+        const estSlug = est.category_id ? idToSlug[est.category_id] : '';
+        const amenities = (estSlug && amenitiesBySlug[estSlug]) || [];
         return (
           <div key={index} className="border border-gris-ligne rounded-lg overflow-hidden">
             <button
@@ -124,16 +152,22 @@ export default function Step3Details({ data, updateData }: Props) {
                     <Settings size={12} /> {t.s3_services}
                   </div>
                   <div className="flex flex-wrap gap-1.5 mb-3">
-                    {services.map((s) => {
-                      const on = (est.services || []).includes(s);
+                    {amenities.length === 0 && (
+                      <span className="text-xs text-gris-doux italic">
+                        {estSlug ? '—' : 'Choisissez une sous-catégorie à l\'étape précédente.'}
+                      </span>
+                    )}
+                    {amenities.map((a) => {
+                      // On stocke la CLÉ (a.key), on affiche le LIBELLÉ (a.label).
+                      const on = (est.services || []).includes(a.key);
                       return (
                         <button
-                          key={s} type="button"
-                          onClick={() => toggleInArray(index, 'services', s)}
+                          key={a.key} type="button"
+                          onClick={() => toggleInArray(index, 'services', a.key)}
                           className={'text-xs font-bold px-3 py-1.5 rounded-full border transition-colors ' +
                             (on ? 'bg-marine text-white border-marine' : 'bg-white text-gris-texte border-gris-ligne hover:border-marine')}
                         >
-                          {on ? '✓ ' : ''}{t.s3_service_names[s] || s}
+                          {on ? '✓ ' : ''}{a.label}
                         </button>
                       );
                     })}
