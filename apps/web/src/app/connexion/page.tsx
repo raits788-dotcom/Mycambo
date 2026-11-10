@@ -257,16 +257,6 @@ export default function ConnexionPage() {
           </button>
         </form>
 
-        <p className="text-center text-xs text-gris-texte mt-6">
-          Pas encore de compte ?{' '}
-          <Link
-            href="/inscription"
-            className="text-marine font-bold hover:underline"
-          >
-            Créer un compte
-          </Link>
-        </p>
-
         <div className="mt-6 pt-6 border-t border-gris-ligne space-y-2">
           <p className="text-xs text-gris-texte text-center mb-2">
             Vous êtes un commerce ou une association ?
@@ -276,6 +266,12 @@ export default function ConnexionPage() {
             className="block text-center text-xs font-bold text-marine border border-gris-ligne rounded-full py-2.5 hover:border-marine transition-colors"
           >
             Espace partenaire →
+          </Link>
+          <Link
+            href="/partenaire/demande"
+            className="block text-center text-xs text-gris-texte hover:text-marine pt-1"
+          >
+            Pas encore partenaire ? Faire une demande
           </Link>
         </div>
       </div>

@@ -159,6 +159,31 @@ export default function PartnerRequestWizard() {
         process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
       );
 
+      // ── Verrou d'unicité email (côté serveur) ─────────────────────────────
+      // Un email ne peut exister qu'une seule fois : refusé s'il a déjà un
+      // compte Auth ou une demande en attente/approuvée. Vérifié par une Edge
+      // Function service_role (anti-contournement côté client).
+      const availRes = await fetch(
+        `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/check-email-available`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: data.email }),
+        }
+      );
+      const avail = await availRes.json().catch(() => ({ available: false }));
+      if (!avail.available) {
+        const msg =
+          avail.reason === 'ACCOUNT_EXISTS'
+            ? 'Un compte existe déjà avec cet email. Connectez-vous ou utilisez « Recevoir un lien » depuis la page de connexion.'
+            : avail.reason === 'REQUEST_EXISTS'
+            ? 'Une demande de partenariat est déjà en cours avec cet email. Nous reviendrons vers vous par email.'
+            : 'Cet email ne peut pas être utilisé pour une nouvelle demande.';
+        alert(msg);
+        setSubmitting(false);
+        return;
+      }
+
       // Les champs demande (p_category/p_city/réseaux) reflètent le 1er
       // établissement pour compat avec la RPC existante ; le détail par
       // établissement vit dans le jsonb p_establishments (famille,
