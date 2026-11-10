@@ -71,3 +71,37 @@ export async function getCategoryTree(client?: any): Promise<CategoryFamily[]> {
     children: nodes.filter((c) => c.parent_id === r.id),
   }));
 }
+
+/**
+ * Pour une catégorie donnée (par son slug), retourne de quoi afficher la
+ * sous-barre de sa rubrique parente : le slug de la famille, ses sous-catégories
+ * et la sous-catégorie active (celle passée). Utilisé sur la fiche établissement
+ * pour garder la sous-barre visible, avec l'onglet de l'établissement surligné.
+ *
+ * - Si le slug est lui-même une famille (parent_id null) → parent = ce slug,
+ *   enfants = ses sous-catégories, actif = '' (onglet "Toutes").
+ * - Si le slug est une sous-catégorie → parent = sa famille, actif = ce slug.
+ * Retourne null si la catégorie n'a pas de sous-barre pertinente.
+ */
+export async function getFamilyNavForCategory(
+  categorySlug: string | null | undefined
+): Promise<{ parentSlug: string; children: CategoryNode[]; activeSlug: string } | null> {
+  if (!categorySlug) return null;
+  const tree = await getCategoryTree();
+
+  // Cas 1 : le slug est une famille.
+  const asFamily = tree.find((f) => f.slug === categorySlug);
+  if (asFamily) {
+    if (asFamily.children.length === 0) return null;
+    return { parentSlug: asFamily.slug, children: asFamily.children, activeSlug: '' };
+  }
+
+  // Cas 2 : le slug est une sous-catégorie → trouver sa famille.
+  for (const fam of tree) {
+    const child = fam.children.find((c) => c.slug === categorySlug);
+    if (child) {
+      return { parentSlug: fam.slug, children: fam.children, activeSlug: child.slug };
+    }
+  }
+  return null;
+}
