@@ -6,6 +6,7 @@ import { createBrowserClient } from '@supabase/ssr';
 import EtablissementCard from './EtablissementCard';
 import FiltersBar, { type Filters } from './FiltersBar';
 import { getLabelCatalog } from '@/lib/levels';
+import { getCities, type City } from '@/lib/cities';
 
 interface Props {
   typeSlug?: string;
@@ -21,6 +22,13 @@ export default function EtablissementGrid({ typeSlug, childSlugs, initialData }:
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [filters, setFilters] = useState<Filters>({});
+  const [cityList, setCityList] = useState<City[]>([]);
+
+  // Villes officielles (table cities) au lieu de celles extraites des fiches.
+  useEffect(() => { getCities().then(setCityList); }, []);
+
+  const norm = (s: string) =>
+    s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim();
 
   useEffect(() => {
     (async () => {
@@ -91,10 +99,8 @@ export default function EtablissementGrid({ typeSlug, childSlugs, initialData }:
     })();
   }, [typeSlug, childSlugs?.join(',')]);
 
-  // Villes disponibles
-  const cities = useMemo(() => {
-    return [...new Set(businesses.map((b) => b.city).filter(Boolean))].sort();
-  }, [businesses]);
+  // Villes proposées = table cities (noms officiels).
+  const cities = useMemo(() => cityList.map((c) => c.name), [cityList]);
 
   // Sous-catégories disponibles (avec compteur)
   const subcategories = useMemo(() => {
@@ -125,7 +131,11 @@ export default function EtablissementGrid({ typeSlug, childSlugs, initialData }:
         if (!matchSearch) return false;
       }
 
-      if (filters.city && b.city !== filters.city) return false;
+      if (filters.city) {
+        const bc = norm(b.city || '');
+        const fc = norm(filters.city);
+        if (!bc.includes(fc) && !fc.includes(bc)) return false;
+      }
       if (filters.level && b.level !== filters.level) return false;
       if (filters.subcategory && b.categorySlug !== filters.subcategory) return false;
 
