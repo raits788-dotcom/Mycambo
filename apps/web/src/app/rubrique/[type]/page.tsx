@@ -1,5 +1,4 @@
 import Image from 'next/image';
-import Link from 'next/link';
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import FeaturedCarousel from '@/components/rubrique/FeaturedCarousel';
@@ -193,15 +192,6 @@ export default async function RubriquePage({ params, searchParams }: Props) {
               <p className="text-sm text-white/85 leading-relaxed mb-6 max-w-sm">
                 {intro}
               </p>
-
-              <div className="flex flex-wrap gap-3 mb-6">
-                <Link
-                  href="#resultats"
-                  className="inline-flex items-center gap-2 bg-white text-marine font-bold px-4 py-2.5 rounded-full hover:bg-white/90 transition-colors text-sm"
-                >
-                  Voir toutes les adresses
-                </Link>
-              </div>
 
               <div className="flex flex-wrap gap-x-4 gap-y-2 text-xs text-white/75">
                 <span className="flex items-center gap-1.5">

@@ -4,6 +4,15 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { createClient } from '@supabase/supabase-js';
 import { Search } from 'lucide-react';
+import { getCities, type City } from '@/lib/cities';
+
+// Niveaux de vérification (filtre générique).
+const LEVELS = [
+  { slug: 'all', label: 'Tous niveaux' },
+  { slug: 'inscrit', label: 'Inscrit' },
+  { slug: 'verifie', label: 'Vérifié' },
+  { slug: 'premium', label: 'Premium' },
+];
 
 type Estab = {
   id: string;
@@ -34,6 +43,12 @@ export default function AnnuaireExplorer() {
   const [q, setQ] = useState('');
   const [family, setFamily] = useState<string>('all');
   const [city, setCity] = useState<string>('all');
+  const [level, setLevel] = useState<string>('all');
+  const [cityList, setCityList] = useState<City[]>([]);
+
+  // Villes officielles (table cities, comme le wizard) — fini les villes
+  // incohérentes extraites des fiches ("Pnhom penh kampot").
+  useEffect(() => { getCities().then(setCityList); }, []);
 
   useEffect(() => {
     (async () => {
@@ -91,23 +106,28 @@ export default function AnnuaireExplorer() {
     })();
   }, []);
 
-  const cities = useMemo(
-    () => [...new Set(items.map((i) => i.city).filter(Boolean))].sort() as string[],
-    [items]
-  );
+  // Normalise une ville pour un matching souple (casse/espaces/accents).
+  const norm = (s: string) =>
+    s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim();
 
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();
+    const cityNeedle = city !== 'all' ? norm(city) : '';
     return items.filter((i) => {
       if (family !== 'all' && i.familySlug !== family) return false;
-      if (city !== 'all' && i.city !== city) return false;
+      // Ville : match souple (la fiche "Pnhom penh kampot" matche "Kampot"/"Phnom Penh").
+      if (cityNeedle) {
+        const c = norm(i.city || '');
+        if (!c.includes(cityNeedle) && !cityNeedle.includes(c)) return false;
+      }
+      if (level !== 'all' && (i.level || 'inscrit') !== level) return false;
       if (needle) {
         const hay = `${i.name} ${i.city || ''} ${i.categoryName || ''} ${i.description || ''}`.toLowerCase();
         if (!hay.includes(needle)) return false;
       }
       return true;
     });
-  }, [items, q, family, city]);
+  }, [items, q, family, city, level]);
 
   // Groupe les résultats par famille (dans l'ordre FAMILIES)
   const groups = useMemo(() => {
@@ -153,7 +173,14 @@ export default function AnnuaireExplorer() {
             className="text-xs font-bold px-3 py-2 rounded-full border border-gris-ligne bg-white text-gris-texte"
           >
             <option value="all">Toutes les villes</option>
-            {cities.map((c) => <option key={c} value={c}>{c}</option>)}
+            {cityList.map((c) => <option key={c.slug} value={c.name}>{c.name}</option>)}
+          </select>
+          <select
+            value={level}
+            onChange={(e) => setLevel(e.target.value)}
+            className="text-xs font-bold px-3 py-2 rounded-full border border-gris-ligne bg-white text-gris-texte"
+          >
+            {LEVELS.map((l) => <option key={l.slug} value={l.slug}>{l.label}</option>)}
           </select>
           <span className="ml-auto text-xs text-gris-doux font-bold">
             {loading ? '…' : `${filtered.length} résultat${filtered.length > 1 ? 's' : ''}`}
