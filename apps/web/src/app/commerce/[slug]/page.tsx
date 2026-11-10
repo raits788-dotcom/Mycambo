@@ -18,6 +18,8 @@ import { LevelBadge, SubLabels } from '@/components/ui/LevelBadge';
 import { createBrowserClient } from '@supabase/ssr';
 import { getPlanPermissions, getPlanPermissionsFromDB, type PlanPermissions } from '@/lib/plan-permissions';
 import { getAmenitiesForCategory } from '@/lib/amenities';
+import { getFamilyNavForCategory, type CategoryNode } from '@/lib/categories';
+import CategorySubNav from '@/components/rubrique/CategorySubNav';
 import { getActiveOffers, getJobOffers, type Offer, type JobOffer } from '@/lib/services';
 import { formatHours } from '@/lib/utils';
 
@@ -29,6 +31,7 @@ export default function CommercePage() {
   const [tenantLevel, setTenantLevel] = useState<string | null>(null);
   const [tenantLabels, setTenantLabels] = useState<any[]>([]);
   const [amenityLabels, setAmenityLabels] = useState<Record<string, string>>({});
+  const [subNav, setSubNav] = useState<{ parentSlug: string; children: CategoryNode[]; activeSlug: string } | null>(null);
   const [planSlug, setPlanSlug] = useState<string>('decouverte');
   const [permissions, setPermissions] = useState<PlanPermissions>(() => getPlanPermissions('decouverte'));
   const [mounted, setMounted] = useState(false);
@@ -111,6 +114,14 @@ export default function CommercePage() {
         reviews: 0,
       });
 
+      // 3ter. Sous-barre des sous-catégories (comme en rubrique), avec l'onglet
+      //       de l'établissement surligné. Garde la navigation visible sur la fiche.
+      try {
+        setSubNav(await getFamilyNavForCategory(business.categories?.slug));
+      } catch {
+        setSubNav(null);
+      }
+
       // 3bis. Charge les libellés de commodités de la famille (source unique).
       //       Permet d'afficher les services en public avec le bon libellé,
       //       cohérent avec le wizard et l'éditeur partenaire.
@@ -188,6 +199,16 @@ export default function CommercePage() {
 
   return (
     <>
+      {/* Sous-barre des sous-catégories (comme en rubrique), sous le header.
+          Reste visible sur la fiche, avec l'onglet de l'établissement surligné. */}
+      {subNav && (
+        <CategorySubNav
+          parentSlug={subNav.parentSlug}
+          children={subNav.children}
+          activeSlug={subNav.activeSlug}
+        />
+      )}
+
       {/* HERO */}
       <section className="relative h-[240px] md:h-[280px] overflow-hidden">
         <Image

@@ -15,6 +15,9 @@ interface Props {
   parentSlug: string;
   // Sous-catégories à afficher dans la sous-barre.
   children: SubCat[];
+  // Sous-catégorie active imposée (ex. sur une fiche établissement, où il n'y
+  // a pas de ?cat= dans l'URL). Prioritaire sur le paramètre d'URL.
+  activeSlug?: string;
 }
 
 /**
@@ -22,9 +25,10 @@ interface Props {
  * Même principe que DiscoverSubNav : défile au doigt sur mobile, pas de
  * menu au survol. La sous-catégorie active est pilotée par ?cat=<slug>.
  */
-export default function CategorySubNav({ parentSlug, children }: Props) {
+export default function CategorySubNav({ parentSlug, children, activeSlug }: Props) {
   const searchParams = useSearchParams();
-  const active = searchParams.get('cat') || '';
+  // Sur une fiche, activeSlug impose la sous-catégorie active ; sinon ?cat=.
+  const active = activeSlug ?? (searchParams.get('cat') || '');
 
   if (!children || children.length === 0) return null;
 
