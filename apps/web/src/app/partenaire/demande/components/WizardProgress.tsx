@@ -2,22 +2,16 @@
 
 import { Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useWizardLang } from '../WizardLangContext';
 
 interface WizardProgressProps {
   currentStep: number;
   totalSteps: number;
 }
 
-const STEP_LABELS = [
-  'Demandeur',
-  'Établissements',
-  'Détails',
-  'Photos',
-  'Motivation',
-  'Vérification',
-];
-
 export default function WizardProgress({ currentStep, totalSteps }: WizardProgressProps) {
+  const { t } = useWizardLang();
+  const STEP_LABELS = t.step_labels;
   return (
     <div className="mb-8">
       <div className="flex items-center justify-between mb-3">
@@ -64,7 +58,7 @@ export default function WizardProgress({ currentStep, totalSteps }: WizardProgre
       </div>
 
       <div className="text-center text-xs text-gris-texte mt-6">
-        Étape <b className="text-marine">{currentStep}</b> sur {totalSteps}
+        {t.progress_step_of(currentStep, totalSteps)}
       </div>
     </div>
   );

@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Shield, Check, Loader2, Mail, AlertCircle, RefreshCw } from 'lucide-react';
 import type { WizardData } from '../page';
+import { useWizardLang } from '../WizardLangContext';
 
 interface Props {
   data: WizardData;
@@ -10,6 +11,7 @@ interface Props {
 }
 
 export default function Step5Verification({ data, updateData }: Props) {
+  const { t } = useWizardLang();
   const [code, setCode] = useState('');
   const [sending, setSending] = useState(false);
   const [verifying, setVerifying] = useState(false);
@@ -19,7 +21,7 @@ export default function Step5Verification({ data, updateData }: Props) {
 
   const handleSendCode = async () => {
     if (!data.email) {
-      setError('Veuillez renseigner votre email à l\'étape 1.');
+      setError(t.s6_err_no_email);
       return;
     }
 
@@ -38,7 +40,7 @@ export default function Step5Verification({ data, updateData }: Props) {
 
       const result = await res.json();
       if (!res.ok || !result.success) {
-        throw new Error(result.error || 'Erreur d\'envoi');
+        throw new Error(result.error || t.s6_err_send);
       }
 
       setCodeSent(true);
@@ -51,7 +53,7 @@ export default function Step5Verification({ data, updateData }: Props) {
 
   const handleVerifyCode = async () => {
     if (code.length !== 6) {
-      setError('Le code doit contenir 6 chiffres.');
+      setError(t.s6_err_code_len);
       return;
     }
 
@@ -70,7 +72,7 @@ export default function Step5Verification({ data, updateData }: Props) {
 
       const result = await res.json();
       if (!result.success) {
-        throw new Error(result.error || 'Code invalide');
+        throw new Error(result.error || t.s6_err_invalid_code);
       }
 
       updateData({ email_verified: true });
@@ -86,29 +88,29 @@ export default function Step5Verification({ data, updateData }: Props) {
     <div className="space-y-6">
       <div>
         <h2 className="text-lg font-extrabold text-marine flex items-center gap-2 mb-1">
-          <Shield size={18} /> Vérification
+          <Shield size={18} /> {t.s6_title}
         </h2>
         <p className="text-xs text-gris-texte">
-          Vérifiez votre email et acceptez les conditions pour finaliser votre demande.
+          {t.s6_subtitle}
         </p>
       </div>
 
       {/* Bloc vérification email */}
       <div className="bg-gris-fond rounded-lg p-4 border border-gris-ligne">
         <h3 className="font-bold text-marine text-sm mb-3 flex items-center gap-2">
-          <Mail size={14} /> Vérification de votre email
+          <Mail size={14} /> {t.s6_email_block_title}
         </h3>
 
         <div className="flex items-center gap-2 mb-3 text-xs">
-          <span className="text-gris-texte">Email :</span>
-          <b className="text-marine">{data.email || '(non renseigné)'}</b>
+          <span className="text-gris-texte">{t.s6_email_label}</span>
+          <b className="text-marine">{data.email || t.s6_email_none}</b>
         </div>
 
         {success ? (
           <div className="bg-green-50 border border-green-200 rounded-lg p-3 flex items-center gap-2">
             <Check size={16} className="text-green-600" />
             <span className="text-xs text-green-800 font-bold">
-              Email vérifié avec succès !
+              {t.s6_verified}
             </span>
           </div>
         ) : !codeSent ? (
@@ -119,15 +121,15 @@ export default function Step5Verification({ data, updateData }: Props) {
             className="w-full flex items-center justify-center gap-2 bg-marine text-white font-bold py-2.5 rounded-full hover:bg-marine-dark transition-colors disabled:opacity-50 text-xs"
           >
             {sending ? (
-              <><Loader2 size={14} className="animate-spin" /> Envoi en cours...</>
+              <><Loader2 size={14} className="animate-spin" /> {t.s6_sending}</>
             ) : (
-              <><Mail size={14} /> Envoyer le code de vérification</>
+              <><Mail size={14} /> {t.s6_send_code}</>
             )}
           </button>
         ) : (
           <div className="space-y-3">
             <div className="text-xs text-gris-texte">
-              Code envoyé à <b className="text-marine">{data.email}</b>. Il expire dans 15 minutes.
+              {t.s6_code_sent(data.email)}
             </div>
 
             <div className="flex gap-2">
@@ -138,7 +140,7 @@ export default function Step5Verification({ data, updateData }: Props) {
                 maxLength={6}
                 value={code}
                 onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
-                placeholder="123456"
+                placeholder={t.s6_code_ph}
                 className="flex-1 px-4 py-3 text-center text-xl font-mono tracking-widest rounded-lg border border-gris-ligne focus:border-marine focus:outline-none bg-white"
                 autoFocus
               />
@@ -158,7 +160,7 @@ export default function Step5Verification({ data, updateData }: Props) {
               disabled={sending}
               className="flex items-center gap-1 text-xs text-marine hover:underline"
             >
-              <RefreshCw size={11} /> Renvoyer le code
+              <RefreshCw size={11} /> {t.s6_resend}
             </button>
           </div>
         )}
@@ -166,7 +168,7 @@ export default function Step5Verification({ data, updateData }: Props) {
 
       {/* Bloc acceptation CGU */}
       <div className="bg-gris-fond rounded-lg p-4 border border-gris-ligne">
-        <h3 className="font-bold text-marine text-sm mb-3">📋 Conditions générales</h3>
+        <h3 className="font-bold text-marine text-sm mb-3">📋 {t.s6_cgu_title}</h3>
 
         <label className="flex items-start gap-3 cursor-pointer">
           <input
@@ -176,15 +178,15 @@ export default function Step5Verification({ data, updateData }: Props) {
             className="mt-0.5 w-4 h-4 accent-marine"
           />
           <span className="text-xs text-gris-texte leading-relaxed">
-            J&apos;accepte les{' '}
+            {t.s6_cgu_accept_1}
             <a href="/legal/cgu" target="_blank" className="text-marine font-bold hover:underline">
-              conditions générales d&apos;utilisation
-            </a>{' '}
-            et la{' '}
+              {t.s6_cgu_link}
+            </a>
+            {t.s6_cgu_and}
             <a href="/legal/confidentialite" target="_blank" className="text-marine font-bold hover:underline">
-              politique de confidentialité
-            </a>{' '}
-            de MyCambo. Je certifie que les informations fournies sont exactes.
+              {t.s6_cgu_privacy}
+            </a>
+            {t.s6_cgu_accept_2}
           </span>
         </label>
       </div>
@@ -199,31 +201,31 @@ export default function Step5Verification({ data, updateData }: Props) {
 
       {/* Récap */}
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-        <h3 className="font-bold text-blue-900 text-sm mb-3">📋 Récapitulatif</h3>
+        <h3 className="font-bold text-blue-900 text-sm mb-3">📋 {t.s6_recap_title}</h3>
         <ul className="space-y-1.5 text-xs text-blue-800">
           <li className="flex items-center gap-2">
             {data.legal_name ? <Check size={12} className="text-green-600" /> : <AlertCircle size={12} className="text-red-500" />}
-            Entreprise : {data.legal_name || 'non renseigné'}
+            {t.s6_recap_company} {data.legal_name || t.s6_recap_none}
           </li>
           <li className="flex items-center gap-2">
             {data.establishments.length > 0 && data.establishments.every((e) => e.name) ? <Check size={12} className="text-green-600" /> : <AlertCircle size={12} className="text-red-500" />}
-            Établissements : {data.establishments.length} déclaré(s)
+            {t.s6_recap_establishments(data.establishments.length)}
           </li>
           <li className="flex items-center gap-2">
             {data.photo_exterior_url && data.photo_interior_url ? <Check size={12} className="text-green-600" /> : <AlertCircle size={12} className="text-red-500" />}
-            Photos obligatoires : {data.photo_exterior_url && data.photo_interior_url ? 'fournies' : 'manquantes'}
+            {t.s6_recap_photos} {data.photo_exterior_url && data.photo_interior_url ? t.s6_recap_photos_ok : t.s6_recap_photos_ko}
           </li>
           <li className="flex items-center gap-2">
             {data.motivation.length >= 50 ? <Check size={12} className="text-green-600" /> : <AlertCircle size={12} className="text-red-500" />}
-            Motivation : {data.motivation.length} caractères
+            {t.s6_recap_motivation(data.motivation.length)}
           </li>
           <li className="flex items-center gap-2">
             {data.email_verified ? <Check size={12} className="text-green-600" /> : <AlertCircle size={12} className="text-red-500" />}
-            Email : {data.email_verified ? 'vérifié' : 'non vérifié'}
+            {t.s6_recap_email} {data.email_verified ? t.s6_recap_email_ok : t.s6_recap_email_ko}
           </li>
           <li className="flex items-center gap-2">
             {data.accepts_terms ? <Check size={12} className="text-green-600" /> : <AlertCircle size={12} className="text-red-500" />}
-            CGU : {data.accepts_terms ? 'acceptées' : 'non acceptées'}
+            {t.s6_recap_cgu} {data.accepts_terms ? t.s6_recap_cgu_ok : t.s6_recap_cgu_ko}
           </li>
         </ul>
       </div>

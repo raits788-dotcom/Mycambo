@@ -10,6 +10,8 @@ import Step3Details from './components/Step3Details';
 import Step3Photos from './components/Step3Photos';
 import Step4Motivation from './components/Step4Motivation';
 import Step5Verification from './components/Step5Verification';
+import LangSelector from './components/LangSelector';
+import { WizardLangProvider, useWizardLang } from './WizardLangContext';
 
 // Un établissement déclaré dans la demande (étapes 2 + 3 Détails).
 export interface DemandeEstablishment {
@@ -89,6 +91,15 @@ const INITIAL_DATA: WizardData = {
 };
 
 export default function PartnerRequestWizard() {
+  return (
+    <WizardLangProvider>
+      <WizardInner />
+    </WizardLangProvider>
+  );
+}
+
+function WizardInner() {
+  const { t } = useWizardLang();
   const [step, setStep] = useState(1);
   const [data, setData] = useState<WizardData>(INITIAL_DATA);
   const [submitting, setSubmitting] = useState(false);
@@ -175,10 +186,10 @@ export default function PartnerRequestWizard() {
       if (!avail.available) {
         const msg =
           avail.reason === 'ACCOUNT_EXISTS'
-            ? 'Un compte existe déjà avec cet email. Connectez-vous ou utilisez « Recevoir un lien » depuis la page de connexion.'
+            ? t.email_account_exists
             : avail.reason === 'REQUEST_EXISTS'
-            ? 'Une demande de partenariat est déjà en cours avec cet email. Nous reviendrons vers vous par email.'
-            : 'Cet email ne peut pas être utilisé pour une nouvelle demande.';
+            ? t.email_request_exists
+            : t.email_not_usable;
         alert(msg);
         setSubmitting(false);
         return;
@@ -231,7 +242,7 @@ export default function PartnerRequestWizard() {
       setSubmitted(true);
     } catch (err) {
       console.error('Erreur:', err);
-      alert('Erreur : ' + (err as Error).message);
+      alert(t.submit_error + (err as Error).message);
     } finally {
       setSubmitting(false);
     }
@@ -245,31 +256,29 @@ export default function PartnerRequestWizard() {
             <Check size={32} className="text-green-600" />
           </div>
           <h1 className="text-2xl font-extrabold text-marine mb-3">
-            Demande envoyée !
+            {t.done_title}
           </h1>
           <p className="text-sm text-gris-texte leading-relaxed mb-6">
-            Merci pour votre intérêt. Notre équipe va examiner votre dossier
-            sous <b>48h ouvrées</b>. Vous recevrez un email dès qu'une décision
-            sera prise.
+            {t.done_text_1} <b>{t.done_48h}</b>{t.done_text_2}
           </p>
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-6 text-left">
             <p className="text-xs text-blue-800">
-              <b>Prochaines étapes :</b>
+              <b>{t.done_next_title}</b>
               <br />
-              1. Vérification de votre dossier par l&apos;équipe MyCambo
+              1. {t.done_next_1}
               <br />
-              2. Email d&apos;approbation avec lien pour créer votre compte
+              2. {t.done_next_2}
               <br />
-              3. Choix d&apos;une formule d&apos;abonnement
+              3. {t.done_next_3}
               <br />
-              4. Création de vos établissements
+              4. {t.done_next_4}
             </p>
           </div>
           <a
             href="/"
             className="inline-flex items-center justify-center gap-2 bg-marine text-white font-bold px-6 py-3 rounded-full hover:bg-marine-dark transition-colors text-sm w-full"
           >
-            Retour à l&apos;accueil
+            {t.done_home}
           </a>
         </div>
       </section>
@@ -279,14 +288,18 @@ export default function PartnerRequestWizard() {
   return (
     <section className="bg-gris-fond min-h-[calc(100vh-160px)] py-12 px-4">
       <div className="max-w-3xl mx-auto">
+        {/* Sélecteur de langue — présent dès l'étape 1, persistant partout */}
+        <div className="flex justify-end mb-3">
+          <LangSelector />
+        </div>
+
         {/* En-tête */}
         <div className="text-center mb-8">
           <h1 className="text-2xl md:text-3xl font-extrabold text-marine mb-2">
-            Devenir partenaire MyCambo
+            {t.header_title}
           </h1>
           <p className="text-sm text-gris-texte">
-            Remplissez ce formulaire pour rejoindre l&apos;annuaire. Cela prend
-            environ 5 minutes.
+            {t.header_subtitle}
           </p>
         </div>
 
@@ -312,7 +325,7 @@ export default function PartnerRequestWizard() {
             className="flex items-center gap-2 text-sm font-bold border border-gris-ligne text-marine px-5 py-3 rounded-full hover:border-marine transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <ArrowLeft size={14} />
-            Précédent
+            {t.nav_prev}
           </button>
 
           {step < TOTAL_STEPS ? (
@@ -322,7 +335,7 @@ export default function PartnerRequestWizard() {
               disabled={!canGoNext()}
               className="flex items-center gap-2 text-sm font-bold bg-marine text-white px-6 py-3 rounded-full hover:bg-marine-dark transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              Étape suivante
+              {t.nav_next}
               <ArrowRight size={14} />
             </button>
           ) : (
@@ -335,12 +348,12 @@ export default function PartnerRequestWizard() {
               {submitting ? (
                 <>
                   <Loader2 size={14} className="animate-spin" />
-                  Envoi en cours...
+                  {t.nav_submitting}
                 </>
               ) : (
                 <>
                   <Check size={14} />
-                  Envoyer ma demande
+                  {t.nav_submit}
                 </>
               )}
             </button>
