@@ -35,7 +35,7 @@ const INTERACTIONS_OFF = {
 
 export const PLAN_PERMISSIONS: Record<PlanSlug, PlanPermissions> = {
   decouverte: {
-    canShowPhotos: false,
+    canShowPhotos: true, // 1 photo principale autorisée en Découverte
     canShowDescription: false,
     canShowHours: false,
     canShowSocialLinks: false,
@@ -43,7 +43,7 @@ export const PLAN_PERMISSIONS: Record<PlanSlug, PlanPermissions> = {
     canBeFeatured: false,
     canShowBanner: false,
     canUseMessaging: false,
-    maxPhotos: 0,
+    maxPhotos: 1,
     maxEstablishments: 1,
     canReceiveMessages: false, canReceiveReservations: false, canPublishOffers: false, canReceiveApplications: false,
   },

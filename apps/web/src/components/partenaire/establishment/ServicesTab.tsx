@@ -1,220 +1,62 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import {
-  Heart,
-  Users,
-  Target,
-  Hotel,
-  UtensilsCrossed,
-  Compass,
-  ShoppingBag,
-  Bike,
-  Info,
-} from 'lucide-react';
+import { Info } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { createBrowserClient } from '@supabase/ssr';
 import type { StoredEstablishment } from '@/lib/establishment-storage';
 import { updateEstablishment } from '@/lib/establishment-storage';
+import { getAmenitiesForCategory } from '@/lib/amenities';
+import { AMENITY_ICONS } from '@/lib/amenity-icons';
 
-// Mapping clé d'icône (base) -> composant lucide (ne peut pas vivre en base).
-const ICONS: Record<string, typeof Heart> = {
-  heart: Heart,
-  users: Users,
-  target: Target,
-  hotel: Hotel,
-  menu: UtensilsCrossed,
-  compass: Compass,
-  shopping: ShoppingBag,
-  bike: Bike,
-};
+// Icône par défaut si la clé n'est pas mappée.
+const ICONS = AMENITY_ICONS;
 
 interface ServicesTabProps {
   establishment: StoredEstablishment;
   onUpdate: () => void;
 }
 
-type ServiceKey =
-  | 'donations'
-  | 'volunteers'
-  | 'projects'
-  | 'reservations'
-  | 'menu'
-  | 'rooms'
-  | 'offers'
-  | 'shipping'
-  | 'tours'
-  | 'products';
+// Clé ouverte : les commodités viennent de la base (category_amenities).
+type ServiceKey = string;
 
 type Service = {
   key: ServiceKey;
   label: string;
   description: string;
-  icon: typeof Heart;
+  icon: typeof Info;
   color: string;
 };
 
-// ===== Services par type d'établissement =====
-const SERVICES_BY_TYPE: Record<string, Service[]> = {
-  association: [
-    {
-      key: 'donations',
-      label: 'Dons',
-      description: 'Recevoir des promesses de don',
-      icon: Heart,
-      color: 'text-red-500 bg-red-100',
-    },
-    {
-      key: 'volunteers',
-      label: 'Bénévolat',
-      description: 'Recevoir des candidatures bénévoles',
-      icon: Users,
-      color: 'text-green-600 bg-green-100',
-    },
-    {
-      key: 'projects',
-      label: 'Projets',
-      description: 'Présenter vos projets en cours',
-      icon: Target,
-      color: 'text-orange-600 bg-orange-100',
-    },
-  ],
-  hotel: [
-    {
-      key: 'rooms',
-      label: 'Chambres',
-      description: 'Afficher vos chambres et tarifs',
-      icon: Hotel,
-      color: 'text-blue-600 bg-blue-100',
-    },
-    {
-      key: 'reservations',
-      label: 'Réservations',
-      description: 'Recevoir des demandes de réservation',
-      icon: Target,
-      color: 'text-green-600 bg-green-100',
-    },
-    {
-      key: 'offers',
-      label: 'Offres promotionnelles',
-      description: 'Créer des offres spéciales',
-      icon: Heart,
-      color: 'text-red-500 bg-red-100',
-    },
-  ],
-  restaurant: [
-    {
-      key: 'menu',
-      label: 'Menu',
-      description: 'Afficher votre menu et vos plats',
-      icon: UtensilsCrossed,
-      color: 'text-orange-600 bg-orange-100',
-    },
-    {
-      key: 'reservations',
-      label: 'Réservations',
-      description: 'Recevoir des demandes de réservation',
-      icon: Target,
-      color: 'text-green-600 bg-green-100',
-    },
-    {
-      key: 'shipping',
-      label: 'Livraison',
-      description: 'Proposer la livraison ou à emporter',
-      icon: Bike,
-      color: 'text-blue-600 bg-blue-100',
-    },
-  ],
-  activite: [
-    {
-      key: 'tours',
-      label: 'Tours / Activités',
-      description: 'Présenter vos activités et horaires',
-      icon: Compass,
-      color: 'text-green-600 bg-green-100',
-    },
-    {
-      key: 'reservations',
-      label: 'Réservations',
-      description: 'Recevoir des demandes de réservation',
-      icon: Target,
-      color: 'text-blue-600 bg-blue-100',
-    },
-  ],
-  boutique: [
-    {
-      key: 'products',
-      label: 'Produits',
-      description: 'Afficher vos produits en vente',
-      icon: ShoppingBag,
-      color: 'text-purple-600 bg-purple-100',
-    },
-    {
-      key: 'shipping',
-      label: 'Livraison',
-      description: 'Proposer la livraison',
-      icon: Bike,
-      color: 'text-blue-600 bg-blue-100',
-    },
-  ],
-};
-
-// Mapping du nom de catégorie vers la clé de SERVICES_BY_TYPE
-function getServiceTypeFromCategory(categoryName?: string | null): string {
-  if (!categoryName) return '';
-  const lower = categoryName.toLowerCase();
-  if (lower.includes('association')) return 'association';
-  if (lower.includes('hôtel') || lower.includes('hotel')) return 'hotel';
-  if (lower.includes('restaurant')) return 'restaurant';
-  if (lower.includes('activité') || lower.includes('activite')) return 'activite';
-  if (lower.includes('boutique') || lower.includes('shop')) return 'boutique';
-  return '';
-}
 
 export default function ServicesTab({
   establishment,
   onUpdate,
 }: ServicesTabProps) {
-  const serviceType = getServiceTypeFromCategory(establishment.categories?.name);
+  // La famille de commodités est résolue depuis le SLUG de catégorie (fiable),
+  // avec repli sur le nom. Source unique : table category_amenities.
+  const categorySlug = establishment.categories?.slug || establishment.categories?.name || '';
 
-  // Services chargés depuis la base (table category_services) ; fallback en dur.
-  const [services, setServices] = useState<Service[]>(
-    () => SERVICES_BY_TYPE[serviceType] || []
-  );
+  const [services, setServices] = useState<Service[]>([]);
 
   useEffect(() => {
     let active = true;
     (async () => {
-      try {
-        const sb = createBrowserClient(
-          process.env.NEXT_PUBLIC_SUPABASE_URL!,
-          process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-        );
-        const { data } = await sb
-          .from('category_services')
-          .select('service_key, label, description, icon_key, color')
-          .eq('category_slug', serviceType)
-          .eq('is_active', true)
-          .order('position');
-        if (active && data && data.length) {
-          setServices(
-            data.map((s: any) => ({
-              key: s.service_key as ServiceKey,
-              label: s.label,
-              description: s.description || '',
-              icon: ICONS[s.icon_key] || Info,
-              color: s.color || 'text-marine bg-blue-100',
-            }))
-          );
-        }
-      } catch {
-        // garde le fallback en dur
-      }
+      const amenities = await getAmenitiesForCategory(categorySlug);
+      if (!active) return;
+      setServices(
+        amenities.map((a) => ({
+          key: a.key,
+          label: a.label,
+          description: '',
+          icon: ICONS[a.icon_key || ''] || Info,
+          color: 'text-marine bg-blue-100',
+        }))
+      );
     })();
     return () => {
       active = false;
     };
-  }, [serviceType]);
+  }, [categorySlug]);
 
   const [active, setActive] = useState<Record<string, boolean>>(() => {
     const initial: Record<string, boolean> = {};

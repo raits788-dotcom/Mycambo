@@ -17,6 +17,7 @@ import VolunteerModal from '@/components/association/VolunteerModal';
 import { LevelBadge, SubLabels } from '@/components/ui/LevelBadge';
 import { createBrowserClient } from '@supabase/ssr';
 import { getPlanPermissions, getPlanPermissionsFromDB, type PlanPermissions } from '@/lib/plan-permissions';
+import { getAmenitiesForCategory } from '@/lib/amenities';
 import { getActiveOffers, getJobOffers, type Offer, type JobOffer } from '@/lib/services';
 import { formatHours } from '@/lib/utils';
 
@@ -27,6 +28,7 @@ export default function CommercePage() {
   const [commerce, setCommerce] = useState<any>(null);
   const [tenantLevel, setTenantLevel] = useState<string | null>(null);
   const [tenantLabels, setTenantLabels] = useState<any[]>([]);
+  const [amenityLabels, setAmenityLabels] = useState<Record<string, string>>({});
   const [planSlug, setPlanSlug] = useState<string>('decouverte');
   const [permissions, setPermissions] = useState<PlanPermissions>(() => getPlanPermissions('decouverte'));
   const [mounted, setMounted] = useState(false);
@@ -60,7 +62,7 @@ export default function CommercePage() {
         .from('businesses')
         .select(`
           *,
-          categories(name, icon, color),
+          categories(name, slug, icon, color),
           tenants(
             id, name, verification_level, city, email, plan_id,
             plans(slug, name)
@@ -109,6 +111,18 @@ export default function CommercePage() {
         reviews: 0,
       });
 
+      // 3bis. Charge les libellés de commodités de la famille (source unique).
+      //       Permet d'afficher les services en public avec le bon libellé,
+      //       cohérent avec le wizard et l'éditeur partenaire.
+      try {
+        const famAmenities = await getAmenitiesForCategory(business.categories?.slug);
+        const map: Record<string, string> = {};
+        for (const a of famAmenities) map[a.key] = a.label;
+        setAmenityLabels(map);
+      } catch {
+        setAmenityLabels({});
+      }
+
       // 4. Charge le niveau + labels
       setTenantLevel((business.tenants as any)?.verification_level || 'inscrit');
 
@@ -153,13 +167,22 @@ export default function CommercePage() {
   const isAssociation = commerce.type === 'association';
   // `permissions` vient de la base (state), avec fallback en dur au premier rendu.
 
-  // La galerie publique respecte la limite `maxPhotos` de la formule
-  // (0 ou non défini = pas de limite effective → on garde tout).
-  const photoLimit = permissions.maxPhotos ?? 0;
-  const visiblePhotos = permissions.canShowPhotos
-    ? (photoLimit > 0 ? (commerce.gallery || []).slice(0, photoLimit) : (commerce.gallery || []))
-    : [];
-  const heroImage = permissions.canShowPhotos && commerce.image
+  // La galerie publique respecte la limite `maxPhotos` de la formule.
+  // Règle : maxPhotos est le nombre EXACT de photos autorisées.
+  //   - undefined  → pas de limite définie → on garde tout
+  //   - 0          → zéro photo
+  //   - n > 0      → au plus n photos
+  // (Découverte = 1 : seule la photo principale est publique.)
+  const photoLimit = permissions.maxPhotos;
+  const gallery = commerce.gallery || [];
+  const visiblePhotos = !permissions.canShowPhotos
+    ? []
+    : photoLimit === undefined
+      ? gallery
+      : gallery.slice(0, photoLimit);
+  // Le héro n'apparaît que si la formule autorise au moins 1 photo.
+  const canShowHero = permissions.canShowPhotos && (photoLimit === undefined || photoLimit >= 1);
+  const heroImage = canShowHero && commerce.image
     ? commerce.image
     : 'https://images.unsplash.com/photo-1497486751825-1233686d5d80?q=85&w=1600&auto=format&fit=crop';
 
@@ -227,18 +250,30 @@ export default function CommercePage() {
         </div>
       </section>
 
-      {/* Bandeau informatif si formule Découverte */}
-      {!permissions.canShowPhotos && (
-        <div className="bg-blue-50 border-b border-blue-200">
-          <div className="max-w-wrap mx-auto px-4 md:px-8 lg:px-12 xl:px-20 py-3 flex items-center gap-2">
-            <Lock size={14} className="text-blue-600" />
-            <p className="text-xs text-blue-800">
-              <b>Cette fiche est en formule Découverte.</b> Les photos, description et
-              informations détaillées ne sont pas disponibles.
-            </p>
+      {/* Bandeau informatif si des éléments restent bridés par la formule.
+          On liste dynamiquement ce qui est réellement masqué (plus de texte figé). */}
+      {(() => {
+        const missing: string[] = [];
+        if (!permissions.canShowDescription) missing.push('la présentation détaillée');
+        if (!permissions.canShowHours) missing.push('les horaires');
+        if (!permissions.canShowSocialLinks) missing.push('les liens (site, réseaux)');
+        if (missing.length === 0) return null;
+        const list =
+          missing.length === 1
+            ? missing[0]
+            : missing.slice(0, -1).join(', ') + ' et ' + missing[missing.length - 1];
+        return (
+          <div className="bg-blue-50 border-b border-blue-200">
+            <div className="max-w-wrap mx-auto px-4 md:px-8 lg:px-12 xl:px-20 py-3 flex items-center gap-2">
+              <Lock size={14} className="text-blue-600" />
+              <p className="text-xs text-blue-800">
+                <b>Fiche en formule limitée.</b> {list} {missing.length === 1 ? "n'est" : 'ne sont'} pas
+                encore disponible{missing.length === 1 ? '' : 's'} sur cette fiche.
+              </p>
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* CONTENU */}
       <section className="max-w-wrap mx-auto px-4 md:px-8 lg:px-12 xl:px-20 py-6">
@@ -288,6 +323,7 @@ export default function CommercePage() {
               isAssociation={isAssociation}
               stats={null}
               permissions={permissions}
+              amenityLabels={amenityLabels}
               activeTab={activeTab}
               onTabChange={setActiveTab}
               onDonate={() => openSupport('donate')}

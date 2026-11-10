@@ -58,7 +58,7 @@ export interface StoredEstablishment {
   featured_position: number | null;
   created_at: string;
   updated_at: string;
-  categories?: { name: string; icon?: string } | null;
+  categories?: { name: string; icon?: string; slug?: string } | null;
   rejectionReason?: string;
   submittedAt?: string;
   approvedAt?: string;
@@ -78,7 +78,7 @@ export type ArchivedEstablishment = StoredEstablishment & {
 export async function getStoredEstablishments(): Promise<StoredEstablishment[]> {
   const { data, error } = await supabase()
     .from('businesses')
-    .select('*, categories(name, icon)')
+    .select('*, categories(name, icon, slug)')
     .order('created_at', { ascending: false });
   if (error) {
     console.error('getStoredEstablishments:', error);
@@ -92,7 +92,7 @@ export async function getPartnerEstablishments(
 ): Promise<StoredEstablishment[]> {
   const { data, error } = await supabase()
     .from('businesses')
-    .select('*, categories(name, icon)')
+    .select('*, categories(name, icon, slug)')
     .eq('tenant_id', tenantId)
     .order('created_at', { ascending: false });
   if (error) {
@@ -107,7 +107,7 @@ export async function getEstablishmentBySlug(
 ): Promise<StoredEstablishment | null> {
   const { data, error } = await supabase()
     .from('businesses')
-    .select('*, categories(name, icon)')
+    .select('*, categories(name, icon, slug)')
     .eq('slug', slug)
     .maybeSingle();
   if (error) {

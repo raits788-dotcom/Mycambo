@@ -67,6 +67,8 @@ interface Props {
     canShowStats: boolean;
     maxPhotos: number;
   };
+  // Libellés de commodités par catégorie (source unique category_amenities).
+  amenityLabels?: Record<string, string>;
   // Onglet piloté par le parent (optionnel) + callbacks de soutien.
   activeTab?: TabId;
   onTabChange?: (t: TabId) => void;
@@ -83,6 +85,7 @@ export default function CommerceTabsPublic({
   isAssociation,
   stats,
   permissions,
+  amenityLabels = {},
   activeTab,
   onTabChange,
   onDonate,
@@ -301,7 +304,7 @@ export default function CommerceTabsPublic({
                   .map(([key]) => (
                     <div key={key} className="flex items-center gap-2 text-sm text-gris-texte">
                       <div className="w-1.5 h-1.5 rounded-full bg-marine flex-shrink-0" />
-                      {SERVICE_LABELS[key] || key}
+                      {amenityLabels[key] || SERVICE_LABELS[key] || key}
                     </div>
                   ))}
               </div>

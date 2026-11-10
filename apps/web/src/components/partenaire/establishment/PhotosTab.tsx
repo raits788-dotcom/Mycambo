@@ -55,7 +55,10 @@ export default function PhotosTab({ establishment, onUpdate }: PhotosTabProps) {
   }, [establishment.tenant_id]);
 
   const limit = maxPhotos;
-  const isLocked = planSlug === 'decouverte';
+  // Verrouillé = la formule n'autorise AUCUNE photo publique (maxPhotos 0).
+  // Découverte autorise désormais 1 photo → non verrouillé mais limité.
+  const isLocked = limit <= 0;
+  const isLimited = limit > 0 && limit < 5; // peu de photos → inciter à l'upgrade
   const remaining = Math.max(0, limit - photos.length);
 
   const uploadFile = async (file: File): Promise<string | null> => {
@@ -124,7 +127,7 @@ export default function PhotosTab({ establishment, onUpdate }: PhotosTabProps) {
   return (
     <div className="space-y-6">
 
-      {/* Bandeau formule Découverte */}
+      {/* Bandeau : aucune photo publique autorisée (formule à 0 photo) */}
       {isLocked && (
         <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3">
           <Lock size={18} className="text-amber-600 flex-shrink-0 mt-0.5" />
@@ -134,7 +137,7 @@ export default function PhotosTab({ establishment, onUpdate }: PhotosTabProps) {
             </div>
             <div className="text-xs text-amber-800 leading-relaxed">
               Vous êtes sur la formule <b>{planName}</b> qui n&apos;inclut pas les photos publiques.
-              Passez à la formule <b>Essentiel</b> (19 $/mois) pour les débloquer immédiatement.
+              Passez à une formule supérieure pour les débloquer immédiatement.
             </div>
             <Link
               href="/partenaire/formules"
@@ -142,6 +145,31 @@ export default function PhotosTab({ establishment, onUpdate }: PhotosTabProps) {
             >
               <Sparkles size={12} />
               Débloquer mes photos →
+            </Link>
+          </div>
+        </div>
+      )}
+
+      {/* Bandeau : formule limitée (ex. Découverte = 1 photo publique) */}
+      {isLimited && (
+        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-4 flex items-start gap-3">
+          <Sparkles size={18} className="text-blue-600 flex-shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <div className="font-bold text-blue-900 text-sm mb-1">
+              📸 {limit} photo{limit > 1 ? 's' : ''} publique{limit > 1 ? 's' : ''} avec la formule {planName}
+            </div>
+            <div className="text-xs text-blue-800 leading-relaxed">
+              {limit === 1
+                ? 'Votre photo principale est visible sur votre fiche publique. '
+                : `Vos ${limit} premières photos sont visibles sur votre fiche publique. `}
+              Passez à une formule supérieure pour afficher davantage de photos et débloquer la galerie complète.
+            </div>
+            <Link
+              href="/partenaire/formules"
+              className="inline-flex items-center gap-1 text-xs font-bold text-blue-900 hover:underline mt-2"
+            >
+              <Sparkles size={12} />
+              Voir les formules →
             </Link>
           </div>
         </div>
