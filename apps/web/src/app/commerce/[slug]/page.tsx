@@ -18,6 +18,7 @@ import { LevelBadge, SubLabels } from '@/components/ui/LevelBadge';
 import { createBrowserClient } from '@supabase/ssr';
 import { getPlanPermissions, getPlanPermissionsFromDB, type PlanPermissions } from '@/lib/plan-permissions';
 import { getAmenitiesForCategory } from '@/lib/amenities';
+import { incrementViews } from '@/lib/stats-tracker';
 import { getFamilyNavForCategory, type CategoryNode } from '@/lib/categories';
 import CategorySubNav from '@/components/rubrique/CategorySubNav';
 import { getActiveOffers, getJobOffers, type Offer, type JobOffer } from '@/lib/services';
@@ -80,6 +81,10 @@ export default function CommercePage() {
         setMounted(true);
         return;
       }
+
+      // 1bis. Enregistre une VUE (anti-doublon par session dans incrementViews).
+      //       C'est ce qui alimente les vraies statistiques du partenaire.
+      incrementViews(business.id).catch(() => {});
 
       // 2. Détermine le plan + charge ses permissions depuis la base
       const tenantPlan = (business.tenants as any)?.plans?.slug || 'decouverte';
